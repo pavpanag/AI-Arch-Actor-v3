@@ -1738,7 +1738,7 @@ MonoBehaviour:
   useExampleIntensityBuckets: 1
   lowUpper: 33
   mediumUpper: 66
-  apiKey: REDACTED_OPENAI_KEY
+  apiKey: 
   model: gpt-4o-mini
 --- !u!114 &786603652
 MonoBehaviour:
