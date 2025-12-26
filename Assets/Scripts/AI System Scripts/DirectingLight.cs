@@ -47,7 +47,24 @@ namespace DirectingSystem
         public TMP_Text conversationLog;         // Log output
 
         [Header("Scene Light")]
-        public Light sceneLight;             
+        public Light sceneLight;
+
+        // NEW: inspector controls for intensity examples / buckets
+        [Header("Intensity Examples")]
+        [Tooltip("Scene light intensity to use for LOW brightness bucket.")]
+        public float intensityLow = 2f;
+        [Tooltip("Scene light intensity to use for MEDIUM brightness bucket.")]
+        public float intensityMedium = 5f;
+        [Tooltip("Scene light intensity to use for HIGH brightness bucket.")]
+        public float intensityHigh = 10f;
+        [Tooltip("When true, use the low/medium/high buckets instead of linear mapping.")]
+        public bool useExampleIntensityBuckets = true;
+        [Tooltip("Upper brightness (0-100) threshold for the LOW bucket.")]
+        [Range(0,100)]
+        public int lowUpper = 33;
+        [Tooltip("Upper brightness (0-100) threshold for the MEDIUM bucket.")]
+        [Range(0,100)]
+        public int mediumUpper = 66;
 
         [Header("OpenAI")]
         public string apiKey = "";           
@@ -213,8 +230,21 @@ namespace DirectingSystem
                 1f
             );
 
-            float norm = Mathf.Clamp01(lb.brightness / 100f);
-            sceneLight.intensity = Mathf.Lerp(0f, 10f, norm);
+            // use either the new example buckets or the original linear mapping
+            if (!useExampleIntensityBuckets)
+            {
+                float norm = Mathf.Clamp01(lb.brightness / 100f);
+                sceneLight.intensity = Mathf.Lerp(0f, 10f, norm);
+            }
+            else
+            {
+                int b = Mathf.Clamp(lb.brightness, 0, 100);
+                float applied = intensityHigh; // default
+                if (b <= lowUpper) applied = Mathf.Max(0f, intensityLow);
+                else if (b <= mediumUpper) applied = Mathf.Max(0f, intensityMedium);
+                else applied = Mathf.Max(0f, intensityHigh);
+                sceneLight.intensity = applied;
+            }
         }
     }   // closes DirectingLight
 }       // closes namespace
