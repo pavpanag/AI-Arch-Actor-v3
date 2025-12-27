@@ -148,10 +148,34 @@ public sealed class BlueprintChatController : MonoBehaviour
             return;
         }
 
-        var json = File.ReadAllText(LatestBlueprintPath);
-        // avoid System.Text.Json dependency; keep stored JSON as-is
-        _blueprintPretty = string.IsNullOrWhiteSpace(json) ? "{}" : json;
+        var raw = File.ReadAllText(LatestBlueprintPath, Encoding.UTF8);
 
+        // Normalize any escaped/newline artifacts that slipped into the stored file
+        var cleaned = TraceUtils.NormalizeEmbeddedJson(raw);
+
+        // basic validation: require an object root
+        if (string.IsNullOrWhiteSpace(cleaned) || !cleaned.TrimStart().StartsWith("{"))
+        {
+            Append($"[error] Blueprint file contains invalid JSON.");
+            return;
+        }
+
+        // Optional: if normalization changed the content, overwrite the file to repair it
+        if (cleaned != raw)
+        {
+            try
+            {
+                var pretty = TraceUtils.TryPrettyPrintJson(cleaned) ?? cleaned;
+                File.WriteAllText(LatestBlueprintPath, pretty, Encoding.UTF8);
+                Append($"[blueprint] Auto-repaired and saved normalized version.");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[BlueprintChatController] Auto-repair save failed: {ex.Message}");
+            }
+        }
+
+        _blueprintPretty = cleaned;
         Append($"\nLoaded blueprint: {LatestBlueprintPath}");
     }
 
@@ -346,9 +370,9 @@ $@"LAST TURN STATE (treat as true):
 - white: clarity
 - black: despair";
 
-        var directingBlock =
-            "DIRECTOR INSTRUCTIONS (always obey if compatible):\n" +
-            (string.IsNullOrWhiteSpace(directing) ? "(none)" : directing);
+        var directingBlock = string.IsNullOrWhiteSpace(directing)
+            ? ""
+            : $"DIRECTOR INSTRUCTIONS (always obey if compatible):\n{directing}\n\n";
 
         // Embed enforcement schema/rules here (system prompt, once per request)
         var schemaBlock =
@@ -361,7 +385,7 @@ $@"LAST TURN STATE (treat as true):
 
 Rules:
 - color must follow Color Semantics.
-- reply: theatrical, in-character, max 2 sentences.
+- reply: theatrical, in-character, max 2 sentences. NEVER repeat the exact same reply from last_room_reply; vary your language and imagery.
 - explanation MUST be 1–2 short sentences, <= 18 words total, and use ONE of these templates:
   - ""Stayed <color> because '<blueprint quote>' and you said '<user quote>'.""
   - ""Shifted " + SafeColor(lastColor) + @"-><color> because '<blueprint quote>' and you said '<user quote>'.""
@@ -376,9 +400,7 @@ Output MUST follow the JSON schema requested by the user message (no extra keys)
 
 {schemaBlock}
 
-{directingBlock}
-
-CHARACTER BLUEPRINT (dramaturgy):
+{directingBlock}CHARACTER BLUEPRINT (dramaturgy):
 {blueprintPretty}
 
 {memoryBlock}
@@ -389,7 +411,8 @@ CHARACTER BLUEPRINT (dramaturgy):
 
 Constraints:
 - explanation must be concrete, 1–2 sentences, <= 18 words, include 2 short quotes (blueprint + user).
-- Avoid vague filler like: chaos, destiny, energy, vibes, symbolic.";
+- Avoid vague filler like: chaos, destiny, energy, vibes, symbolic.
+- IMPORTANT: Do not copy/paste your previous reply verbatim. Respond to the new user input with fresh theatrical language.";
     }
 
     private async Task<string> SummarizeMemoryAsync(string priorSummary, List<ChatMsg> chunk)
@@ -557,10 +580,8 @@ DIALOGUE CHUNK:
 
     private string GetDirecting()
     {
-        var cur = (DirectingInput != null ? (DirectingInput.text ?? "").Trim() : "");
-        if (string.IsNullOrWhiteSpace(_directingNotes)) return cur ?? "";
-        if (string.IsNullOrWhiteSpace(cur)) return _directingNotes;
-        return _directingNotes + "\n" + cur;
+        // Only return persisted notes, NOT the live preview field
+        return _directingNotes ?? "";
     }
 
     // Map semantic color names to Unity Color and apply to N lights.

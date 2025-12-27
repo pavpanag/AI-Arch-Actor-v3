@@ -539,8 +539,29 @@ Schema:
 
     private void SaveLatestBlueprint(string blueprintJsonText)
     {
-        var pretty = PrettyJson(blueprintJsonText);
-        File.WriteAllText(LatestBlueprintPath, pretty);
+        // normalize possible escaped/newline artifacts from model output or double-escaping
+        var normalized = TraceUtils.NormalizeEmbeddedJson(blueprintJsonText ?? "");
+
+        // pretty-print when possible
+        var pretty = TraceUtils.TryPrettyPrintJson(normalized) ?? normalized;
+
+        // validate and surface warnings in the UI/console
+        var warnings = TraceUtils.ValidateBlueprintJson(normalized);
+        if (warnings != null && warnings.Count > 0)
+        {
+            Append($"[blueprint warnings] {string.Join("; ", warnings)}");
+        }
+
+        try
+        {
+            File.WriteAllText(LatestBlueprintPath, pretty, Encoding.UTF8);
+            Append($"[BlueprintInterviewController] Saved blueprint to: {LatestBlueprintPath}");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[BlueprintInterviewController] Failed to save blueprint: {ex.Message}");
+            Append($"[error] Failed to save blueprint: {ex.Message}");
+        }
     }
 
     private static string BuildTranscript(string[] questions, Dictionary<string, string> raw, List<string> clarifications)
