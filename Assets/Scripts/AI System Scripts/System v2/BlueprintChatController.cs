@@ -224,6 +224,12 @@ public sealed class BlueprintChatController : MonoBehaviour
         UserInput.text = "";
         UserInput.ActivateInputField();
 
+        // Auto-commit any directing preview before sending chat to model
+        if (DirectingInput != null && !string.IsNullOrWhiteSpace(DirectingInput.text))
+        {
+            AddDirectingNote();
+        }
+
         _ = HandleChatAsync(userText);
     }
 
@@ -300,18 +306,20 @@ Previous JSON was:
                 }
             }
 
+            // Remap disallowed/empty colors to a visible, steady color (last stable or white)
+            if (string.IsNullOrWhiteSpace(parsed.color) || parsed.color.Equals("black", StringComparison.OrdinalIgnoreCase))
+                parsed.color = string.IsNullOrWhiteSpace(_lastColor) ? "white" : _lastColor;
+
             Append($"Color: {parsed.color}");
             Append($"Room:  {parsed.reply}");
             Append($"Why:   {parsed.explanation}\n");
 
-            // Do NOT add formatted assistant summary to history; store reply only (reduces token bloat)
             _history.Add(new ChatMsg("assistant", parsed.reply));
 
             _lastColor = parsed.color;
             _lastReply = parsed.reply;
             _lastExplanation = parsed.explanation;
 
-            // attempt to extract structured light_behavior from the assistant JSON; prefer structured behavior if present
             if (TryExtractLightBehaviorFromJson(jsonText, out var lb))
             {
                 Append($"LightBehavior → Hue:{lb.hue}, Brightness:{lb.brightness}, Saturation:{lb.saturation}, On:{lb.on}, Effect:{lb.effect}");
@@ -319,7 +327,6 @@ Previous JSON was:
             }
             else
             {
-                // apply semantic color fallback
                 try { ApplyColorToLights(_lastColor, Math.Max(0, NumLightsToSet)); } catch (Exception e) { Append($"[lights] {e.Message}"); }
             }
         }
@@ -367,14 +374,12 @@ $@"LAST TURN STATE (treat as true):
 - green: growth
 - yellow: alert
 - purple: ambition
-- white: clarity
-- black: despair";
+- white: clarity";
 
         var directingBlock = string.IsNullOrWhiteSpace(directing)
             ? ""
             : $"DIRECTOR INSTRUCTIONS (always obey if compatible):\n{directing}\n\n";
 
-        // Embed enforcement schema/rules here (system prompt, once per request)
         var schemaBlock =
 @"Respond with JSON only using this schema (no extra keys):
 {
@@ -384,7 +389,8 @@ $@"LAST TURN STATE (treat as true):
 }
 
 Rules:
-- color must follow Color Semantics.
+- NEVER output ""black"" or darkness. If tempted to use black, pick a non-dark color (red/blue/green/yellow/purple/white).
+- color must follow Color Semantics (black is disallowed).
 - reply: theatrical, in-character, max 2 sentences. NEVER repeat the exact same reply from last_room_reply; vary your language and imagery.
 - explanation MUST be 1–2 short sentences, <= 18 words total, and use ONE of these templates:
   - ""Stayed <color> because '<blueprint quote>' and you said '<user quote>'.""
@@ -417,7 +423,8 @@ Constraints:
 
     private async Task<string> SummarizeMemoryAsync(string priorSummary, List<ChatMsg> chunk)
     {
-        var directing = (DirectingInput != null ? (DirectingInput.text ?? "").Trim() : "");
+        // Only use persisted directing notes, NOT live input
+        var directing = _directingNotes ?? "";
 
         var system =
 $@"You compress dialogue into durable memory for a roleplaying ROOM-ACTOR.
@@ -588,21 +595,22 @@ DIALOGUE CHUNK:
     private void ApplyColorToLights(string colorName, int count)
     {
         if (count <= 0) return;
-        if (string.IsNullOrWhiteSpace(colorName)) return;
 
-        // ensure targets
+        // Fallback: keep the last stable color (or white) if black/empty is requested
+        var effective = (colorName ?? "").Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(effective) || effective == "black")
+            effective = string.IsNullOrWhiteSpace(_lastColor) ? "white" : _lastColor.ToLowerInvariant();
+
         Light[] lights = TargetLights != null && TargetLights.Length > 0
             ? TargetLights
             : UnityEngine.Object.FindObjectsByType<Light>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-
         if (lights == null || lights.Length == 0)
         {
             Append("[lights] No Light objects found in scene.");
             return;
         }
 
-        var name = (colorName ?? "").Trim().ToLowerInvariant();
-        Color col = name switch
+        Color col = effective switch
         {
             "red" => Color.red,
             "blue" => Color.blue,
@@ -610,10 +618,9 @@ DIALOGUE CHUNK:
             "yellow" => Color.yellow,
             "purple" => new Color(0.6f, 0.2f, 0.8f),
             "white" => Color.white,
-            "black" => Color.black,
             "orange" => new Color(1f, 0.5f, 0f),
             "pink" => new Color(1f, 0.4f, 0.7f),
-            _ => ParseHexOrDefault(colorName)
+            _ => ParseHexOrDefault(effective)
         };
 
         int applied = 0;
@@ -622,36 +629,15 @@ DIALOGUE CHUNK:
             var L = lights[i];
             if (L == null) continue;
 
-            // ensure the light is enabled so color/intensity are visible
             L.enabled = true;
-
-            // apply color
             L.color = col;
-
-            // set intensity: black -> 0, otherwise pick a visible intensity
-            if (name == "black")
-            {
-                L.intensity = 0f;
-            }
-            else
-            {
-                // use configured buckets if requested, otherwise use medium as sensible default
-                if (!useExampleIntensityBuckets)
-                {
-                    // no brightness info available for semantic color -> use medium as default
-                    L.intensity = Mathf.Max(0f, intensityMedium);
-                }
-                else
-                {
-                    // semantic mapping: use medium intensity for visible color
-                    L.intensity = Mathf.Max(0f, intensityMedium);
-                }
-            }
+            // steady, visible intensity (no darkness/pulses)
+            L.intensity = Mathf.Max(0f, intensityMedium);
 
             applied++;
         }
 
-        Append($"[lights] Applied color '{colorName}' to {applied} light(s).");
+        Append($"[lights] Applied color '{effective}' to {applied} light(s).");
     }
 
     private static Color ParseHexOrDefault(string input)
