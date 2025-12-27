@@ -8,37 +8,45 @@ public class FlyCamera : MonoBehaviour
     public float boostMultiplier = 4f;
     public float lookSensitivity = 2f;
 
-    private float rotationX;
-    private float rotationY;
+    private float yaw;   // rotation around Y (left/right)
+    private float pitch; // rotation around X (up/down)
 
-    private bool cameraActive = true; // starts active
+    private bool cameraActive = true;
 
     void Start()
     {
+        SyncRotationFromTransform();
         ActivateCamera(true);
     }
 
     void Update()
     {
-        // --- Toggle with Tab ---
+        // Toggle camera control
         if (Keyboard.current.tabKey.wasPressedThisFrame)
         {
             cameraActive = !cameraActive;
+
+            if (cameraActive)
+                SyncRotationFromTransform();
+
             ActivateCamera(cameraActive);
         }
 
         if (!cameraActive)
-            return; // skip input while paused
+            return;
 
-        // --- Look around ---
+        // Mouse look
         Vector2 look = Mouse.current.delta.ReadValue();
-        rotationX += look.x * lookSensitivity * Time.deltaTime;
-        rotationY -= look.y * lookSensitivity * Time.deltaTime;
-        rotationY = Mathf.Clamp(rotationY, -90f, 90f);
-        transform.rotation = Quaternion.Euler(rotationY, rotationX, 0);
+        yaw   += look.x * lookSensitivity * Time.deltaTime;
+        pitch -= look.y * lookSensitivity * Time.deltaTime;
 
-        // --- Movement ---
+        pitch = Mathf.Clamp(pitch, -90f, 90f);
+
+        transform.rotation = Quaternion.Euler(pitch, yaw, 0f);
+
+        // Movement
         Vector3 move = Vector3.zero;
+
         if (Keyboard.current.wKey.isPressed) move += transform.forward;
         if (Keyboard.current.sKey.isPressed) move -= transform.forward;
         if (Keyboard.current.aKey.isPressed) move -= transform.right;
@@ -50,7 +58,20 @@ public class FlyCamera : MonoBehaviour
         transform.position += move * speed * Time.deltaTime;
     }
 
-    void ActivateCamera(bool active)
+    private void SyncRotationFromTransform()
+    {
+        Vector3 e = transform.eulerAngles;
+
+        yaw = e.y;
+        pitch = e.x;
+
+        if (pitch > 180f)
+            pitch -= 360f;
+
+        pitch = Mathf.Clamp(pitch, -90f, 90f);
+    }
+
+    private void ActivateCamera(bool active)
     {
         if (active)
         {

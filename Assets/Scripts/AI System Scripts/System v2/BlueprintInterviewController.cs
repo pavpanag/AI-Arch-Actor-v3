@@ -28,11 +28,11 @@ public sealed class BlueprintInterviewController : MonoBehaviour
 
     private readonly string[] _questions =
     {
-        "What should I know about my character as a room? (1–3 short lines)",
-        "What is it trying to achieve right now? (objectives: 1–2)",
-        "What gets in the way? (obstacles: 1–2)",
-        "How does it feel inside right now?",
-        "What’s happening around it right now?"
+        "What should I know about my character as a room? (backstory/identity)",
+        "What is it trying to achieve right now? (objectives)",
+        "What gets in the way? (obstacles)",
+        "How does it feel inside right now? (internal conditions)",
+        "What’s happening around it right now? (external circumstances)"
     };
 
     private enum State
@@ -66,6 +66,20 @@ public sealed class BlueprintInterviewController : MonoBehaviour
     private readonly List<string> _displayLines = new List<string>();
     private string _directingNotes = "";
     private string _directingPreview = "";
+
+    [Header("Lighting (optional)")]
+    [Tooltip("Optional: assign specific scene Lights to color. If empty, script will auto-find scene Lights.")]
+    public Light[] TargetLights;
+    [Tooltip("Number of lights (from TargetLights or auto-found list) to set when applying color.")]
+    public int NumLightsToSet = 1;
+
+    [Header("Intensity Examples (optional)")]
+    public float intensityLow = 2f;
+    public float intensityMedium = 5f;
+    public float intensityHigh = 10f;
+    public bool useExampleIntensityBuckets = true;
+    [Range(0,100)] public int lowUpper = 33;
+    [Range(0,100)] public int mediumUpper = 66;
 
     private void Awake()
     {
@@ -220,13 +234,13 @@ public sealed class BlueprintInterviewController : MonoBehaviour
     private void AskNextQuestion()
     {
         Append($"Q{_qIndex + 1}: {_questions[_qIndex]}");
-        Append("(submit answer in DramaturgyInput)\n");
+        Append("(submit answer in Dramaturgy)\n");
     }
 
     private void AskNextClarification()
     {
         Append($"C{_cIndex + 1}: {_clarificationQs[_cIndex]}");
-        Append("(submit answer in DramaturgyInput)\n");
+        Append("(submit answer in Dramaturgy)\n");
     }
 
     private async Task SynthesizeThenClarifyAsync()
@@ -336,7 +350,7 @@ Schema:
             SimpleSerializeDictionary(raw) +
             "\n\nDistill into the blueprint JSON only.";
 
-        return await CallJsonObjectAsync(system, user);
+        return await CallJsonObjectAsync(system, user, "Interview:SynthesizeBlueprint");
     }
 
     private async Task<List<string>> RequestClarificationsOnceAsync(Dictionary<string, string> raw, string blueprintJson, string transcript, string directing)
@@ -373,7 +387,7 @@ Return schema:
         ub.Append("\n\nProduce clarification_questions only.");
         var user = ub.ToString().Trim();
 
-        var jsonText = await CallJsonObjectAsync(system, user);
+        var jsonText = await CallJsonObjectAsync(system, user, "Interview:Clarifications");
 
         var arr = ExtractStringArrayFromJson(jsonText, "clarification_questions");
         if (arr == null) return new List<string>();
@@ -428,7 +442,7 @@ Schema:
             "\n\nFinalize the blueprint now. Output JSON only."
         ).Trim();
 
-        return await CallJsonObjectAsync(system, user);
+        return await CallJsonObjectAsync(system, user, "Interview:FinalizeBlueprint");
     }
 
     private async Task<string> ReviseBlueprintAsync(Dictionary<string, string> raw, string blueprintJson, string feedback, string transcript, string directing)
@@ -472,10 +486,10 @@ Schema:
             "\n\nUpdate the blueprint accordingly. Output JSON only."
         ).Trim();
 
-        return await CallJsonObjectAsync(system, user);
+        return await CallJsonObjectAsync(system, user, "Interview:ReviseBlueprint");
     }
 
-    private async Task<string> CallJsonObjectAsync(string system, string user)
+    private async Task<string> CallJsonObjectAsync(string system, string user, string contextTag = "Unspecified")
     {
         var messages = new List<OpenAIClient.Msg>
         {
@@ -483,7 +497,7 @@ Schema:
             new OpenAIClient.Msg("user", user),
         };
 
-        var content = await OpenAI.ChatCompletionsJsonAsync(messages, model: Model);
+        var content = await OpenAI.ChatCompletionsJsonAsync(messages, model: Model, contextTag: contextTag);
         // basic validation: ensure returned text looks like a JSON object
         if (!LooksLikeJsonObject(content))
             throw new Exception("Model did not return a JSON object.");
@@ -688,5 +702,67 @@ Schema:
         {
             _pendingAppends.Enqueue(line);
         }
+    }
+
+    // Public helper: apply semantic color name or hex to N lights (same semantics as BlueprintChatController)
+    public void ApplyColorToLights(string colorName, int count)
+    {
+        if (count <= 0) return;
+        if (string.IsNullOrWhiteSpace(colorName)) return;
+
+        Light[] lights = TargetLights != null && TargetLights.Length > 0
+            ? TargetLights
+            : UnityEngine.Object.FindObjectsByType<Light>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+        if (lights == null || lights.Length == 0)
+        {
+            Append("[lights] No Light objects found in scene.");
+            return;
+        }
+
+        var name = (colorName ?? "").Trim().ToLowerInvariant();
+        Color col = name switch
+        {
+            "red" => Color.red,
+            "blue" => Color.blue,
+            "green" => Color.green,
+            "yellow" => Color.yellow,
+            "purple" => new Color(0.6f, 0.2f, 0.8f),
+            "white" => Color.white,
+            "black" => Color.black,
+            "orange" => new Color(1f, 0.5f, 0f),
+            "pink" => new Color(1f, 0.4f, 0.7f),
+            _ => ParseHexOrDefault(colorName)
+        };
+
+        int applied = 0;
+        for (int i = 0; i < lights.Length && applied < count; i++)
+        {
+            var L = lights[i];
+            if (L == null) continue;
+            L.color = col;
+            if (name == "black") L.intensity = 0f;
+            applied++;
+        }
+
+        Append($"[lights] Applied color '{colorName}' to {applied} light(s).");
+    }
+
+    // small helper: parse #RRGGBB fallback
+    private static Color ParseHexOrDefault(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return Color.white;
+        var s = input.Trim();
+        if (s.StartsWith("#")) s = s.Substring(1);
+        if (s.Length == 6)
+        {
+            if (byte.TryParse(s.Substring(0,2), System.Globalization.NumberStyles.HexNumber, null, out var r) &&
+                byte.TryParse(s.Substring(2,2), System.Globalization.NumberStyles.HexNumber, null, out var g) &&
+                byte.TryParse(s.Substring(4,2), System.Globalization.NumberStyles.HexNumber, null, out var b))
+            {
+                return new Color32(r, g, b, 255);
+            }
+        }
+        return Color.white;
     }
 }

@@ -281,8 +281,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -179, y: 450}
-  m_SizeDelta: {x: 1000, y: 50}
+  m_AnchoredPosition: {x: -179, y: 460}
+  m_SizeDelta: {x: 1000, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &126048176
 MonoBehaviour:
@@ -839,7 +839,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 526, y: -394}
+  m_AnchoredPosition: {x: 526, y: -345}
   m_SizeDelta: {x: 300, y: 250}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &459382928
@@ -1356,6 +1356,55 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 542385558}
   m_CullTransparentMesh: 1
+--- !u!1 &542945084
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 542945085}
+  - component: {fileID: 542945086}
+  m_Layer: 0
+  m_Name: OscSpeechReceiver
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &542945085
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 542945084}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 1214.7896, y: 286.3181, z: -68.01572}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1228943005}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &542945086
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 542945084}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 995c7c15469aa4aa59b3277da1badf49, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::OscSpeechReceiver
+  Chat: {fileID: 1691529550}
+  osc: {fileID: 1228943004}
+  ExpectedAddress: /speech
+  AcceptAnyChannel: 1
+  AllowedChannels: 01000000
 --- !u!1 &550764392
 GameObject:
   m_ObjectHideFlags: 0
@@ -1404,12 +1453,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 550764392}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1.60374, y: -5.09184, z: 3.37172}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 1228943005}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &565354732
 GameObject:
@@ -1738,7 +1787,7 @@ MonoBehaviour:
   useExampleIntensityBuckets: 1
   lowUpper: 33
   mediumUpper: 66
-  apiKey: 
+  apiKey: REDACTED_OPENAI_KEY
   model: gpt-4o-mini
 --- !u!114 &786603652
 MonoBehaviour:
@@ -1752,9 +1801,66 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4d3763fef4cc64212b6ecb6e2197097b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OpenAIClient
-  ApiKey: 
+  ApiKey: REDACTED_OPENAI_KEY
   DefaultModel: gpt-4o-mini
   Temperature: 0.7
+--- !u!1 &807965603
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 807965606}
+  - component: {fileID: 807965608}
+  - component: {fileID: 807965607}
+  m_Layer: 0
+  m_Name: ChatTrace
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &807965606
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 807965603}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1216.3933, y: 281.2263, z: -64.644}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &807965607
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 807965603}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8121c179ba4404cfe8de1cef254ab2fc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ChatTraceLogger
+--- !u!114 &807965608
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 807965603}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f49a12b8a3c8e4c7eae43380d7fc569c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ChatTraceControls
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -1993,6 +2099,14 @@ MonoBehaviour:
   Model: gpt-4o-mini
   MaxClarificationQuestions: 4
   MaxDisplayLines: 12
+  TargetLights: []
+  NumLightsToSet: 1
+  intensityLow: 2
+  intensityMedium: 5
+  intensityHigh: 10
+  useExampleIntensityBuckets: 1
+  lowUpper: 33
+  mediumUpper: 66
 --- !u!1 &858030716
 GameObject:
   m_ObjectHideFlags: 0
@@ -2340,13 +2454,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 886946793}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.38965118, y: -0.085613124, z: 0.026600756, w: 0.9165887}
+  m_LocalRotation: {x: 0.4118669, y: -0.01177863, z: -0.00404307, w: 0.9111589}
   m_LocalPosition: {x: 0.8, y: 6.33, z: -7.94}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 45.96, y: -11.3, z: -1.48}
+  m_LocalEulerAnglesHint: {x: 48.63, y: -2.15, z: -1.48}
 --- !u!1 &991491339
 GameObject:
   m_ObjectHideFlags: 0
@@ -2381,7 +2495,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 6, y: -915}
+  m_AnchoredPosition: {x: 6, y: -895}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1015055868
@@ -2966,7 +3080,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -672, y: -270}
+  m_AnchoredPosition: {x: -672, y: -250}
   m_SizeDelta: {x: 150, y: 150}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1124481839
@@ -3124,6 +3238,10 @@ MonoBehaviour:
   inPort: 3333
   outIP: 127.0.0.1
   outPort: 4444
+  DebugLogPackets: 0
+  DebugLogMessages: 0
+  DebugMaxMessagesPerFrame: 10
+  DebugStatusIntervalSeconds: 1
 --- !u!4 &1228943005
 Transform:
   m_ObjectHideFlags: 0
@@ -3136,7 +3254,9 @@ Transform:
   m_LocalPosition: {x: 1.60374, y: -5.09184, z: 3.37172}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 550764394}
+  - {fileID: 542945085}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1245865741
@@ -3368,7 +3488,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 91, y: -301}
+  m_AnchoredPosition: {x: 91, y: -250}
   m_SizeDelta: {x: 500, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1254255345
@@ -4604,6 +4724,18 @@ MonoBehaviour:
   DirectingDisplay: {fileID: 0}
   Model: gpt-4o-mini
   MaxDisplayLines: 12
+  TargetLights:
+  - {fileID: 516469531}
+  NumLightsToSet: 1
+  intensityLow: 2
+  intensityMedium: 5
+  intensityHigh: 10
+  useExampleIntensityBuckets: 1
+  lowUpper: 33
+  mediumUpper: 66
+  InputMode: 0
+  AllowTypedUserInputWhenMicrophone: 1
+  SimulatedSpeechText: 
 --- !u!1 &1741359920
 GameObject:
   m_ObjectHideFlags: 0
@@ -4907,7 +5039,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -179, y: 550}
+  m_AnchoredPosition: {x: -179, y: 580}
   m_SizeDelta: {x: 1000, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1771405061
@@ -5450,7 +5582,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -434, y: -302}
+  m_AnchoredPosition: {x: -434, y: -250}
   m_SizeDelta: {x: 500, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2057297849
@@ -5767,5 +5899,5 @@ SceneRoots:
   - {fileID: 1578428142}
   - {fileID: 1245865743}
   - {fileID: 1228943005}
-  - {fileID: 550764394}
   - {fileID: 1887442494}
+  - {fileID: 807965606}
