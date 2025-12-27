@@ -167,6 +167,12 @@ public sealed class BlueprintInterviewController : MonoBehaviour
         DramaturgyInput.text = "";
         DramaturgyInput.ActivateInputField();
 
+        // Auto-commit any directing preview before processing dramaturgy
+        if (DirectingInput != null && !string.IsNullOrWhiteSpace(DirectingInput.text))
+        {
+            AddDirectingNote();
+        }
+
         _ = HandleDramaturgyAsync(text);
     }
 
@@ -249,7 +255,8 @@ public sealed class BlueprintInterviewController : MonoBehaviour
 
         _transcript = BuildTranscript(_questions, _raw, clarifications: null);
 
-        var directing = GetDirecting();
+        // Only include directing when EXPLICITLY synthesizing (not on every call)
+        var directing = _directingNotes ?? "";
         var blueprintRootJson = await SynthesizeBlueprintAsync(_raw, _transcript, directing);
         _blueprintJson = PrettyJson(blueprintRootJson);
 
@@ -265,7 +272,7 @@ public sealed class BlueprintInterviewController : MonoBehaviour
             return;
         }
 
-        await FinalizeAsync(); // no clarifications needed → finalize anyway (best-effort)
+        await FinalizeAsync();
     }
 
     private async Task FinalizeAsync()
@@ -274,7 +281,8 @@ public sealed class BlueprintInterviewController : MonoBehaviour
 
         _transcript = BuildTranscript(_questions, _raw, _clarificationQs.Count > 0 ? _clarificationQs : null);
 
-        var directing = GetDirecting();
+        // Only include directing when EXPLICITLY finalizing
+        var directing = _directingNotes ?? "";
         var finalJson = await FinalizeBlueprintWithClarificationsAsync(_raw, _blueprintJson, _transcript, directing);
         _blueprintJson = PrettyJson(finalJson);
 
@@ -292,7 +300,8 @@ public sealed class BlueprintInterviewController : MonoBehaviour
             ? BuildTranscript(_questions, _raw, _clarificationQs.Count > 0 ? _clarificationQs : null)
             : _transcript + $"\n\nDIRECTOR_FEEDBACK:\n{feedback}";
 
-        var directing = GetDirecting();
+        // Only include directing when EXPLICITLY revising
+        var directing = _directingNotes ?? "";
         var revised = await ReviseBlueprintAsync(_raw, _blueprintJson, feedback, _transcript, directing);
         _blueprintJson = PrettyJson(revised);
 
@@ -521,10 +530,9 @@ Schema:
 
     private string GetDirecting()
     {
-        var cur = (DirectingInput != null ? (DirectingInput.text ?? "").Trim() : "");
-        if (string.IsNullOrWhiteSpace(_directingNotes)) return cur ?? "";
-        if (string.IsNullOrWhiteSpace(cur)) return _directingNotes;
-        return _directingNotes + "\n" + cur;
+        // Return ONLY persisted directing notes (never include live preview)
+        // Live preview is UI-only; it should NOT affect model calls or state
+        return _directingNotes ?? "";
     }
 
     private void PrintBlueprint(string blueprintPrettyJson)
