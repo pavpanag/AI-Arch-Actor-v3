@@ -224,4 +224,75 @@ public static class TraceUtils
 
 		return warnings;
 	}
+
+	// Unescape common JSON escape sequences inside a string (\" \\n \\t etc.)
+	public static string UnescapeJsonEscapes(string escaped)
+	{
+		if (string.IsNullOrEmpty(escaped)) return escaped;
+		var sb = new StringBuilder();
+		bool esc = false;
+		for (int i = 0; i < escaped.Length; i++)
+		{
+			if (esc)
+			{
+				switch (escaped[i])
+				{
+					case 'n': sb.Append('\n'); break;
+					case 'r': sb.Append('\r'); break;
+					case 't': sb.Append('\t'); break;
+					case 'b': sb.Append('\b'); break;
+					case 'f': sb.Append('\f'); break;
+					case '\\': sb.Append('\\'); break;
+					case '\"': sb.Append('\"'); break;
+					case '/': sb.Append('/'); break;
+					case 'u':
+						if (i + 4 < escaped.Length)
+						{
+							var hex = escaped.Substring(i + 1, 4);
+							if (int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out var code))
+							{
+								sb.Append((char)code);
+								i += 4;
+							}
+							else sb.Append('\\').Append('u');
+						}
+						else sb.Append('\\').Append('u');
+						break;
+					default:
+						sb.Append('\\').Append(escaped[i]);
+						break;
+				}
+				esc = false;
+			}
+			else if (escaped[i] == '\\')
+			{
+				esc = true;
+			}
+			else
+			{
+				sb.Append(escaped[i]);
+			}
+		}
+		if (esc) sb.Append('\\');
+		return sb.ToString();
+	}
+
+	// Normalize embedded JSON that may contain double-escaped or literal 'n' markers from traces:
+	// - unescape common sequences (\\n -> newline etc.)
+	// - attempt simple fixes for literal "n" markers often seen as "{n" or "n}" in traces
+	public static string NormalizeEmbeddedJson(string s)
+	{
+		if (string.IsNullOrWhiteSpace(s)) return s;
+		// first, unescape typical JSON sequences
+		var unescaped = UnescapeJsonEscapes(s);
+
+		// quick fixes for common corrupted patterns (e.g., "{n  \"key\": ..." seen in traces)
+		unescaped = unescaped.Replace("{n", "{\n");
+		unescaped = unescaped.Replace("n}", "\n}");
+		unescaped = unescaped.Replace("n  \"", "\n  \"");
+		// also collapse any double-backslash-newline artifacts
+		unescaped = unescaped.Replace("\\n", "\n").Replace("\\r", "\r");
+
+		return unescaped;
+	}
 }
