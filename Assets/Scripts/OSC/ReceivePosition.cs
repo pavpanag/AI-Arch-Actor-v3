@@ -44,6 +44,18 @@ public class ReceivePosition : MonoBehaviour
     float _lastApplyTime;
     bool _registeredHandler = false;
 
+    void OnEnable()
+    {
+        if (osc == null) return;
+
+        if (!_registeredHandler)
+        {
+            osc.SetAddressHandler("/position", OnReceivePosition);
+            _registeredHandler = true;
+            if (verboseDebug) Debug.Log($"{nameof(ReceivePosition)} OnEnable - registered handler");
+        }
+    }
+
     void Start()
     {
         if (osc == null)
@@ -53,13 +65,7 @@ public class ReceivePosition : MonoBehaviour
             return;
         }
 
-        // Register handler (only once)
-        if (!_registeredHandler)
-        {
-            osc.SetAddressHandler("/position", OnReceivePosition);
-            _registeredHandler = true;
-        }
-
+        // Handler registration moved to OnEnable (keeps toggling safe)
         if (verboseDebug) Debug.Log($"{nameof(ReceivePosition)} Start - registered handler: {_registeredHandler}");
 
         // Reuse any already-spawned agents to avoid continuous duplicates when toggling script

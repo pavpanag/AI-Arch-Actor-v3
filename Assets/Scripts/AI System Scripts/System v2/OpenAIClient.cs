@@ -75,42 +75,70 @@ public sealed class OpenAIClient : MonoBehaviour
     public async Task<string> ChatCompletionsJsonAsync(
         IReadOnlyList<Msg> messages,
         string model = null,
-        float? temperature = null)
+        float? temperature = null,
+        string contextTag = "Unspecified")
     {
         if (string.IsNullOrWhiteSpace(ApiKey))
             throw new Exception("OpenAIClient.ApiKey is empty (set it in the Inspector).");
 
         var usedModel = string.IsNullOrWhiteSpace(model) ? DefaultModel : model;
         var usedTemp = (temperature ?? Temperature);
-
-        // build payload manually to avoid System.Text.Json dependency
         var payload = BuildPayloadJson(usedModel, usedTemp, messages);
 
-        using var req = new UnityWebRequest("https://api.openai.com/v1/chat/completions", "POST");
-        req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(payload));
-        req.downloadHandler = new DownloadHandlerBuffer();
-        req.SetRequestHeader("Content-Type", "application/json");
-        req.SetRequestHeader("Authorization", $"Bearer {ApiKey.Trim()}");
+        Guid? traceId = null;
+        UnityWebRequest req = null;
+        string responseBody = null;
+        int responseCode = 0;
+        bool errorLogged = false;
 
-        await Send(req);
+        try
+        {
+            try { traceId = ChatTraceLogger.LogRequest(contextTag, "https://api.openai.com/v1/chat/completions", usedModel, messages, payload); }
+            catch (Exception logEx) { Debug.LogWarning($"[OpenAIClient] Trace log request failed: {logEx.Message}"); }
 
-        var body = req.downloadHandler.text ?? "";
-        if (req.result != UnityWebRequest.Result.Success)
-            throw new Exception($"HTTP {(long)req.responseCode}: {req.error}\n{body}");
+            req = new UnityWebRequest("https://api.openai.com/v1/chat/completions", "POST");
+            req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(payload));
+            req.downloadHandler = new DownloadHandlerBuffer();
+            req.SetRequestHeader("Content-Type", "application/json");
+            req.SetRequestHeader("Authorization", $"Bearer {ApiKey.Trim()}");
 
-        // check for error message (naive but sufficient for typical OpenAI responses)
-        if (TryExtractJsonString(body, new[] { "error", "message" }, out var errMsg) && !string.IsNullOrWhiteSpace(errMsg))
-            throw new Exception(errMsg);
+            await Send(req);
 
-        // extract choices[0].message.content (naive extractor)
-        if (!TryExtractFirstChoiceContent(body, out var content))
-            throw new Exception("Malformed response: missing choices[0].message.content.");
+            responseCode = (int)req.responseCode;
+            responseBody = req.downloadHandler.text ?? "";
 
-        var text = (content ?? "").Trim();
-        if (string.IsNullOrWhiteSpace(text))
-            throw new Exception("Model returned empty content.");
+            if (req.result != UnityWebRequest.Result.Success)
+            {
+                TryLogError(traceId, $"HTTP {responseCode}: {req.error}", responseCode, responseBody);
+                errorLogged = true;
+                throw new Exception($"HTTP {responseCode}: {req.error}\n{responseBody}");
+            }
 
-        return text;
+            // check for error message (naive but sufficient for typical OpenAI responses)
+            if (TryExtractJsonString(responseBody, new[] { "error", "message" }, out var errMsg) && !string.IsNullOrWhiteSpace(errMsg))
+                throw new Exception(errMsg);
+
+            // extract choices[0].message.content (naive extractor)
+            if (!TryExtractFirstChoiceContent(responseBody, out var content))
+                throw new Exception("Malformed response: missing choices[0].message.content.");
+
+            var text = (content ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(text))
+                throw new Exception("Model returned empty content.");
+
+            TryLogResponse(traceId, responseBody, content, responseCode); // pass raw content + status
+            return text;
+        }
+        catch (Exception ex)
+        {
+            if (!errorLogged)
+                TryLogError(traceId, ex.Message, responseCode, responseBody, ex.GetType().Name, ex.StackTrace);
+            throw;
+        }
+        finally
+        {
+            req?.Dispose();
+        }
     }
 
     private static object[] BuildMessages(IReadOnlyList<Msg> messages)
@@ -154,18 +182,13 @@ public sealed class OpenAIClient : MonoBehaviour
             var name = "\"" + path[p] + "\"";
             var pos = cur.IndexOf(name, StringComparison.OrdinalIgnoreCase);
             if (pos < 0) return false;
-            // move to colon after property name
             var colon = cur.IndexOf(':', pos + name.Length);
             if (colon < 0) return false;
-            // take rest after colon
-            cur = cur.Substring(colon + 1);
-            cur = cur.TrimStart();
-            // if last path element and starts with quote, extract string value
+            cur = cur.Substring(colon + 1).TrimStart();
             if (p == path.Length - 1)
             {
                 if (cur.StartsWith("\""))
                 {
-                    // find closing unescaped quote
                     var sb = new StringBuilder();
                     bool esc = false;
                     for (int i = 1; i < cur.Length; i++)
@@ -173,10 +196,16 @@ public sealed class OpenAIClient : MonoBehaviour
                         var ch = cur[i];
                         if (esc)
                         {
+                            // append escaped char as literal, keep backslash already appended
                             sb.Append(ch);
                             esc = false;
                         }
-                        else if (ch == '\\') esc = true;
+                        else if (ch == '\\')
+                        {
+                            // preserve backslash so '\n' stays intact for later unescape
+                            sb.Append('\\');
+                            esc = true;
+                        }
                         else if (ch == '\"') break;
                         else sb.Append(ch);
                     }
@@ -186,10 +215,8 @@ public sealed class OpenAIClient : MonoBehaviour
                 return false;
             }
 
-            // otherwise try to extract inner object text to continue searching
             if (cur.StartsWith("{"))
             {
-                // attempt to find matching closing brace (simple counter)
                 int depth = 0;
                 int start = cur.IndexOf('{');
                 if (start < 0) return false;
@@ -209,7 +236,6 @@ public sealed class OpenAIClient : MonoBehaviour
             }
             else
             {
-                // cannot descend
                 return false;
             }
         }
@@ -229,7 +255,67 @@ public sealed class OpenAIClient : MonoBehaviour
         var msgPos = afterChoices.IndexOf(messageKey, StringComparison.OrdinalIgnoreCase);
         if (msgPos < 0) return false;
         var afterMsg = afterChoices.Substring(msgPos);
-        return TryExtractJsonString(afterMsg, new[] { "message", "content" }, out content);
+
+        if (!TryExtractJsonString(afterMsg, new[] { "message", "content" }, out var rawExtracted))
+            return false;
+
+        // Unescape JSON escape sequences to preserve actual newlines, etc.
+        content = UnescapeJsonString(rawExtracted);
+        return true;
+    }
+
+    private static string UnescapeJsonString(string escaped)
+    {
+        if (string.IsNullOrWhiteSpace(escaped)) return escaped;
+        var sb = new StringBuilder();
+        bool esc = false;
+        for (int i = 0; i < escaped.Length; i++)
+        {
+            if (esc)
+            {
+                var ch = escaped[i];
+                switch (ch)
+                {
+                    case 'n': sb.Append('\n'); break;
+                    case 'r': sb.Append('\r'); break;
+                    case 't': sb.Append('\t'); break;
+                    case 'b': sb.Append('\b'); break;
+                    case 'f': sb.Append('\f'); break;
+                    case '\\': sb.Append('\\'); break;
+                    case '\"': sb.Append('\"'); break;
+                    case '/': sb.Append('/'); break;
+                    case 'u':
+                        // unicode escape: \uXXXX
+                        if (i + 4 < escaped.Length)
+                        {
+                            var hex = escaped.Substring(i + 1, 4);
+                            if (int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out var code))
+                            {
+                                sb.Append((char)code);
+                                i += 4;
+                                esc = false;
+                                continue;
+                            }
+                        }
+                        sb.Append('\\').Append(ch);
+                        break;
+                    default:
+                        sb.Append('\\').Append(ch);
+                        break;
+                }
+                esc = false;
+            }
+            else if (escaped[i] == '\\')
+            {
+                esc = true;
+            }
+            else
+            {
+                sb.Append(escaped[i]);
+            }
+        }
+        if (esc) sb.Append('\\');
+        return sb.ToString();
     }
 
     private static string EscapeJson(string s)
@@ -262,5 +348,17 @@ public sealed class OpenAIClient : MonoBehaviour
     {
         var op = req.SendWebRequest();
         while (!op.isDone) await Task.Yield();
+    }
+
+    private static void TryLogResponse(Guid? traceId, string rawResponse, string assistantContent, int httpStatus)
+    {
+        try { ChatTraceLogger.LogResponse(traceId, rawResponse, assistantContent, httpStatus); }
+        catch (Exception ex) { Debug.LogWarning($"[OpenAIClient] Trace log response failed: {ex.Message}"); }
+    }
+
+    private static void TryLogError(Guid? traceId, string summary, int responseCode, string responseBody, string exceptionType = null, string stackTrace = null)
+    {
+        try { ChatTraceLogger.LogError(traceId, summary, responseCode, responseBody, exceptionType, stackTrace); }
+        catch (Exception ex) { Debug.LogWarning($"[OpenAIClient] Trace log error failed: {ex.Message}"); }
     }
 }

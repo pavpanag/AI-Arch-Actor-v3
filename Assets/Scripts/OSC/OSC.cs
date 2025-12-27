@@ -13,6 +13,7 @@ using System.IO;
 using System;
 using System.IO;
 using System.Collections;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -127,9 +128,10 @@ public class UDPPacketIO
 	private string remoteHostName;
 	private int remotePort;
 	private int localPort;
-	
-	
-	
+
+	// Added: last sender info for debugging (used by OSC.DebugLogPackets)
+	public string LastReceivedFrom { get; private set; }
+
 	public UDPPacketIO(string hostIP, int remotePort, int localPort){
 		RemoteHostName = hostIP;
 		RemotePort = remotePort;
@@ -199,7 +201,7 @@ public class UDPPacketIO
 	{
 		Close();
 	}
-	
+
 	/// <summary>
 	/// Query the open state of the UDP socket.
 	/// </summary>
@@ -220,7 +222,7 @@ public class UDPPacketIO
 			Open();
 		if (!IsOpen())
 			return;
-		
+
 		Sender.Send(packet, length, remoteHostName, remotePort);
 		//Debug.Log("osc message sent to "+remoteHostName+" port "+remotePort+" len="+length);
 	}
@@ -236,15 +238,27 @@ public class UDPPacketIO
 			Open();
 		if (!IsOpen())
 			return 0;
-		
-		
-		IPEndPoint iep = new IPEndPoint(IPAddress.Any, localPort);
-		byte[] incoming = Receiver.Receive( ref iep );
-		int count = Math.Min(buffer.Length, incoming.Length);
-		System.Array.Copy(incoming, buffer, count);
-		return count;
-		
-		
+
+		try
+		{
+			IPEndPoint iep = new IPEndPoint(IPAddress.Any, localPort);
+			byte[] incoming = Receiver.Receive(ref iep);
+
+			LastReceivedFrom = iep != null ? iep.ToString() : null;
+
+			int count = Math.Min(buffer.Length, incoming.Length);
+			System.Array.Copy(incoming, buffer, count);
+			return count;
+		}
+		catch (SocketException)
+		{
+			// e.g. socket closed during shutdown or other transient socket conditions
+			return 0;
+		}
+		catch (ObjectDisposedException)
+		{
+			return 0;
+		}
 	}
 	
 	
@@ -295,109 +309,69 @@ public class UDPPacketIO
 	}
 }
 
-//namespace MakingThings
-//{
-  /// <summary>
-  /// The OscMessage class is a data structure that represents
-  /// an OSC address and an arbitrary number of values to be sent to that address.
-  /// </summary>
-  public class OscMessage
-  {
-   /// <summary>
-   /// The OSC address of the message as a string.
-   /// </summary>
-   public string address;
-   /// <summary>
-   /// The list of values to be delivered to the Address.
-   /// </summary>
-   public ArrayList values;
+// Re-add these types (they were removed during merges). Other scripts depend on them.
+public class OscMessage
+{
+	/// <summary>The OSC address of the message as a string.</summary>
+	public string address;
 
-    public OscMessage()
-    {
-      values = new ArrayList();
-    }
+	/// <summary>The list of values to be delivered to the Address.</summary>
+	public ArrayList values;
 
-	public override string ToString() {
+	public OscMessage()
+	{
+		values = new ArrayList();
+	}
+
+	public override string ToString()
+	{
 		StringBuilder s = new StringBuilder();
 		s.Append(address);
-		foreach( object o in values )
+		foreach (object o in values)
 		{
 			s.Append(" ");
-			s.Append(o.ToString());
+			s.Append(o != null ? o.ToString() : "null");
 		}
 		return s.ToString();
-
 	}
 
-
-	public int GetInt(int index) {
-
-		if (values [index].GetType() == typeof(int) ) {
-            int data = (int)values[index];
-            if (Double.IsNaN(data)) return 0;
-            return data;
-        }
-        else if (values[index].GetType() == typeof(float)) {
-            int data = (int)((float)values[index]);
-            if (Double.IsNaN(data)) return 0;
-            return data;
-        } else {
-			Debug.Log("Wrong type");
-			return 0;
-		}
+	public int GetInt(int index)
+	{
+		var v = values[index];
+		if (v is int i) return i;
+		if (v is float f) return (int)f;
+		Debug.Log("Wrong type");
+		return 0;
 	}
 
-	public float GetFloat(int index) {
-
-		if (values [index].GetType() == typeof(int)) {
-			float data = (int)values [index];
-            if (Double.IsNaN(data)) return 0f;
-            return data;
-		} else if (values [index].GetType() == typeof(float)) {
-            float data = (float)values[index];
-            if (Double.IsNaN(data)) return 0f;
-            return data;
-		} else {
-			Debug.Log("Wrong type");
-			return 0f;
-		}
+	public float GetFloat(int index)
+	{
+		var v = values[index];
+		if (v is int i) return i;
+		if (v is float f) return f;
+		Debug.Log("Wrong type");
+		return 0f;
 	}
-	
-  }
+}
 
-  public delegate void OscMessageHandler( OscMessage oscM );
+public delegate void OscMessageHandler(OscMessage oscM);
 
-  /// <summary>
-  /// The Osc class provides the methods required to send, receive, and manipulate OSC messages.
-  /// Several of the helper methods are static since a running Osc instance is not required for 
-  /// their use.
-  /// 
-  /// When instanciated, the Osc class opens the PacketIO instance that's handed to it and 
-  /// begins to run a reader thread.  The instance is then ready to service Send OscMessage requests 
-  /// and to start supplying OscMessages as received back.
-  /// 
-  /// The Osc class can be called to Send either individual messages or collections of messages
-  /// in an Osc Bundle.  Receiving is done by delegate.  There are two ways: either submit a method
-  /// to receive all incoming messages or submit a method to handle only one particular address.
-  /// 
-  /// Messages can be encoded and decoded from Strings via the static methods on this class, or
-  /// can be hand assembled / disassembled since they're just a string (the address) and a list 
-  /// of other parameters in Object form. 
-  /// 
-  /// </summary>
-  public class OSC : MonoBehaviour
-  {
+public class OSC : MonoBehaviour
+{
+	public int inPort  = 6969;
+	public string outIP = "127.0.0.1";
+	public int outPort  = 6161;
 
-    public int inPort  = 6969;
-    public string outIP = "127.0.0.1";
-    public int outPort  = 6161;
-
-      private UDPPacketIO OscPacketIO;
-      Thread ReadThread;
+	  private UDPPacketIO OscPacketIO;
+	  Thread ReadThread;
 	  private bool ReaderRunning;
-      private OscMessageHandler AllMessageHandler;
+	  private OscMessageHandler AllMessageHandler;
 
-      Hashtable AddressTable;
+	  private readonly Dictionary<string, List<OscMessageHandler>> _addressHandlers = new();
+	  private readonly object _handlerLock = new();
+
+	  // Ensure this is never null even if SetAddressHandler is called before Awake (script execution order)
+	  Hashtable AddressTable = new Hashtable();
 
 	ArrayList messagesReceived;
 
@@ -406,6 +380,27 @@ public class UDPPacketIO
 	byte[] buffer;
 
 	bool paused = false;
+
+
+	[Header("Debug")]
+	[Tooltip("Logs when UDP packets are received (counts + last sender).")]
+	public bool DebugLogPackets = false;
+
+	[Tooltip("Logs decoded OSC messages (address + args).")]
+	public bool DebugLogMessages = false;
+
+	[Tooltip("Max decoded messages to log per frame when DebugLogMessages is enabled.")]
+	public int DebugMaxMessagesPerFrame = 10;
+
+	[Tooltip("If > 0, periodically logs a one-line status (packets/messages).")]
+	public float DebugStatusIntervalSeconds = 1.0f;
+
+	private long _dbgPackets;
+	private long _dbgMessages;
+	private int _dbgLastPacketLen;
+	private long _dbgLastPacketUtcTicks;
+	private string _dbgLastPacketFrom;
+	private float _dbgNextStatusTime;
 
 
 #if UNITY_EDITOR
@@ -444,7 +439,8 @@ public class UDPPacketIO
         //UnityEditor.EditorApplication.playmodeStateChanged = HandleOnPlayModeChanged;
         UnityEditor.EditorApplication.playModeStateChanged += HandleOnPlayModeChanged;  //FIX FOR UNITY POST 2017
 #endif
-
+		if (DebugLogPackets || DebugLogMessages)
+			Debug.Log($"[OSC] Awake: inPort={inPort} out={outIP}:{outPort}");
     }
 
 	void OnDestroy() {
@@ -459,44 +455,38 @@ public class UDPPacketIO
 	/// <param name="key">Address string to be matched</param>   
 	/// <param name="ah">The method to call back on.</param>   
 	public void SetAddressHandler(string key, OscMessageHandler ah)
-
 	{
-		ArrayList al = (ArrayList)Hashtable.Synchronized(AddressTable)[key];
-		if ( al == null) {
-			al = new ArrayList();
-			al.Add(ah);
-			Hashtable.Synchronized(AddressTable).Add(key, al);
-		} else {
-			al.Add(ah);
+		if (string.IsNullOrEmpty(key) || ah == null)
+			return;
+
+		lock (_handlerLock)
+		{
+			if (!_addressHandlers.TryGetValue(key, out var handlers))
+			{
+				handlers = new List<OscMessageHandler>();
+				_addressHandlers[key] = handlers;
+			}
+			handlers.Add(ah);
 		}
-		/*
-		OscMessageHandler h = (OscMessageHandler)Hashtable.Synchronized(AddressTable)[key];
-		if (h == null)  Hashtable.Synchronized(AddressTable).Add(key, ah);
-		else print ("there");
-		*/
 	}
 
-	/// <summary>
-	/// Remove a previously added handler for a given address.
-	/// Safe no-op if not present.
-	/// </summary>
 	public void RemoveAddressHandler(string key, OscMessageHandler ah)
 	{
-		try
+		if (string.IsNullOrEmpty(key) || ah == null)
+			return;
+
+		lock (_handlerLock)
 		{
-			var table = Hashtable.Synchronized(AddressTable);
-			var al = (ArrayList)table[key];
-			if (al == null) return;
-			al.Remove(ah);
-			if (al.Count == 0)
-				table.Remove(key);
-		}
-		catch (Exception e)
-		{
-			Debug.LogWarning("RemoveAddressHandler error: " + e);
+			if (!_addressHandlers.TryGetValue(key, out var handlers))
+				return;
+
+			handlers.RemoveAll(h => h == ah);
+			if (handlers.Count == 0)
+				_addressHandlers.Remove(key);
 		}
 	}
 
+	// (removed legacy Hashtable AddressTable + EnsureAddressTable helper)
 	void OnApplicationPause(bool pauseStatus) {
 		#if !UNITY_EDITOR
 		paused = pauseStatus;
@@ -506,25 +496,50 @@ public class UDPPacketIO
 
 
 	void Update() {
-
+		if ((DebugLogPackets || DebugLogMessages) && DebugStatusIntervalSeconds > 0f)
+		{
+			if (Time.unscaledTime >= _dbgNextStatusTime)
+			{
+				_dbgNextStatusTime = Time.unscaledTime + DebugStatusIntervalSeconds;
+				Debug.Log($"[OSC] Status: inPort={inPort} packets={Interlocked.Read(ref _dbgPackets)} messages={Interlocked.Read(ref _dbgMessages)} lastFrom={_dbgLastPacketFrom} lastLen={_dbgLastPacketLen}");
+			}
+		}
 
 		if ( messagesReceived.Count > 0 ) {
-			//Debug.Log("received " + messagesReceived.Count + " messages");
 			lock(ReadThreadLock) {
+				int logged = 0;
+
 				foreach (OscMessage om in messagesReceived)
 				{
+					Interlocked.Increment(ref _dbgMessages);
+
+					if (DebugLogMessages && logged < Mathf.Max(0, DebugMaxMessagesPerFrame))
+					{
+						// OscMessage.ToString() prints: "/addr arg0 arg1 ..."
+						Debug.Log("[OSC] RX " + om.ToString());
+						logged++;
+					}
 
 					if (AllMessageHandler != null)
 						AllMessageHandler(om);
 
-					ArrayList al = (ArrayList)Hashtable.Synchronized(AddressTable)[om.address];
-					if ( al != null) {
-						foreach (OscMessageHandler h in al) {
-							h(om);
-						}
+					List<OscMessageHandler> handlers = null;
+					lock (_handlerLock)
+					{
+						if (_addressHandlers.TryGetValue(om.address, out var list))
+							handlers = new List<OscMessageHandler>(list);
 					}
 
+					if (handlers != null)
+					{
+						foreach (var handler in handlers)
+						{
+							try { handler?.Invoke(om); }
+							catch (Exception ex) { Debug.LogWarning($"[OSC] Handler exception for '{om.address}': {ex}"); }
+						}
+					}
 				}
+
 				messagesReceived.Clear();
 			}
 		}
@@ -586,13 +601,16 @@ public class UDPPacketIO
 
 				if (length > 0)
 				{
-					lock(ReadThreadLock) {
+					Interlocked.Increment(ref _dbgPackets);
+					_dbgLastPacketLen = length;
+					_dbgLastPacketUtcTicks = DateTime.UtcNow.Ticks;
+					_dbgLastPacketFrom = OscPacketIO != null ? OscPacketIO.LastReceivedFrom : null;
 
+					lock(ReadThreadLock) {
 						if ( paused == false ) {
 							ArrayList newMessages = OSC.PacketToOscMessages(buffer, length);
 							messagesReceived.AddRange(newMessages);
 						}
-
 					}
 
 
@@ -1016,4 +1034,3 @@ public class UDPPacketIO
         return rawSize + (4 - pad);
     }
   }
-//}

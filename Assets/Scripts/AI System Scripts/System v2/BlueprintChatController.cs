@@ -25,6 +25,29 @@ public sealed class BlueprintChatController : MonoBehaviour
     [Tooltip("Max number of lines to keep in the on-screen ConversationLog (rolling)")]
     public int MaxDisplayLines = 12;
 
+    [Header("Lighting")]
+    [Tooltip("Optional: assign specific scene Lights to color. If empty, script will auto-find scene Lights.")]
+    public Light[] TargetLights;
+    [Tooltip("Number of lights (from TargetLights or auto-found list) to set when assistant replies with a color.")]
+    public int NumLightsToSet = 1;
+
+    // intensity buckets (same concept as reference)
+    [Header("Intensity Examples")]
+    [Tooltip("Scene light intensity to use for LOW brightness bucket.")]
+    public float intensityLow = 2f;
+    [Tooltip("Scene light intensity to use for MEDIUM brightness bucket.")]
+    public float intensityMedium = 5f;
+    [Tooltip("Scene light intensity to use for HIGH brightness bucket.")]
+    public float intensityHigh = 10f;
+    [Tooltip("When true, use the low/medium/high buckets instead of linear mapping.")]
+    public bool useExampleIntensityBuckets = true;
+    [Tooltip("Upper brightness (0-100) threshold for the LOW bucket.")]
+    [Range(0,100)]
+    public int lowUpper = 33;
+    [Tooltip("Upper brightness (0-100) threshold for the MEDIUM bucket.")]
+    [Range(0,100)]
+    public int mediumUpper = 66;
+
     private sealed class ChatMsg
     {
         public string Role;
@@ -48,6 +71,18 @@ public sealed class BlueprintChatController : MonoBehaviour
     private readonly List<string> _displayLines = new List<string>();
     private string _directingNotes = "";
     private string _directingPreview = "";
+
+    // external input mode (inspector)
+    public enum ExternalInputMode { Microphone, Typed }
+    [Tooltip("Select how external speech is provided (Microphone = external bridge/OSC, Typed = simulate speech from inspector)")]
+    public ExternalInputMode InputMode = ExternalInputMode.Microphone;
+
+    [Tooltip("If false and InputMode=Microphone, manual typing into UserInput will be ignored (speech-only mode).")]
+    public bool AllowTypedUserInputWhenMicrophone = true;
+
+    [Tooltip("Simulated/transcribed text to send when using Typed mode")]
+    [TextArea(1,4)]
+    public string SimulatedSpeechText = "";
 
     private void Awake()
     {
@@ -147,6 +182,12 @@ public sealed class BlueprintChatController : MonoBehaviour
 
     public void SubmitChat()
     {
+        if (InputMode == ExternalInputMode.Microphone && !AllowTypedUserInputWhenMicrophone)
+        {
+            Append("[input] Typed input disabled (InputMode=Microphone). Use OSC speech instead.");
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(_blueprintPretty))
         {
             Append("[error] No blueprint loaded. Call LoadLatestBlueprint() first.");
@@ -212,32 +253,14 @@ public sealed class BlueprintChatController : MonoBehaviour
             var messages = new List<OpenAIClient.Msg> { new OpenAIClient.Msg("system", system) };
             messages.AddRange(_history.Select(h => new OpenAIClient.Msg(h.Role, h.Content)));
 
-            var enforcement = $@"
-Respond with JSON only using this schema (no extra keys):
-{{
-  ""color"": string,
-  ""reply"": string,
-  ""explanation"": string
-}}
-
-Rules:
-- color must follow Color Semantics.
-- reply: theatrical, in-character, max 2 sentences.
-- explanation MUST be 1–2 short sentences, <= 18 words total, and use ONE of these templates:
-  - ""Stayed <color> because '<blueprint quote>' and you said '<user quote>'.""
-  - ""Shifted {SafeColor(_lastColor)}-><color> because '<blueprint quote>' and you said '<user quote>'.""
-- <blueprint quote>: exact/near-exact phrase from the blueprint text.
-- <user quote>: exact/near-exact snippet from the latest user message.
-- Use single ' around both quotes. Be concrete; avoid abstract filler words without evidence.
-".Trim();
-
-            messages.Add(new OpenAIClient.Msg("user", enforcement));
+            // REMOVE: enforcement as separate user message (move into system prompt instead)
+            // messages.Add(new OpenAIClient.Msg("user", enforcement));
 
             // first attempt
-            var (ok, parsed, jsonText, errors) = await CallParseValidateAsync(messages);
+            var (ok, parsed, jsonText, errors) = await CallParseValidateAsync(messages, "Chat:Turn");
             if (!ok)
             {
-                // single retry
+                // single retry (keep contextTag explicit)
                 var reasons = string.Join("; ", errors);
                 messages.Add(new OpenAIClient.Msg("user",
 $@"Your last JSON violated constraints: {reasons}.
@@ -245,7 +268,7 @@ Re-emit JSON that fully complies. Output JSON only.
 Previous JSON was:
 {jsonText}"));
 
-                (ok, parsed, jsonText, errors) = await CallParseValidateAsync(messages);
+                (ok, parsed, jsonText, errors) = await CallParseValidateAsync(messages, "Chat:RetryValidation");
                 if (!ok)
                 {
                     Append($"[validation failed] {string.Join("; ", errors)}\n");
@@ -257,11 +280,24 @@ Previous JSON was:
             Append($"Room:  {parsed.reply}");
             Append($"Why:   {parsed.explanation}\n");
 
-            _history.Add(new ChatMsg("assistant", $"Color: {parsed.color}; Room: {parsed.reply}; Why: {parsed.explanation}"));
+            // Do NOT add formatted assistant summary to history; store reply only (reduces token bloat)
+            _history.Add(new ChatMsg("assistant", parsed.reply));
 
             _lastColor = parsed.color;
             _lastReply = parsed.reply;
             _lastExplanation = parsed.explanation;
+
+            // attempt to extract structured light_behavior from the assistant JSON; prefer structured behavior if present
+            if (TryExtractLightBehaviorFromJson(jsonText, out var lb))
+            {
+                Append($"LightBehavior → Hue:{lb.hue}, Brightness:{lb.brightness}, Saturation:{lb.saturation}, On:{lb.on}, Effect:{lb.effect}");
+                try { ApplyLightBehavior(lb, Math.Max(0, NumLightsToSet)); } catch (Exception e) { Append($"[lights] {e.Message}"); }
+            }
+            else
+            {
+                // apply semantic color fallback
+                try { ApplyColorToLights(_lastColor, Math.Max(0, NumLightsToSet)); } catch (Exception e) { Append($"[lights] {e.Message}"); }
+            }
         }
         catch (Exception e)
         {
@@ -270,9 +306,9 @@ Previous JSON was:
     }
 
     private async Task<(bool ok, (string color, string reply, string explanation) parsed, string jsonText, List<string> errors)>
-        CallParseValidateAsync(List<OpenAIClient.Msg> messages)
+        CallParseValidateAsync(List<OpenAIClient.Msg> messages, string contextTag = "Chat:Turn")
     {
-        var jsonText = await OpenAI.ChatCompletionsJsonAsync(messages, model: Model);
+        var jsonText = await OpenAI.ChatCompletionsJsonAsync(messages, model: Model, contextTag: contextTag);
 
         (string color, string reply, string explanation) parsed = ParseColorReply(jsonText);
         var ok = ValidateChatJson(jsonText, parsed, out var errors);
@@ -314,10 +350,31 @@ $@"LAST TURN STATE (treat as true):
             "DIRECTOR INSTRUCTIONS (always obey if compatible):\n" +
             (string.IsNullOrWhiteSpace(directing) ? "(none)" : directing);
 
+        // Embed enforcement schema/rules here (system prompt, once per request)
+        var schemaBlock =
+@"Respond with JSON only using this schema (no extra keys):
+{
+  ""color"": string,
+  ""reply"": string,
+  ""explanation"": string
+}
+
+Rules:
+- color must follow Color Semantics.
+- reply: theatrical, in-character, max 2 sentences.
+- explanation MUST be 1–2 short sentences, <= 18 words total, and use ONE of these templates:
+  - ""Stayed <color> because '<blueprint quote>' and you said '<user quote>'.""
+  - ""Shifted " + SafeColor(lastColor) + @"-><color> because '<blueprint quote>' and you said '<user quote>'.""
+- <blueprint quote>: exact/near-exact phrase from the blueprint text.
+- <user quote>: exact/near-exact snippet from the latest user message.
+- Use single ' around both quotes. Be concrete; avoid abstract filler words without evidence.";
+
         return
 $@"You are a ROOM portrayed as an ACTOR.
 Stay consistent with the character blueprint and the conversation.
 Output MUST follow the JSON schema requested by the user message (no extra keys).
+
+{schemaBlock}
 
 {directingBlock}
 
@@ -504,5 +561,273 @@ DIALOGUE CHUNK:
         if (string.IsNullOrWhiteSpace(_directingNotes)) return cur ?? "";
         if (string.IsNullOrWhiteSpace(cur)) return _directingNotes;
         return _directingNotes + "\n" + cur;
+    }
+
+    // Map semantic color names to Unity Color and apply to N lights.
+    private void ApplyColorToLights(string colorName, int count)
+    {
+        if (count <= 0) return;
+        if (string.IsNullOrWhiteSpace(colorName)) return;
+
+        // ensure targets
+        Light[] lights = TargetLights != null && TargetLights.Length > 0
+            ? TargetLights
+            : UnityEngine.Object.FindObjectsByType<Light>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+        if (lights == null || lights.Length == 0)
+        {
+            Append("[lights] No Light objects found in scene.");
+            return;
+        }
+
+        var name = (colorName ?? "").Trim().ToLowerInvariant();
+        Color col = name switch
+        {
+            "red" => Color.red,
+            "blue" => Color.blue,
+            "green" => Color.green,
+            "yellow" => Color.yellow,
+            "purple" => new Color(0.6f, 0.2f, 0.8f),
+            "white" => Color.white,
+            "black" => Color.black,
+            "orange" => new Color(1f, 0.5f, 0f),
+            "pink" => new Color(1f, 0.4f, 0.7f),
+            _ => ParseHexOrDefault(colorName)
+        };
+
+        int applied = 0;
+        for (int i = 0; i < lights.Length && applied < count; i++)
+        {
+            var L = lights[i];
+            if (L == null) continue;
+
+            // ensure the light is enabled so color/intensity are visible
+            L.enabled = true;
+
+            // apply color
+            L.color = col;
+
+            // set intensity: black -> 0, otherwise pick a visible intensity
+            if (name == "black")
+            {
+                L.intensity = 0f;
+            }
+            else
+            {
+                // use configured buckets if requested, otherwise use medium as sensible default
+                if (!useExampleIntensityBuckets)
+                {
+                    // no brightness info available for semantic color -> use medium as default
+                    L.intensity = Mathf.Max(0f, intensityMedium);
+                }
+                else
+                {
+                    // semantic mapping: use medium intensity for visible color
+                    L.intensity = Mathf.Max(0f, intensityMedium);
+                }
+            }
+
+            applied++;
+        }
+
+        Append($"[lights] Applied color '{colorName}' to {applied} light(s).");
+    }
+
+    private static Color ParseHexOrDefault(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return Color.white;
+        var s = input.Trim();
+        if (s.StartsWith("#")) s = s.Substring(1);
+        if (s.Length == 6)
+        {
+            if (byte.TryParse(s.Substring(0,2), System.Globalization.NumberStyles.HexNumber, null, out var r) &&
+                byte.TryParse(s.Substring(2,2), System.Globalization.NumberStyles.HexNumber, null, out var g) &&
+                byte.TryParse(s.Substring(4,2), System.Globalization.NumberStyles.HexNumber, null, out var b))
+            {
+                return new Color32(r, g, b, 255);
+            }
+        }
+        return Color.white;
+    }
+
+    // new: structured light behavior representation
+    private struct LightBehavior
+    {
+        public int hue;
+        public int brightness;   // 0–100
+        public int saturation;   // 0–100
+        public bool on;
+        public string effect;
+    }
+
+    // naive extractor for a nested "light_behavior" object with numeric and boolean fields
+    private static bool TryExtractLightBehaviorFromJson(string json, out LightBehavior lb)
+    {
+        lb = new LightBehavior { hue = 0, brightness = 100, saturation = 100, on = true, effect = "" };
+        if (string.IsNullOrWhiteSpace(json)) return false;
+        var key = "\"light_behavior\"";
+        var pos = json.IndexOf(key, StringComparison.OrdinalIgnoreCase);
+        if (pos < 0) return false;
+        // find opening brace
+        var brace = json.IndexOf('{', pos);
+        if (brace < 0) return false;
+        // find matching closing brace (simple depth counter)
+        int depth = 0;
+        int end = -1;
+        for (int i = brace; i < json.Length; i++)
+        {
+            if (json[i] == '{') depth++;
+            else if (json[i] == '}')
+            {
+                depth--;
+                if (depth == 0) { end = i; break; }
+            }
+        }
+        if (end < 0) return false;
+        var sub = json.Substring(brace, end - brace + 1);
+
+        bool any = false;
+        if (TryExtractIntPropertyFromJson(sub, "hue", out var hue)) { lb.hue = hue; any = true; }
+        if (TryExtractIntPropertyFromJson(sub, "brightness", out var br)) { lb.brightness = br; any = true; }
+        if (TryExtractIntPropertyFromJson(sub, "saturation", out var sat)) { lb.saturation = sat; any = true; }
+        if (TryExtractBoolPropertyFromJson(sub, "on", out var onv)) { lb.on = onv; any = true; }
+        var eff = ExtractStringPropertyFromJson(sub, "effect");
+        if (!string.IsNullOrWhiteSpace(eff)) { lb.effect = eff; any = true; }
+
+        return any;
+    }
+
+    private static bool TryExtractIntPropertyFromJson(string json, string prop, out int value)
+    {
+        value = 0;
+        var key = $"\"{prop}\"";
+        var pos = json.IndexOf(key, StringComparison.OrdinalIgnoreCase);
+        if (pos < 0) return false;
+        var after = json.Substring(pos + key.Length);
+        var colon = after.IndexOf(':');
+        if (colon < 0) return false;
+        var rest = after.Substring(colon + 1).TrimStart();
+        var sb = new StringBuilder();
+        int i = 0;
+        // collect numeric characters, sign allowed
+        while (i < rest.Length && (char.IsDigit(rest[i]) || rest[i] == '-' || rest[i] == '+')) { sb.Append(rest[i]); i++; }
+        if (sb.Length == 0) return false;
+        return int.TryParse(sb.ToString(), out value);
+    }
+
+    private static bool TryExtractBoolPropertyFromJson(string json, string prop, out bool value)
+    {
+        value = false;
+        var key = $"\"{prop}\"";
+        var pos = json.IndexOf(key, StringComparison.OrdinalIgnoreCase);
+        if (pos < 0) return false;
+        var after = json.Substring(pos + key.Length);
+        var colon = after.IndexOf(':');
+        if (colon < 0) return false;
+        var rest = after.Substring(colon + 1).TrimStart().ToLowerInvariant();
+        if (rest.StartsWith("true")) { value = true; return true; }
+        if (rest.StartsWith("false")) { value = false; return true; }
+        return false;
+    }
+
+    // apply structured LightBehavior to first 'count' lights
+    private void ApplyLightBehavior(LightBehavior lb, int count)
+    {
+        if (count <= 0) return;
+        Light[] lights = TargetLights != null && TargetLights.Length > 0
+            ? TargetLights
+            : UnityEngine.Object.FindObjectsByType<Light>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+        if (lights == null || lights.Length == 0)
+        {
+            Append("[lights] No Light objects found in scene.");
+            return;
+        }
+
+        Color col = Color.white;
+        try
+        {
+            col = Color.HSVToRGB(Mathf.Clamp01(lb.hue / 360f), Mathf.Clamp01(lb.saturation / 100f), 1f);
+        }
+        catch { col = Color.white; }
+
+        int applied = 0;
+        for (int i = 0; i < lights.Length && applied < count; i++)
+        {
+            var L = lights[i];
+            if (L == null) continue;
+            L.enabled = lb.on;
+            if (!lb.on) { applied++; continue; }
+            L.color = col;
+
+            // intensity mapping
+            if (!useExampleIntensityBuckets)
+            {
+                float norm = Mathf.Clamp01(lb.brightness / 100f);
+                L.intensity = Mathf.Lerp(0f, 10f, norm);
+            }
+            else
+            {
+                int b = Mathf.Clamp(lb.brightness, 0, 100);
+                float appliedIntensity = intensityHigh;
+                if (b <= lowUpper) appliedIntensity = Mathf.Max(0f, intensityLow);
+                else if (b <= mediumUpper) appliedIntensity = Mathf.Max(0f, intensityMedium);
+                else appliedIntensity = Mathf.Max(0f, intensityHigh);
+                L.intensity = appliedIntensity;
+            }
+
+            applied++;
+        }
+
+        Append($"[lights] Applied structured behavior to {applied} light(s).");
+    }
+
+    // New: receive transcribed/external speech and route into the chat flow
+    public void ReceiveExternalSpeech(string text)
+    {
+        if (InputMode != ExternalInputMode.Microphone)
+        {
+            Append("[input] Ignored external speech (InputMode=Typed).");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(text)) return;
+
+        // If a TMP_InputField is assigned, route through the UI submission path for consistent behavior
+        if (UserInput != null)
+        {
+            UserInput.text = text;
+            SubmitChat();
+            return;
+        }
+
+        // Fallback: call the handler directly
+        _ = HandleChatAsync(text);
+    }
+
+    // New: helper for inspector button / UI to submit the SimulatedSpeechText
+    public void SubmitSimulatedSpeech()
+    {
+        if (InputMode != ExternalInputMode.Typed)
+        {
+            Append("[input] Ignored simulated speech (InputMode=Microphone).");
+            return;
+        }
+        ReceiveTypedSimulatedSpeech(SimulatedSpeechText ?? "");
+    }
+
+    // Keep simulated speech separate so ReceiveExternalSpeech can be gated to Microphone only.
+    private void ReceiveTypedSimulatedSpeech(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
+
+        if (UserInput != null)
+        {
+            UserInput.text = text;
+            SubmitChat();
+            return;
+        }
+
+        _ = HandleChatAsync(text);
     }
 }
