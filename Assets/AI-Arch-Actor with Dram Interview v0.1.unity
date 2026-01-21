@@ -1787,7 +1787,7 @@ MonoBehaviour:
   useExampleIntensityBuckets: 1
   lowUpper: 33
   mediumUpper: 66
-  apiKey: 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
+  apiKey: 
   model: gpt-4o-mini
 --- !u!114 &786603652
 MonoBehaviour:
