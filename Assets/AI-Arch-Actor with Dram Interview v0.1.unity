@@ -1801,7 +1801,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4d3763fef4cc64212b6ecb6e2197097b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OpenAIClient
-  ApiKey: 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
+  ApiKey: 
   DefaultModel: gpt-4o-mini
   Temperature: 0.7
 --- !u!1 &807965603
