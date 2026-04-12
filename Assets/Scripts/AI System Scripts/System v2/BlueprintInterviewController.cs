@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
@@ -61,11 +62,11 @@ public sealed class BlueprintInterviewController : MonoBehaviour
         Path.Combine(Application.persistentDataPath, "latest_blueprint.json");
 
     private readonly Queue<string> _pendingAppends = new Queue<string>();
-
-    // rolling display buffer and accumulated directing notes
     private readonly List<string> _displayLines = new List<string>();
-    private string _directingNotes = "";
+    private string _directingNotes = ""; // local cache; persisted in DirectingNotesStore
     private string _directingPreview = "";
+
+    private CancellationTokenSource _cts;
 
     [Header("Lighting (optional)")]
     [Tooltip("Optional: assign specific scene Lights to color. If empty, script will auto-find scene Lights.")]
@@ -83,6 +84,7 @@ public sealed class BlueprintInterviewController : MonoBehaviour
 
     private void Awake()
     {
+        _cts = new CancellationTokenSource();
         // optional convenience; safe if you prefer button hooks instead
         if (DramaturgyInput != null)
             DramaturgyInput.onSubmit.AddListener(_ => SubmitDramaturgy());
@@ -126,13 +128,23 @@ public sealed class BlueprintInterviewController : MonoBehaviour
                 t => t.name.Equals("DirectingDisplay", StringComparison.OrdinalIgnoreCase));
             if (dd != null) DirectingDisplay = dd;
         }
+
+        // sync local cache from shared store at startup
+        _directingNotes = DirectingNotesStore.Notes;
+    }
+
+    private void OnDestroy()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
     }
 
     private void OnDirectingChanged(string s)
     {
         _directingPreview = (s ?? "").Trim();
         // also show immediate preview in Console for visibility
-        Debug.Log($"[DIRECTING PREVIEW] {_directingPreview}");
+            Debug.Log($"[DIRECTING] Preview (typing): {_directingPreview}");
         if (DirectingDisplay != null)
         {
             DirectingDisplay.text = string.IsNullOrWhiteSpace(_directingNotes) ? _directingPreview : _directingNotes + "\n" + _directingPreview;
@@ -167,17 +179,15 @@ public sealed class BlueprintInterviewController : MonoBehaviour
         DramaturgyInput.text = "";
         DramaturgyInput.ActivateInputField();
 
-        // Auto-commit any directing preview before processing dramaturgy
-        if (DirectingInput != null && !string.IsNullOrWhiteSpace(DirectingInput.text))
-        {
-            AddDirectingNote();
-        }
+        // NOTE: Submitting dramaturgy must NOT modify directing notes. Use AddDirectingNote() to commit.
 
         _ = HandleDramaturgyAsync(text);
     }
 
     private async Task HandleDramaturgyAsync(string text)
     {
+        if (_cts == null || _cts.IsCancellationRequested) return;
+
         try
         {
             switch (_state)
@@ -230,6 +240,10 @@ public sealed class BlueprintInterviewController : MonoBehaviour
                     break;
             }
         }
+        catch (OperationCanceledException)
+        {
+            Debug.Log("[BlueprintInterviewController] Operation cancelled (expected during cleanup).");
+        }
         catch (Exception e)
         {
             Append($"[error] {e.Message}");
@@ -251,39 +265,51 @@ public sealed class BlueprintInterviewController : MonoBehaviour
 
     private async Task SynthesizeThenClarifyAsync()
     {
+        if (_cts == null || _cts.IsCancellationRequested) return;
+
         _state = State.ProcessingSynthesis;
 
         _transcript = BuildTranscript(_questions, _raw, clarifications: null);
 
-        // Only include directing when EXPLICITLY synthesizing (not on every call)
+        // Persisted directing is included in the system prompt for every model call.
         var directing = _directingNotes ?? "";
         var blueprintRootJson = await SynthesizeBlueprintAsync(_raw, _transcript, directing);
+        
+        if (_cts.IsCancellationRequested) return;
+        
         _blueprintJson = PrettyJson(blueprintRootJson);
 
         PrintBlueprint(_blueprintJson);
 
         _clarificationQs = await RequestClarificationsOnceAsync(_raw, _blueprintJson, _transcript, directing);
-        if (_clarificationQs.Count > 0)
+        
+        if (_cts.IsCancellationRequested) return;
+
+        if (_clarificationQs == null || _clarificationQs.Count == 0)
         {
-            Append("\nClarification round (one-off). Answer briefly.\n");
-            _state = State.AskingClarifications;
-            _cIndex = 0;
-            AskNextClarification();
+            await FinalizeAsync();
             return;
         }
 
-        await FinalizeAsync();
+        _cIndex = 0;
+        _state = State.AskingClarifications;
+        AskNextClarification();
     }
 
     private async Task FinalizeAsync()
     {
+        if (_cts == null || _cts.IsCancellationRequested) return;
+
         _state = State.ProcessingFinalize;
 
         _transcript = BuildTranscript(_questions, _raw, _clarificationQs.Count > 0 ? _clarificationQs : null);
 
-        // Only include directing when EXPLICITLY finalizing
+        // Persisted directing is included in the system prompt for every model call.
         var directing = _directingNotes ?? "";
         var finalJson = await FinalizeBlueprintWithClarificationsAsync(_raw, _blueprintJson, _transcript, directing);
+        
+        if (_cts.IsCancellationRequested) return;
+        
         _blueprintJson = PrettyJson(finalJson);
 
         PrintBlueprint(_blueprintJson);
@@ -293,6 +319,8 @@ public sealed class BlueprintInterviewController : MonoBehaviour
 
     private async Task ReviseAsync(string feedback)
     {
+        if (_cts == null || _cts.IsCancellationRequested) return;
+
         _state = State.ProcessingRevision;
 
         Append($"DIRECTOR_FEEDBACK: {feedback}\n");
@@ -300,9 +328,12 @@ public sealed class BlueprintInterviewController : MonoBehaviour
             ? BuildTranscript(_questions, _raw, _clarificationQs.Count > 0 ? _clarificationQs : null)
             : _transcript + $"\n\nDIRECTOR_FEEDBACK:\n{feedback}";
 
-        // Only include directing when EXPLICITLY revising
+        // Persisted directing is included in the system prompt for every model call.
         var directing = _directingNotes ?? "";
         var revised = await ReviseBlueprintAsync(_raw, _blueprintJson, feedback, _transcript, directing);
+        
+        if (_cts.IsCancellationRequested) return;
+        
         _blueprintJson = PrettyJson(revised);
 
         PrintBlueprint(_blueprintJson);
@@ -316,6 +347,7 @@ public sealed class BlueprintInterviewController : MonoBehaviour
     {
         var system = @"
 You are a dramaturg shaping a ROOM as an ACTOR.
+Make artistic, stage-credible choices grounded in the transcript; avoid fixed or mechanical mappings.
 Output JSON only.
 
 Holistic inference rules:
@@ -350,22 +382,23 @@ Schema:
 }
 ".Trim();
 
+        system = BuildSystemWithDirecting(system, directing);
+
         var user =
-            "DIRECTOR INSTRUCTIONS (always obey if compatible):\n" +
-            (string.IsNullOrWhiteSpace(directing) ? "(none)" : directing) +
-            "\n\nFULL Q/A TRANSCRIPT:\n" +
+            "FULL Q/A TRANSCRIPT:\n" +
             transcript +
             "\n\nRAW INPUT (for reference):\n" +
             SimpleSerializeDictionary(raw) +
             "\n\nDistill into the blueprint JSON only.";
 
-        return await CallJsonObjectAsync(system, user, "Interview:SynthesizeBlueprint");
+        return await CallJsonObjectAsync(system, user, directing, "Interview:SynthesizeBlueprint");
     }
 
     private async Task<List<string>> RequestClarificationsOnceAsync(Dictionary<string, string> raw, string blueprintJson, string transcript, string directing)
     {
         var system = @"
 You are a dramaturg who asks ONE round of clarifying questions to make a ROOM-ACTOR character blueprint playable.
+Favor actor-like, in-the-moment choices; avoid fixed or mechanical mappings.
 Output JSON only.
 
 Goal:
@@ -387,16 +420,16 @@ Return schema:
 }
 ".Trim();
 
+    system = BuildSystemWithDirecting(system, directing);
+
         var ub = new StringBuilder();
-        ub.Append("N = ").Append(MaxClarificationQuestions).Append("\n\nDIRECTOR INSTRUCTIONS (always obey if compatible):\n");
-        ub.Append(string.IsNullOrWhiteSpace(directing) ? "(none)" : directing);
-        ub.Append("\n\nFULL Q/A TRANSCRIPT:\n").Append(transcript);
+    ub.Append("N = ").Append(MaxClarificationQuestions).Append("\n\nFULL Q/A TRANSCRIPT:\n").Append(transcript);
         ub.Append("\n\nRAW INPUT:\n").Append(SimpleSerializeDictionary(raw));
         ub.Append("\n\nCURRENT BLUEPRINT (best effort):\n").Append(blueprintJson);
         ub.Append("\n\nProduce clarification_questions only.");
         var user = ub.ToString().Trim();
 
-        var jsonText = await CallJsonObjectAsync(system, user, "Interview:Clarifications");
+        var jsonText = await CallJsonObjectAsync(system, user, directing, "Interview:Clarifications");
 
         var arr = ExtractStringArrayFromJson(jsonText, "clarification_questions");
         if (arr == null) return new List<string>();
@@ -416,6 +449,7 @@ Return schema:
         var system = @"
 You are a dramaturg finalizing a ROOM-ACTOR blueprint.
 You already asked ONE clarification round; now do the best you can with what you have.
+Make artistic, stage-credible choices; avoid fixed or mechanical mappings.
 Output JSON only.
 
 Holistic inference rules:
@@ -442,22 +476,23 @@ Schema:
 }
 ".Trim();
 
+        system = BuildSystemWithDirecting(system, directing);
+
         var user = (
-            "DIRECTOR INSTRUCTIONS (always obey if compatible):\n" +
-            (string.IsNullOrWhiteSpace(directing) ? "(none)" : directing) +
-            "\n\nFULL Q/A TRANSCRIPT (including clarifications):\n" + transcript +
+            "FULL Q/A TRANSCRIPT (including clarifications):\n" + transcript +
             "\n\nRAW INPUT (including clarifications):\n" + SimpleSerializeDictionary(raw) +
             "\n\nPRIOR BLUEPRINT:\n" + priorBlueprintJson +
             "\n\nFinalize the blueprint now. Output JSON only."
         ).Trim();
 
-        return await CallJsonObjectAsync(system, user, "Interview:FinalizeBlueprint");
+        return await CallJsonObjectAsync(system, user, directing, "Interview:FinalizeBlueprint");
     }
 
     private async Task<string> ReviseBlueprintAsync(Dictionary<string, string> raw, string blueprintJson, string feedback, string transcript, string directing)
     {
         var system = @"
 You revise a ROOM-ACTOR blueprint using directing notes.
+Make artistic, stage-credible choices; avoid fixed or mechanical mappings.
 Output JSON only.
 
 Classification Rules (repeat):
@@ -485,26 +520,28 @@ Schema:
 }
 ".Trim();
 
+        system = BuildSystemWithDirecting(system, directing);
+
         var user = (
-            "DIRECTOR INSTRUCTIONS (always obey if compatible):\n" +
-            (string.IsNullOrWhiteSpace(directing) ? "(none)" : directing) +
-            "\n\nFULL Q/A TRANSCRIPT (including clarifications):\n" + transcript +
+            "FULL Q/A TRANSCRIPT (including clarifications):\n" + transcript +
             "\n\nRAW INPUT:\n" + SimpleSerializeDictionary(raw) +
             "\n\nCURRENT BLUEPRINT:\n" + blueprintJson +
             "\n\nDIRECTOR FEEDBACK:\n" + feedback +
             "\n\nUpdate the blueprint accordingly. Output JSON only."
         ).Trim();
 
-        return await CallJsonObjectAsync(system, user, "Interview:ReviseBlueprint");
+        return await CallJsonObjectAsync(system, user, directing, "Interview:ReviseBlueprint");
     }
 
-    private async Task<string> CallJsonObjectAsync(string system, string user, string contextTag = "Unspecified")
+    private async Task<string> CallJsonObjectAsync(string system, string user, string directing, string contextTag = "Unspecified")
     {
         var messages = new List<OpenAIClient.Msg>
         {
             new OpenAIClient.Msg("system", system),
             new OpenAIClient.Msg("user", user),
         };
+
+        LogRequestDebug(contextTag, directing, system, messages);
 
         var content = await OpenAI.ChatCompletionsJsonAsync(messages, model: Model, contextTag: contextTag);
         // basic validation: ensure returned text looks like a JSON object
@@ -518,20 +555,40 @@ Schema:
     // Add a public method to capture directing instructions from DirectingInput into persistent directing notes.
     public void AddDirectingNote()
     {
+        PersistDirectingFromInput(append: true, clearInput: true);
+    }
+
+    // Persist directorial instructions as stable state; append-only on explicit commit.
+    private void PersistDirectingFromInput(bool append, bool clearInput = false)
+    {
         if (DirectingInput == null) return;
         var txt = (DirectingInput.text ?? "").Trim();
         if (string.IsNullOrWhiteSpace(txt)) return;
-        if (!string.IsNullOrWhiteSpace(_directingNotes)) _directingNotes += "\n";
-        _directingNotes += txt;
-        DirectingInput.text = "";
-        Append($"[DIRECTOR NOTE ADDED] {txt}");
+
+        if (!append) return; // append-only: no overwrite path
+        DirectingNotesStore.Append(txt);
+        _directingNotes = DirectingNotesStore.Notes;
+
+        if (clearInput) DirectingInput.text = "";
+        Append($"[DIRECTING] Committed (persistent): {txt}");
+        Debug.Log($"[DIRECTING] Full stored notes:\n{_directingNotes}");
         if (DirectingDisplay != null) DirectingDisplay.text = _directingNotes;
+    }
+
+    // Ensures director instructions are always highest-priority by placing them in the system prompt.
+    private static string BuildSystemWithDirecting(string baseSystem, string directing)
+    {
+        var block = string.IsNullOrWhiteSpace(directing)
+            ? "DIRECTOR INSTRUCTIONS (HIGHEST PRIORITY — none provided).\n"
+            : $"DIRECTOR INSTRUCTIONS (HIGHEST PRIORITY — obey unless impossible):\n{directing}\n";
+        return block + "\n" + baseSystem;
     }
 
     private string GetDirecting()
     {
         // Return ONLY persisted directing notes (never include live preview)
         // Live preview is UI-only; it should NOT affect model calls or state
+        _directingNotes = DirectingNotesStore.Notes;
         return _directingNotes ?? "";
     }
 
@@ -691,6 +748,60 @@ Schema:
         return string.IsNullOrWhiteSpace(json) ? "{}" : json;
     }
 
+    // Debug: verify directing persistence and presence in the system prompt for each request
+    private void LogRequestDebug(string contextTag, string directing, string systemPrompt, List<OpenAIClient.Msg> messages)
+    {
+        var hasDirecting = !string.IsNullOrWhiteSpace(directing);
+        var probe = GetProbe(directing, 32);
+        var systemHasProbe = !string.IsNullOrWhiteSpace(systemPrompt) && !string.IsNullOrWhiteSpace(probe) && systemPrompt.IndexOf(probe, StringComparison.Ordinal) >= 0;
+
+        var systemPreview = Preview(systemPrompt, 240);
+        Debug.Log($"[InterviewRequest:{contextTag}] directing={(hasDirecting ? "non-empty" : "empty")}, system_has_directing={(systemHasProbe ? "yes" : "no")}");
+        Debug.Log($"[InterviewRequest:{contextTag}] system preview: {systemPreview}");
+        Debug.Log($"[InterviewRequest:{contextTag}] roles: {BuildRolesString(messages)}");
+
+        // Full message dump for debugging
+        Debug.Log($"[InterviewRequest:{contextTag}] === FULL REQUEST DETAILS ===");
+        if (!string.IsNullOrWhiteSpace(directing))
+            Debug.Log($"[InterviewRequest:{contextTag}] Persisted directing notes:\n{directing}");
+        else
+            Debug.Log($"[InterviewRequest:{contextTag}] Persisted directing notes: (empty)");
+        
+        Debug.Log($"[InterviewRequest:{contextTag}] Message count: {messages.Count}");
+        for (int i = 0; i < messages.Count; i++)
+        {
+            var msg = messages[i];
+            var preview = msg.content.Length <= 500 ? msg.content : msg.content.Substring(0, 500) + $"... ({msg.content.Length} chars total)";
+            Debug.Log($"[InterviewRequest:{contextTag}] Message[{i}] role={msg.role}, content:\n{preview}");
+        }
+        Debug.Log($"[InterviewRequest:{contextTag}] === END REQUEST DETAILS ===");
+    }
+
+    private static string BuildRolesString(List<OpenAIClient.Msg> messages)
+    {
+        if (messages == null || messages.Count == 0) return "(none)";
+        var sb = new StringBuilder();
+        for (int i = 0; i < messages.Count; i++)
+        {
+            if (i > 0) sb.Append(" > ");
+            sb.Append(messages[i].role);
+        }
+        return sb.ToString();
+    }
+
+    private static string Preview(string s, int max)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "(empty)";
+        return s.Length <= max ? s : s.Substring(0, max) + "…";
+    }
+
+    private static string GetProbe(string s, int max)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "";
+        var t = s.Trim();
+        return t.Length <= max ? t : t.Substring(0, max);
+    }
+
     // Update: flush pending appends into a rolling buffer and render the entire buffer to the TMP text
     private void Update()
     {
@@ -718,9 +829,11 @@ Schema:
         // update the blueprint and directing overview panels
         if (BlueprintDisplay != null)
             BlueprintDisplay.text = string.IsNullOrWhiteSpace(_blueprintJson) ? "(blueprint: none yet)" : _blueprintJson;
+        _directingNotes = DirectingNotesStore.Notes;
         if (DirectingDisplay != null)
-            DirectingDisplay.text = string.IsNullOrWhiteSpace(_directingNotes) && string.IsNullOrWhiteSpace(_directingPreview)
-                ? "(directing: none)" : (_directingNotes + (string.IsNullOrWhiteSpace(_directingPreview) ? "" : (_directingNotes.Length > 0 ? "\n" : "") + _directingPreview));
+            DirectingDisplay.text = string.IsNullOrWhiteSpace(_directingNotes)
+                ? (string.IsNullOrWhiteSpace(_directingPreview) ? "(directing: none)" : _directingPreview)
+                : (_directingNotes + (string.IsNullOrWhiteSpace(_directingPreview) ? "" : "\n" + _directingPreview));
     }
 
     private void Append(string line)

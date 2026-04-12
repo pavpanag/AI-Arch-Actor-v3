@@ -11,7 +11,7 @@ from threading import Thread
 from pythonosc import udp_client
 import torch
 
-camera_index = 0
+camera_index = 1
 RES_WIDTH, RES_HEIGHT = 640, 480
 
 # Load YOLOv8 Nano model for faster inference

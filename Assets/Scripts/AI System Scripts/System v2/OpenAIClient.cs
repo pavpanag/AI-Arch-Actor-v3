@@ -65,6 +65,18 @@ public sealed class OpenAIClient : MonoBehaviour
     public string DefaultModel = "gpt-4o-mini";
     [Range(0f, 2f)] public float Temperature = 0.7f;
 
+    [Header("Debug Logging")]
+    [Tooltip("Logs request summary, roles order, and system prompt preview.")]
+    public bool LogRequestSummary = true;
+    [Tooltip("Logs a payload JSON preview (use with caution in production).")]
+    public bool LogPayloadPreview = true;
+    [Tooltip("Logs the complete response body from OpenAI.")]
+    public bool LogFullResponse = true;
+    [Range(200, 50000)]
+    public int PayloadPreviewChars = 20000;
+    [Range(200, 20000)]
+    public int SystemPreviewChars = 10000;
+
     public readonly struct Msg
     {
         public readonly string role;
@@ -84,6 +96,19 @@ public sealed class OpenAIClient : MonoBehaviour
         var usedModel = string.IsNullOrWhiteSpace(model) ? DefaultModel : model;
         var usedTemp = (temperature ?? Temperature);
         var payload = BuildPayloadJson(usedModel, usedTemp, messages);
+
+        if (LogRequestSummary)
+        {
+            var roles = BuildRolesString(messages);
+            var sys = FindFirstSystem(messages);
+            var sysPreview = Preview(sys, SystemPreviewChars);
+            Debug.Log($"[OpenAIClient] Request {contextTag}: model={usedModel}, temp={usedTemp}, roles={roles}");
+            Debug.Log($"[OpenAIClient] System preview: {sysPreview}");
+        }
+        if (LogPayloadPreview)
+        {
+            Debug.Log($"[OpenAIClient] === FULL REQUEST PAYLOAD ===\n{payload}\n=== END PAYLOAD ===");
+        }
 
         Guid? traceId = null;
         UnityWebRequest req = null;
@@ -126,6 +151,12 @@ public sealed class OpenAIClient : MonoBehaviour
             if (string.IsNullOrWhiteSpace(text))
                 throw new Exception("Model returned empty content.");
 
+            if (LogFullResponse)
+            {
+                Debug.Log($"[OpenAIClient] === FULL RESPONSE BODY ===\n{responseBody}\n=== END RESPONSE ===");
+                Debug.Log($"[OpenAIClient] Extracted content: {text}");
+            }
+
             TryLogResponse(traceId, responseBody, content, responseCode); // pass raw content + status
             return text;
         }
@@ -147,6 +178,35 @@ public sealed class OpenAIClient : MonoBehaviour
         for (int i = 0; i < messages.Count; i++)
             arr[i] = new { role = messages[i].role, content = messages[i].content };
         return arr;
+    }
+
+    private static string BuildRolesString(IReadOnlyList<Msg> messages)
+    {
+        if (messages == null || messages.Count == 0) return "(none)";
+        var sb = new StringBuilder();
+        for (int i = 0; i < messages.Count; i++)
+        {
+            if (i > 0) sb.Append(" > ");
+            sb.Append(messages[i].role);
+        }
+        return sb.ToString();
+    }
+
+    private static string FindFirstSystem(IReadOnlyList<Msg> messages)
+    {
+        if (messages == null) return "";
+        for (int i = 0; i < messages.Count; i++)
+        {
+            if (string.Equals(messages[i].role, "system", StringComparison.OrdinalIgnoreCase))
+                return messages[i].content ?? "";
+        }
+        return "";
+    }
+
+    private static string Preview(string s, int max)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "(empty)";
+        return s.Length <= max ? s : s.Substring(0, max) + "…";
     }
 
     // Helper: build JSON payload string (simple, escapes content)

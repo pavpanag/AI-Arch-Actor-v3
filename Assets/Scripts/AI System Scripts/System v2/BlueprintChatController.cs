@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
@@ -30,6 +31,9 @@ public sealed class BlueprintChatController : MonoBehaviour
     public Light[] TargetLights;
     [Tooltip("Number of lights (from TargetLights or auto-found list) to set when assistant replies with a color.")]
     public int NumLightsToSet = 1;
+    [Tooltip("Duration (seconds) to turn lights off before applying new color. Creates visual break between responses.")]
+    [Range(0f, 3f)]
+    public float LightTransitionBlackoutDuration = 0.5f;
 
     // intensity buckets (same concept as reference)
     [Header("Intensity Examples")]
@@ -67,10 +71,16 @@ public sealed class BlueprintChatController : MonoBehaviour
     private string _lastExplanation = "";
     private string _lastUserText = "";
 
+    // Color variety tracking
+    private readonly Queue<string> _recentColors = new Queue<string>();
+    private const int MaxColorHistory = 5;
+
     private readonly Queue<string> _pendingAppends = new Queue<string>();
     private readonly List<string> _displayLines = new List<string>();
-    private string _directingNotes = "";
+    private string _directingNotes = ""; // local cache; persisted in DirectingNotesStore
     private string _directingPreview = "";
+
+    private CancellationTokenSource _cts;
 
     // external input mode (inspector)
     public enum ExternalInputMode { Microphone, Typed }
@@ -86,6 +96,8 @@ public sealed class BlueprintChatController : MonoBehaviour
 
     private void Awake()
     {
+        _cts = new CancellationTokenSource();
+
         // optional convenience; safe if you prefer button hooks instead
         if (UserInput != null)
             UserInput.onSubmit.AddListener(_ => SubmitChat());
@@ -128,12 +140,22 @@ public sealed class BlueprintChatController : MonoBehaviour
                 t => t.name.Equals("DirectingDisplay", StringComparison.OrdinalIgnoreCase));
             if (dd != null) DirectingDisplay = dd;
         }
+
+        // sync local cache from shared store at startup
+        _directingNotes = DirectingNotesStore.Notes;
+    }
+
+    private void OnDestroy()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
     }
 
     private void OnDirectingChanged(string s)
     {
         _directingPreview = (s ?? "").Trim();
-        Debug.Log($"[DIRECTING PREVIEW] {_directingPreview}");
+        Debug.Log($"[DIRECTING] Preview (typing): {_directingPreview}");
         if (DirectingDisplay != null)
         {
             DirectingDisplay.text = string.IsNullOrWhiteSpace(_directingNotes) ? _directingPreview : _directingNotes + "\n" + _directingPreview;
@@ -224,17 +246,15 @@ public sealed class BlueprintChatController : MonoBehaviour
         UserInput.text = "";
         UserInput.ActivateInputField();
 
-        // Auto-commit any directing preview before sending chat to model
-        if (DirectingInput != null && !string.IsNullOrWhiteSpace(DirectingInput.text))
-        {
-            AddDirectingNote();
-        }
+        // NOTE: Sending chat must NOT modify directing notes. Use AddDirectingNote() to commit.
 
         _ = HandleChatAsync(userText);
     }
 
     private async Task HandleChatAsync(string userText)
     {
+        if (_cts == null || _cts.IsCancellationRequested) return;
+
         try
         {
             _lastUserText = userText;
@@ -278,16 +298,17 @@ public sealed class BlueprintChatController : MonoBehaviour
             }
 
             var directing = GetDirecting();
-            var system = BuildSystemPrompt(_blueprintPretty, _memorySummary, _lastUserText, _lastColor, _lastReply, _lastExplanation, directing);
+            var recentColorsText = GetRecentColorsText();
+            var system = BuildSystemPrompt(_blueprintPretty, _memorySummary, _lastUserText, _lastColor, _lastReply, _lastExplanation, directing, recentColorsText);
 
             var messages = new List<OpenAIClient.Msg> { new OpenAIClient.Msg("system", system) };
             messages.AddRange(_history.Select(h => new OpenAIClient.Msg(h.Role, h.Content)));
 
-            // REMOVE: enforcement as separate user message (move into system prompt instead)
-            // messages.Add(new OpenAIClient.Msg("user", enforcement));
-
             // first attempt
-            var (ok, parsed, jsonText, errors) = await CallParseValidateAsync(messages, "Chat:Turn");
+            var (ok, parsed, jsonText, errors) = await CallParseValidateAsync(messages, "Chat:Turn", directing, system);
+            
+            if (_cts.IsCancellationRequested) return;
+
             if (!ok)
             {
                 // single retry (keep contextTag explicit)
@@ -298,7 +319,10 @@ Re-emit JSON that fully complies. Output JSON only.
 Previous JSON was:
 {jsonText}"));
 
-                (ok, parsed, jsonText, errors) = await CallParseValidateAsync(messages, "Chat:RetryValidation");
+                (ok, parsed, jsonText, errors) = await CallParseValidateAsync(messages, "Chat:RetryValidation", directing, system);
+                
+                if (_cts.IsCancellationRequested) return;
+                
                 if (!ok)
                 {
                     Append($"[validation failed] {string.Join("; ", errors)}\n");
@@ -310,6 +334,9 @@ Previous JSON was:
             if (string.IsNullOrWhiteSpace(parsed.color) || parsed.color.Equals("black", StringComparison.OrdinalIgnoreCase))
                 parsed.color = string.IsNullOrWhiteSpace(_lastColor) ? "white" : _lastColor;
 
+            // Track color for variety
+            TrackColor(parsed.color);
+
             Append($"Color: {parsed.color}");
             Append($"Room:  {parsed.reply}");
             Append($"Why:   {parsed.explanation}\n");
@@ -319,6 +346,15 @@ Previous JSON was:
             _lastColor = parsed.color;
             _lastReply = parsed.reply;
             _lastExplanation = parsed.explanation;
+
+            // Apply blackout before new color
+            if (LightTransitionBlackoutDuration > 0f)
+            {
+                TurnOffLights(Math.Max(0, NumLightsToSet));
+                await Task.Delay((int)(LightTransitionBlackoutDuration * 1000), _cts.Token);
+            }
+
+            if (_cts.IsCancellationRequested) return;
 
             if (TryExtractLightBehaviorFromJson(jsonText, out var lb))
             {
@@ -330,6 +366,11 @@ Previous JSON was:
                 try { ApplyColorToLights(_lastColor, Math.Max(0, NumLightsToSet)); } catch (Exception e) { Append($"[lights] {e.Message}"); }
             }
         }
+        catch (OperationCanceledException)
+        {
+            // Expected during domain reload or component destruction
+            Debug.Log("[BlueprintChatController] Operation cancelled (expected during cleanup).");
+        }
         catch (Exception e)
         {
             Append($"[error] {e.Message}\n");
@@ -337,14 +378,30 @@ Previous JSON was:
     }
 
     private async Task<(bool ok, (string color, string reply, string explanation) parsed, string jsonText, List<string> errors)>
-        CallParseValidateAsync(List<OpenAIClient.Msg> messages, string contextTag = "Chat:Turn")
+        CallParseValidateAsync(List<OpenAIClient.Msg> messages, string contextTag, string directing, string systemPrompt)
     {
+        LogRequestDebug(contextTag, directing, systemPrompt, messages);
         var jsonText = await OpenAI.ChatCompletionsJsonAsync(messages, model: Model, contextTag: contextTag);
 
         (string color, string reply, string explanation) parsed = ParseColorReply(jsonText);
         var ok = ValidateChatJson(jsonText, parsed, out var errors);
 
         return (ok, parsed, jsonText, errors);
+    }
+
+    private void TrackColor(string color)
+    {
+        if (string.IsNullOrWhiteSpace(color)) return;
+        var normalized = color.Trim().ToLowerInvariant();
+        _recentColors.Enqueue(normalized);
+        while (_recentColors.Count > MaxColorHistory)
+            _recentColors.Dequeue();
+    }
+
+    private string GetRecentColorsText()
+    {
+        if (_recentColors.Count == 0) return "none";
+        return string.Join(", ", _recentColors);
     }
 
     private static string BuildSystemPrompt(
@@ -354,7 +411,8 @@ Previous JSON was:
         string lastColor,
         string lastReply,
         string lastExplanation,
-        string directing)
+        string directing,
+        string recentColorsText)
     {
         var memoryBlock = string.IsNullOrWhiteSpace(memorySummary)
             ? "Memory: (none yet)"
@@ -365,20 +423,12 @@ $@"LAST TURN STATE (treat as true):
 - last_user: ""{lastUserText}""
 - last_color: ""{(string.IsNullOrWhiteSpace(lastColor) ? "none" : lastColor)}""
 - last_room_reply: ""{lastReply}""
-- last_explanation: ""{lastExplanation}""";
-
-        var colorSemantics =
-@"Color Semantics (fixed mapping):
-- red: anger
-- blue: calm
-- green: growth
-- yellow: alert
-- purple: ambition
-- white: clarity";
+- last_explanation: ""{lastExplanation}""
+- recent_colors (last {MaxColorHistory}): {recentColorsText}";
 
         var directingBlock = string.IsNullOrWhiteSpace(directing)
             ? ""
-            : $"DIRECTOR INSTRUCTIONS (always obey if compatible):\n{directing}\n\n";
+            : $"DIRECTOR INSTRUCTIONS (HIGHEST PRIORITY — obey unless impossible):\n{directing}\n\n";
 
         var schemaBlock =
 @"Respond with JSON only using this schema (no extra keys):
@@ -389,40 +439,49 @@ $@"LAST TURN STATE (treat as true):
 }
 
 Rules:
-- NEVER output ""black"" or darkness. If tempted to use black, pick a non-dark color (red/blue/green/yellow/purple/white).
-- color must follow Color Semantics (black is disallowed).
+- color: ONLY use one of these: red, green, blue, yellow, white, orange, purple, cyan. 
+  * Choose based on SPECIFIC emotional shifts, dramatic beats, or character state changes
+  * VARY your color choices intentionally - avoid repeating recent colors unless dramatically justified
+  * Each color should reflect a distinct emotional quality:
+    - red: passion, anger, danger, intensity
+    - blue: calm, sadness, introspection, cold
+    - green: growth, envy, nature, unease
+    - yellow: joy, caution, energy, warmth
+    - white: clarity, emptiness, purity, starkness
+    - orange: excitement, transition, warmth, creativity
+    - purple: mystery, luxury, spirituality, tension
+    - cyan: detachment, technology, coolness, clarity
+  * If you've used a color recently (see recent_colors above), choose a DIFFERENT one unless there's a compelling dramatic reason to repeat
+  * Let the conversation's emotional arc guide your color choices, not atmosphere alone
 - reply: theatrical, in-character, max 2 sentences. NEVER repeat the exact same reply from last_room_reply; vary your language and imagery.
-- explanation MUST be 1–2 short sentences, <= 18 words total, and use ONE of these templates:
-  - ""Stayed <color> because '<blueprint quote>' and you said '<user quote>'.""
-  - ""Shifted " + SafeColor(lastColor) + @"-><color> because '<blueprint quote>' and you said '<user quote>'.""
-- <blueprint quote>: exact/near-exact phrase from the blueprint text.
-- <user quote>: exact/near-exact snippet from the latest user message.
-- Use single ' around both quotes. Be concrete; avoid abstract filler words without evidence.";
+- explanation: briefly explain WHY this specific color for THIS moment (not just general mood) - what shifted?";
 
         return
-$@"You are a ROOM portrayed as an ACTOR.
+    $@"You are a ROOM portrayed as an ACTOR.
 Stay consistent with the character blueprint and the conversation.
 Output MUST follow the JSON schema requested by the user message (no extra keys).
 
-{schemaBlock}
+{directingBlock}{schemaBlock}
 
-{directingBlock}CHARACTER BLUEPRINT (dramaturgy):
+CHARACTER BLUEPRINT (dramaturgy):
 {blueprintPretty}
 
 {memoryBlock}
 
 {lastTurnState}
 
-{colorSemantics}
-
-Constraints:
-- explanation must be concrete, 1–2 sentences, <= 18 words, include 2 short quotes (blueprint + user).
-- Avoid vague filler like: chaos, destiny, energy, vibes, symbolic.
-- IMPORTANT: Do not copy/paste your previous reply verbatim. Respond to the new user input with fresh theatrical language.";
+Guidance:
+- Always follow the DIRECTOR INSTRUCTIONS above (highest priority).
+- Choose colors INTENTIONALLY based on emotional beats, not default atmosphere. Each color change should mark a shift.
+- Avoid repeating colors you've used recently unless there's a strong dramatic reason.
+- You may reference any part of the blueprint that feels relevant to your response.
+- Do not repeat your previous reply verbatim; vary your theatrical language.";
     }
 
     private async Task<string> SummarizeMemoryAsync(string priorSummary, List<ChatMsg> chunk)
     {
+        if (_cts == null || _cts.IsCancellationRequested) return priorSummary ?? "";
+
         // Only use persisted directing notes, NOT live input
         var directing = _directingNotes ?? "";
 
@@ -431,7 +490,7 @@ $@"You compress dialogue into durable memory for a roleplaying ROOM-ACTOR.
 Keep it short and concrete. Do not invent new facts.
 Output JSON only: {{ ""memory_summary"": string }}.
 
-DIRECTOR INSTRUCTIONS (always obey if compatible):
+DIRECTOR INSTRUCTIONS (HIGHEST PRIORITY — obey unless impossible):
 {(string.IsNullOrWhiteSpace(directing) ? "(none)" : directing)}
 
 Blueprint:
@@ -449,11 +508,18 @@ Focus on: stakes, relationships, recurring motifs, unresolved tensions, current 
 DIALOGUE CHUNK:
 {convoText}";
 
+        LogRequestDebug("Chat:SummarizeMemory", directing, system, new List<OpenAIClient.Msg>
+        {
+            new OpenAIClient.Msg("system", system),
+            new OpenAIClient.Msg("user", user)
+        });
         var jsonText = await OpenAI.ChatCompletionsJsonAsync(new[]
         {
             new OpenAIClient.Msg("system", system),
             new OpenAIClient.Msg("user", user)
         }, model: Model);
+
+        if (_cts.IsCancellationRequested) return priorSummary ?? "";
 
         var memory = ExtractStringPropertyFromJson(jsonText, "memory_summary");
         return memory ?? priorSummary ?? "";
@@ -558,9 +624,11 @@ DIALOGUE CHUNK:
         // update blueprint and directing overview panels
         if (BlueprintDisplay != null)
             BlueprintDisplay.text = string.IsNullOrWhiteSpace(_blueprintPretty) ? "(blueprint: none yet)" : _blueprintPretty;
+        _directingNotes = DirectingNotesStore.Notes;
         if (DirectingDisplay != null)
-            DirectingDisplay.text = string.IsNullOrWhiteSpace(_directingNotes) && string.IsNullOrWhiteSpace(_directingPreview)
-                ? "(directing: none)" : (_directingNotes + (string.IsNullOrWhiteSpace(_directingPreview) ? "" : (_directingNotes.Length > 0 ? "\n" : "") + _directingPreview));
+            DirectingDisplay.text = string.IsNullOrWhiteSpace(_directingNotes)
+                ? (string.IsNullOrWhiteSpace(_directingPreview) ? "(directing: none)" : _directingPreview)
+                : (_directingNotes + (string.IsNullOrWhiteSpace(_directingPreview) ? "" : "\n" + _directingPreview));
     }
 
     private void Append(string line)
@@ -572,23 +640,89 @@ DIALOGUE CHUNK:
         }
     }
 
-    // Add directing-note helper
+    // Add directing-note helper (explicit commit). Appends to persistent store and updates UI.
     public void AddDirectingNote()
+    {
+        PersistDirectingFromInput(append: true, clearInput: true);
+    }
+
+    // Persist directorial instructions as stable state; append-only on explicit commit.
+    private void PersistDirectingFromInput(bool append, bool clearInput = false)
     {
         if (DirectingInput == null) return;
         var txt = (DirectingInput.text ?? "").Trim();
         if (string.IsNullOrWhiteSpace(txt)) return;
-        if (!string.IsNullOrWhiteSpace(_directingNotes)) _directingNotes += "\n";
-        _directingNotes += txt;
-        DirectingInput.text = "";
-        Append($"[DIRECTOR NOTE ADDED] {txt}");
+
+        if (!append) return; // append-only: no overwrite path
+        DirectingNotesStore.Append(txt);
+        _directingNotes = DirectingNotesStore.Notes;
+
+        if (clearInput) DirectingInput.text = "";
+            Append($"[DIRECTING] Committed (persistent): {txt}");
+            Debug.Log($"[DIRECTING] Full stored notes:\n{_directingNotes}");
         if (DirectingDisplay != null) DirectingDisplay.text = _directingNotes;
     }
 
     private string GetDirecting()
     {
-        // Only return persisted notes, NOT the live preview field
+        // Only return persisted notes from shared store, NOT the live preview field
+        _directingNotes = DirectingNotesStore.Notes;
         return _directingNotes ?? "";
+    }
+
+    // Debug: verify directing persistence and presence in the system prompt for each request
+    private void LogRequestDebug(string contextTag, string directing, string systemPrompt, List<OpenAIClient.Msg> messages)
+    {
+        var hasDirecting = !string.IsNullOrWhiteSpace(directing);
+        var probe = GetProbe(directing, 32);
+        var systemHasProbe = !string.IsNullOrWhiteSpace(systemPrompt) && !string.IsNullOrWhiteSpace(probe) && systemPrompt.IndexOf(probe, StringComparison.Ordinal) >= 0;
+
+        var systemPreview = Preview(systemPrompt, 240);
+        var recentColorsText = GetRecentColorsText();
+        Debug.Log($"[ChatRequest:{contextTag}] directing={(hasDirecting ? "non-empty" : "empty")}, system_has_directing={(systemHasProbe ? "yes" : "no")}, recent_colors={recentColorsText}");
+        Debug.Log($"[ChatRequest:{contextTag}] system preview: {systemPreview}");
+        Debug.Log($"[ChatRequest:{contextTag}] roles: {BuildRolesString(messages)}");
+
+        // Full message dump for debugging
+        Debug.Log($"[ChatRequest:{contextTag}] === FULL REQUEST DETAILS ===");
+        if (!string.IsNullOrWhiteSpace(directing))
+            Debug.Log($"[ChatRequest:{contextTag}] Persisted directing notes:\n{directing}");
+        else
+            Debug.Log($"[ChatRequest:{contextTag}] Persisted directing notes: (empty)");
+        
+        Debug.Log($"[ChatRequest:{contextTag}] Message count: {messages.Count}");
+        for (int i = 0; i < messages.Count; i++)
+        {
+            var msg = messages[i];
+            var preview = msg.content.Length <= 500 ? msg.content : msg.content.Substring(0, 500) + $"... ({msg.content.Length} chars total)";
+            Debug.Log($"[ChatRequest:{contextTag}] Message[{i}] role={msg.role}, content:\n{preview}");
+        }
+        Debug.Log($"[ChatRequest:{contextTag}] === END REQUEST DETAILS ===");
+    }
+
+    private static string BuildRolesString(List<OpenAIClient.Msg> messages)
+    {
+        if (messages == null || messages.Count == 0) return "(none)";
+        var sb = new StringBuilder();
+        for (int i = 0; i < messages.Count; i++)
+        {
+            if (i > 0) sb.Append(" > ");
+            sb.Append(messages[i].role);
+        }
+        return sb.ToString();
+    }
+
+    private static string Preview(string s, int max)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "(empty)";
+        return s.Length <= max ? s : s.Substring(0, max) + "…";
+    }
+
+    private static string GetProbe(string s, int max)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "";
+        var t = s.Trim();
+        return t.Length <= max ? t : t.Substring(0, max);
     }
 
     // Map semantic color names to Unity Color and apply to N lights.
@@ -638,6 +772,26 @@ DIALOGUE CHUNK:
         }
 
         Append($"[lights] Applied color '{effective}' to {applied} light(s).");
+    }
+
+    private void TurnOffLights(int count)
+    {
+        if (count <= 0) return;
+
+        Light[] lights = TargetLights != null && TargetLights.Length > 0
+            ? TargetLights
+            : UnityEngine.Object.FindObjectsByType<Light>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+        if (lights == null || lights.Length == 0) return;
+
+        int applied = 0;
+        for (int i = 0; i < lights.Length && applied < count; i++)
+        {
+            var L = lights[i];
+            if (L == null) continue;
+            L.intensity = 0f;
+            applied++;
+        }
     }
 
     private static Color ParseHexOrDefault(string input)

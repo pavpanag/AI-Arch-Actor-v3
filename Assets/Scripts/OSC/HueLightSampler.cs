@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Text;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -9,7 +10,16 @@ public class HueLightSampler : MonoBehaviour
 	public string bridgeIP = "192.168.1.85";
 	[Tooltip("Hue API user token / whitelist key")]
 	public string userApi = "";
-	public int bulbId = 1;
+
+	[Header("Target Hue Lights")]
+	public bool useLight1 = true;
+	public bool useLight2 = false;
+	public bool useLight3 = false;
+	public bool useLight4 = false;
+	public bool useLight5 = false;
+	public bool useLight6 = false;
+	public bool useLight7 = false;
+	public bool useLight8 = false;
 
 	[Header("Unity Light to sample")]
 	public Light unityLight;
@@ -141,36 +151,62 @@ public class HueLightSampler : MonoBehaviour
 
 	void _startSend(int hueVal, int satVal, int briVal, bool on)
 	{
-		StartCoroutine(SendStateCoroutine(hueVal, satVal, briVal, on));
+		List<int> ids = GetSelectedBulbIds();
+		if (ids.Count == 0)
+		{
+			if (verbose) Debug.LogWarning("HueLightSampler: no target lights selected (1-8).");
+			return;
+		}
+
+		StartCoroutine(SendStateToSelectedCoroutine(ids, hueVal, satVal, briVal, on));
 	}
 
-	IEnumerator SendStateCoroutine(int hueVal, int satVal, int briVal, bool on)
+	List<int> GetSelectedBulbIds()
+	{
+		var ids = new List<int>(8);
+		if (useLight1) ids.Add(1);
+		if (useLight2) ids.Add(2);
+		if (useLight3) ids.Add(3);
+		if (useLight4) ids.Add(4);
+		if (useLight5) ids.Add(5);
+		if (useLight6) ids.Add(6);
+		if (useLight7) ids.Add(7);
+		if (useLight8) ids.Add(8);
+		return ids;
+	}
+
+	IEnumerator SendStateToSelectedCoroutine(List<int> ids, int hueVal, int satVal, int briVal, bool on)
 	{
 		_isSending = true;
 
-		if (string.IsNullOrEmpty(BridgeBaseUrl) || string.IsNullOrWhiteSpace(UserApiTrimmed) || bulbId <= 0)
+		if (string.IsNullOrEmpty(BridgeBaseUrl) || string.IsNullOrWhiteSpace(UserApiTrimmed))
 		{
-			Debug.LogError("HueLightSampler: invalid bridgeIP/userApi/bulbId.");
+			Debug.LogError("HueLightSampler: invalid bridgeIP/userApi.");
 			_isSending = false;
 			yield break;
 		}
 
-		string url = BuildUrl($"/api/{UserApiTrimmed}/lights/{bulbId}/state");
 		string json = on
 			? $"{{\"on\":true,\"bri\":{briVal},\"hue\":{hueVal},\"sat\":{satVal}}}"
 			: "{\"on\":false}";
 
-		if (verbose) Debug.Log($"HueLightSampler: PUT {url} payload={json}");
-
-		using (var req = new UnityWebRequest(url, "PUT"))
+		for (int i = 0; i < ids.Count; i++)
 		{
-			byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
-			req.uploadHandler = new UploadHandlerRaw(bodyRaw) { contentType = "application/json" };
-			req.downloadHandler = new DownloadHandlerBuffer();
-			req.SetRequestHeader("Content-Type", "application/json");
-			req.SetRequestHeader("Accept", "application/json");
-			req.useHttpContinue = false;
-			req.timeout = 10;
+			int bulbId = ids[i];
+			if (bulbId <= 0) continue;
+
+			string url = BuildUrl($"/api/{UserApiTrimmed}/lights/{bulbId}/state");
+			if (verbose) Debug.Log($"HueLightSampler: PUT {url} payload={json}");
+
+			using (var req = new UnityWebRequest(url, "PUT"))
+			{
+				byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
+				req.uploadHandler = new UploadHandlerRaw(bodyRaw) { contentType = "application/json" };
+				req.downloadHandler = new DownloadHandlerBuffer();
+				req.SetRequestHeader("Content-Type", "application/json");
+				req.SetRequestHeader("Accept", "application/json");
+				req.useHttpContinue = false;
+				req.timeout = 10;
 
 #if UNITY_2020_1_OR_NEWER
 			yield return req.SendWebRequest();
@@ -180,9 +216,10 @@ public class HueLightSampler : MonoBehaviour
 			bool isError = req.isNetworkError || req.isHttpError;
 #endif
 
-			string resp = req.downloadHandler != null ? req.downloadHandler.text : "<no body>";
-			if (isError) Debug.LogWarning($"HueLightSampler: request failed: error={req.error} responseCode={req.responseCode} body={resp}");
-			else if (verbose) Debug.Log($"HueLightSampler: request success responseCode={req.responseCode} body={resp}");
+				string resp = req.downloadHandler != null ? req.downloadHandler.text : "<no body>";
+				if (isError) Debug.LogWarning($"HueLightSampler: request failed: error={req.error} responseCode={req.responseCode} body={resp}");
+				else if (verbose) Debug.Log($"HueLightSampler: request success responseCode={req.responseCode} body={resp}");
+			}
 		}
 
 		_isSending = false;

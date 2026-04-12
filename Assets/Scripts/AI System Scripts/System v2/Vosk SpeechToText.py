@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 """
 Vosk → OSC Transcriber (Tkinter GUI)
 
@@ -114,7 +114,7 @@ class VoskOscApp:
         tk.Label(cfg, text="Vosk model path:").grid(row=0, column=0, sticky="w")
         self.model_path = tk.Entry(cfg, width=86)
         self.model_path.grid(row=0, column=1, columnspan=7, sticky="we", padx=6)
-        self.model_path.insert(0, "/Users/psxpp3/Desktop/Final Form/LLM architecture control/vosk-model-small-en-us-0.15")
+        self.model_path.insert(0, r"C:\Users\pavpa\AI Arch Actor v3\Assets\Scripts\AI System Scripts\System v2\vosk-model-small-en-us-0.15\vosk-model-small-en-us-0.15")
 
         tk.Label(cfg, text="Mic:").grid(row=1, column=0, sticky="w")
         self.mic_var = tk.StringVar(value="")
