@@ -15,6 +15,15 @@ USER_API = "0fLeSuFEFbk1UV2ehHFZKAyOBDL7dlSbE2szNqwR"
 memory = {i: [(0, 0, 0) for _ in range(8)] for i in range(1, 21)}  # Default to (0, 0, 0) for all lights
 current_memory = 1
 osc_active = False  # Tracks if OSC input is enabled
+base_color_image = None
+
+def get_base_color_image():
+    global base_color_image
+    if base_color_image is None:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        img_path = os.path.join(script_dir, "app.png")
+        base_color_image = Image.open(img_path).convert("RGB")
+    return base_color_image
 
 def set_light_state(light_id, brightness, hue, saturation):
     url = f"http://{BRIDGE_IP}/api/{USER_API}/lights/{light_id}/state"
@@ -27,6 +36,7 @@ def set_light_state(light_id, brightness, hue, saturation):
 
 def create_color_field_and_brightness_slider(parent, light_id, row, column):
     brightness = tk.IntVar(value=254)  # Default brightness
+    color_image = get_base_color_image()
 
     def update_light(event=None):
         bri = brightness.get()
@@ -34,9 +44,25 @@ def create_color_field_and_brightness_slider(parent, light_id, row, column):
         sat = sat_vars[light_id]
         set_light_state(light_id, bri, hue, sat)
 
+    def redraw_color_canvas(event=None):
+        width = max(2, canvas.winfo_width())
+        height = max(2, canvas.winfo_height())
+        resized = color_image.resize((width, height), Image.Resampling.LANCZOS)
+        img_tk = ImageTk.PhotoImage(resized)
+        canvas.delete("all")
+        canvas.create_image(0, 0, anchor=tk.NW, image=img_tk)
+        canvas.image = img_tk
+
     def on_canvas_click(event):
-        x, y = event.x, event.y
-        rgb = image.getpixel((x, y))  # Get RGB values from clicked point
+        canvas_width = max(1, canvas.winfo_width())
+        canvas_height = max(1, canvas.winfo_height())
+        x = min(max(event.x, 0), canvas_width - 1)
+        y = min(max(event.y, 0), canvas_height - 1)
+
+        img_x = int(x * (color_image.width - 1) / max(1, canvas_width - 1))
+        img_y = int(y * (color_image.height - 1) / max(1, canvas_height - 1))
+
+        rgb = color_image.getpixel((img_x, img_y))
         r, g, b = rgb
         max_val = max(r, g, b)
         min_val = min(r, g, b)
@@ -56,23 +82,19 @@ def create_color_field_and_brightness_slider(parent, light_id, row, column):
         update_light()
 
     label = tk.Label(parent, text=f"Light {light_id}")
-    label.grid(row=row, column=column, padx=10, pady=5)
+    label.grid(row=row, column=column, padx=10, pady=5, sticky="ew")
 
     brightness_slider = tk.Scale(parent, from_=0, to=254, orient=tk.HORIZONTAL, variable=brightness, command=update_light)
-    brightness_slider.grid(row=row + 1, column=column, padx=10)
+    brightness_slider.grid(row=row + 1, column=column, padx=10, sticky="ew")
 
     canvas = Canvas(parent, width=256, height=256)
-    canvas.grid(row=row + 2, column=column, padx=10)
+    canvas.grid(row=row + 2, column=column, padx=10, sticky="nsew")
+    parent.columnconfigure(column, weight=1)
+    parent.rowconfigure(row + 2, weight=1)
 
-    global image
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    img_path = os.path.join(script_dir, "app.png")
-    img = Image.open(img_path).resize((256, 256), Image.Resampling.LANCZOS).convert("RGB")
-    image = img
-    img_tk = ImageTk.PhotoImage(img)
-    canvas.create_image(0, 0, anchor=tk.NW, image=img_tk)
+    redraw_color_canvas()
     canvas.bind("<Button-1>", on_canvas_click)
-    canvas.image = img_tk
+    canvas.bind("<Configure>", redraw_color_canvas)
 
     return brightness
 
@@ -139,12 +161,52 @@ def start_osc_server():
 # Initialize Tkinter
 root = tk.Tk()
 root.title("Philips Hue Light Control")
+root.minsize(900, 600)
 
-lights_frame = Frame(root)
-lights_frame.grid(row=0, column=0, padx=10, pady=10)
+# Make the root window resize-aware.
+root.rowconfigure(0, weight=1)
+root.columnconfigure(0, weight=1)
 
-memories_frame = Frame(root)
-memories_frame.grid(row=0, column=1, padx=10, pady=10)
+# Scrollable container so controls remain accessible when the window is small.
+main_container = Frame(root)
+main_container.grid(row=0, column=0, sticky="nsew")
+main_container.rowconfigure(0, weight=1)
+main_container.columnconfigure(0, weight=1)
+
+ui_canvas = Canvas(main_container, highlightthickness=0)
+ui_canvas.grid(row=0, column=0, sticky="nsew")
+
+v_scroll = tk.Scrollbar(main_container, orient=tk.VERTICAL, command=ui_canvas.yview)
+v_scroll.grid(row=0, column=1, sticky="ns")
+
+h_scroll = tk.Scrollbar(main_container, orient=tk.HORIZONTAL, command=ui_canvas.xview)
+h_scroll.grid(row=1, column=0, sticky="ew")
+
+ui_canvas.configure(yscrollcommand=v_scroll.set, xscrollcommand=h_scroll.set)
+
+content_frame = Frame(ui_canvas)
+canvas_window = ui_canvas.create_window((0, 0), window=content_frame, anchor="nw")
+
+def _update_scroll_region(event=None):
+    ui_canvas.configure(scrollregion=ui_canvas.bbox("all"))
+
+def _fit_content_to_canvas(event):
+    # Keep content width at least as wide as the viewport, but allow horizontal scrolling when needed.
+    content_width = max(event.width, content_frame.winfo_reqwidth())
+    ui_canvas.itemconfigure(canvas_window, width=content_width)
+
+content_frame.bind("<Configure>", _update_scroll_region)
+ui_canvas.bind("<Configure>", _fit_content_to_canvas)
+
+content_frame.columnconfigure(0, weight=1)
+content_frame.columnconfigure(1, weight=0)
+content_frame.rowconfigure(0, weight=1)
+
+lights_frame = Frame(content_frame)
+lights_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+memories_frame = Frame(content_frame)
+memories_frame.grid(row=0, column=1, padx=10, pady=10, sticky="n")
 
 active_memory_label = tk.Label(memories_frame, text="Active Memory: Memory 1", font=("Arial", 12))
 active_memory_label.grid(row=0, column=0, columnspan=5, padx=10, pady=10)

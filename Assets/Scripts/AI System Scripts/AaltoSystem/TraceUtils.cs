@@ -4,6 +4,9 @@ using System.Linq;
 using System.Text;
 using UnityEngine;
 
+namespace AaltoSystemV3
+{
+
 /// <summary>
 /// Utility functions for trace logging: JSON parsing, pretty-printing, validation.
 /// </summary>
@@ -295,4 +298,5 @@ public static class TraceUtils
 
 		return unescaped;
 	}
+}
 }

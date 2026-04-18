@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using AaltoSystemV3;
 
 public sealed class OscSpeechReceiver : MonoBehaviour
 {
     [Header("Wiring")]
     public BlueprintChatController Chat;
+    public AaltoDirectedRoomPerformerController DirectedPerformer;
 
     [Header("OSC (via OSC.cs)")]
     [Tooltip("Reference to the OSC MonoBehaviour that owns the UDP receiver thread.")]
@@ -23,9 +25,15 @@ public sealed class OscSpeechReceiver : MonoBehaviour
 
     private bool _registered;
 
+    private void Awake()
+    {
+        ResolveTargetsIfNeeded();
+    }
+
     private void OnEnable()
     {
         Debug.Log($"[{nameof(OscSpeechReceiver)}] OnEnable");
+        ResolveTargetsIfNeeded();
         StartReceiver();
     }
 
@@ -49,10 +57,30 @@ public sealed class OscSpeechReceiver : MonoBehaviour
             while (_pending.Count > 0)
             {
                 var t = _pending.Dequeue();
-                Debug.Log($"[{nameof(OscSpeechReceiver)}] Dispatching transcript to Chat: \"{t}\"");
+                ResolveTargetsIfNeeded();
+                Debug.Log($"[{nameof(OscSpeechReceiver)}] Dispatching transcript: \"{t}\"");
                 if (Chat != null) Chat.ReceiveExternalSpeech(t);
-                if (Chat == null) Debug.LogWarning($"[{nameof(OscSpeechReceiver)}] Chat is null, dropped transcript: \"{t}\"");
+                if (DirectedPerformer != null) DirectedPerformer.ReceiveExternalSpeech(t);
+                if (Chat == null && DirectedPerformer == null)
+                    Debug.LogWarning($"[{nameof(OscSpeechReceiver)}] No target assigned, dropped transcript: \"{t}\"");
             }
+        }
+    }
+
+    private void ResolveTargetsIfNeeded()
+    {
+        if (DirectedPerformer == null)
+        {
+            DirectedPerformer = FindObjectOfType<AaltoDirectedRoomPerformerController>();
+            if (DirectedPerformer != null)
+                Debug.Log($"[{nameof(OscSpeechReceiver)}] Auto-linked DirectedPerformer: {DirectedPerformer.name}");
+        }
+
+        if (Chat == null)
+        {
+            Chat = FindObjectOfType<BlueprintChatController>();
+            if (Chat != null)
+                Debug.Log($"[{nameof(OscSpeechReceiver)}] Auto-linked Chat: {Chat.name}");
         }
     }
 

@@ -3,6 +3,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
+namespace AaltoSystemV3
+{
 
 /// <summary>
 /// Chat trace logger: captures every OpenAI API request/response for offline analysis.
@@ -40,8 +46,19 @@ public sealed class ChatTraceLogger : MonoBehaviour
 	private string _sessionId = Guid.NewGuid().ToString();
 	private string _traceFolderPath;
 	private string _lastSavePath;
+	private string _latestRequestPath;
+	private string _latestResponsePath;
 
 	public static ChatTraceLogger Instance => EnsureInstance();
+	public static string CurrentSessionId => Instance._sessionId;
+	public static string TraceFolderPath => Instance._traceFolderPath;
+	public static string LastSavedTraceFilePath => Instance._lastSavePath;
+	public static string LatestRequestFilePath => Instance._latestRequestPath;
+	public static string LatestResponseFilePath => Instance._latestResponsePath;
+
+	public static event Action<string, string, string> RequestLogged;
+	public static event Action<string, int, string> ResponseLogged;
+	public static event Action<string, string> SessionSaved;
 
 	[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
 	private static void ResetStatics() => _instance = null;
@@ -62,6 +79,8 @@ public sealed class ChatTraceLogger : MonoBehaviour
 		DontDestroyOnLoad(gameObject);
 
 		_traceFolderPath = Path.Combine(Application.persistentDataPath, "chat_traces");
+		_latestRequestPath = Path.Combine(_traceFolderPath, "latest_request.json");
+		_latestResponsePath = Path.Combine(_traceFolderPath, "latest_response.json");
 		try { Directory.CreateDirectory(_traceFolderPath); }
 		catch (Exception ex) { Debug.LogWarning($"[ChatTraceLogger] Failed to create trace folder: {ex.Message}"); }
 
@@ -89,6 +108,11 @@ public sealed class ChatTraceLogger : MonoBehaviour
 
 	public static void SaveSessionToFile() => Instance.InternalSaveSessionToFile();
 
+	public static void RevealTraceFolder() => Instance.InternalRevealPath(TraceFolderPath, "trace folder");
+	public static void RevealLastSavedTraceFile() => Instance.InternalRevealPath(LastSavedTraceFilePath, "last saved trace file");
+	public static void RevealLatestRequestFile() => Instance.InternalRevealPath(LatestRequestFilePath, "latest request file");
+	public static void RevealLatestResponseFile() => Instance.InternalRevealPath(LatestResponseFilePath, "latest response file");
+
 	private void InternalStartNewSession()
 	{
 		lock (_lock)
@@ -108,6 +132,7 @@ public sealed class ChatTraceLogger : MonoBehaviour
 		string rawRequestJson)
 	{
 		var id = Guid.NewGuid();
+		var normalizedContextTag = string.IsNullOrWhiteSpace(contextTag) ? "Unspecified" : contextTag;
 		var traceMessages = new List<ChatTraceEntry.TraceMessage>();
 		if (messages != null)
 		{
@@ -123,7 +148,7 @@ public sealed class ChatTraceLogger : MonoBehaviour
 		{
 			sessionId = _sessionId,
 			requestId = id.ToString(),
-			contextTag = string.IsNullOrWhiteSpace(contextTag) ? "Unspecified" : contextTag,
+			contextTag = normalizedContextTag,
 			timestampUtc = DateTime.UtcNow.ToString("o"),
 			ok = false, // assume failure until LogResponse is called
 			httpStatus = 0,
@@ -141,11 +166,17 @@ public sealed class ChatTraceLogger : MonoBehaviour
 		};
 
 		lock (_lock) _entries.Add(entry);
+		TryWriteLatestFile(_latestRequestPath, rawRequestJson);
+		RequestLogged?.Invoke(entry.requestId, normalizedContextTag, _latestRequestPath);
 		return id;
 	}
 
 	private void InternalLogResponse(Guid? requestId, string rawResponseJson, string assistantContentRaw, int httpStatus)
 	{
+		TryWriteLatestFile(_latestResponsePath, rawResponseJson);
+
+		string loggedRequestId = null;
+		bool didLog = false;
 		lock (_lock)
 		{
 			var entry = FindOrCreate(requestId);
@@ -174,7 +205,13 @@ public sealed class ChatTraceLogger : MonoBehaviour
 
 			var warnings = TraceUtils.ValidateChatJson(contentRaw, entry.contextTag);
 			entry.warnings.AddRange(warnings);
+
+			loggedRequestId = entry.requestId;
+			didLog = true;
 		}
+
+		if (didLog)
+			ResponseLogged?.Invoke(loggedRequestId, httpStatus, _latestResponsePath);
 	}
 
 	private void InternalLogError(Guid? requestId, string errorSummary, int httpStatus, string responseBody, string exceptionType = null, string stackTrace = null)
@@ -224,6 +261,8 @@ public sealed class ChatTraceLogger : MonoBehaviour
 
 	private void InternalSaveSessionToFile()
 	{
+		string savedPath = null;
+		string savedSessionId = null;
 		lock (_lock)
 		{
 			if (_entries.Count == 0) return;
@@ -247,6 +286,8 @@ public sealed class ChatTraceLogger : MonoBehaviour
 					}
 				}
 				_lastSavePath = filePath;
+				savedPath = filePath;
+				savedSessionId = _sessionId;
 				Debug.Log($"[ChatTraceLogger] Session {_sessionId} saved to {_lastSavePath}");
 			}
 			catch (Exception ex)
@@ -254,6 +295,39 @@ public sealed class ChatTraceLogger : MonoBehaviour
 				Debug.LogWarning($"[ChatTraceLogger] Failed to save session to file: {ex.Message}");
 			}
 		}
+
+		if (!string.IsNullOrWhiteSpace(savedPath))
+			SessionSaved?.Invoke(savedSessionId, savedPath);
+	}
+
+	private void TryWriteLatestFile(string path, string contents)
+	{
+		if (string.IsNullOrWhiteSpace(path)) return;
+		try
+		{
+			if (string.IsNullOrWhiteSpace(_traceFolderPath))
+				_traceFolderPath = Path.Combine(Application.persistentDataPath, "chat_traces");
+			Directory.CreateDirectory(_traceFolderPath);
+			File.WriteAllText(path, contents ?? "");
+		}
+		catch (Exception ex)
+		{
+			Debug.LogWarning($"[ChatTraceLogger] Failed to write latest trace file '{path}': {ex.Message}");
+		}
+	}
+
+	private void InternalRevealPath(string path, string label)
+	{
+		if (string.IsNullOrWhiteSpace(path))
+		{
+			Debug.LogWarning($"[ChatTraceLogger] Cannot reveal {label}: path is empty.");
+			return;
+		}
+
+		Debug.Log($"[ChatTraceLogger] {label}: {path}");
+		#if UNITY_EDITOR
+		EditorUtility.RevealInFinder(path);
+		#endif
 	}
 
 	private void OnDisable() => TryAutoSave("[ChatTraceLogger] OnDisable auto-save");
@@ -267,4 +341,5 @@ public sealed class ChatTraceLogger : MonoBehaviour
 		Debug.Log($"[ChatTraceLogger] {reason}: attempting auto-save...");
 		InternalSaveSessionToFile();
 	}
+}
 }

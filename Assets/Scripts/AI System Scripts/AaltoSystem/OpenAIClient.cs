@@ -9,6 +9,9 @@ using UnityEditor;
 using System.IO;
 #endif
 
+namespace AaltoSystemV3
+{
+
 #if UNITY_EDITOR
 // Editor-only: ensure Unity's External Script Editor path is valid; try common defaults if missing.
 [InitializeOnLoad]
@@ -77,6 +80,15 @@ public sealed class OpenAIClient : MonoBehaviour
     [Range(200, 20000)]
     public int SystemPreviewChars = 10000;
 
+    public string LastRawRequestJson { get; private set; }
+    public string LastRawResponseJson { get; private set; }
+    public string LastAssistantContent { get; private set; }
+    public string LastContextTag { get; private set; }
+    public int LastResponseCode { get; private set; }
+    public string LastTraceSessionId { get; private set; }
+    public string LastTraceRequestId { get; private set; }
+    public string LastTraceContextTag { get; private set; }
+
     public readonly struct Msg
     {
         public readonly string role;
@@ -96,6 +108,15 @@ public sealed class OpenAIClient : MonoBehaviour
         var usedModel = string.IsNullOrWhiteSpace(model) ? DefaultModel : model;
         var usedTemp = (temperature ?? Temperature);
         var payload = BuildPayloadJson(usedModel, usedTemp, messages);
+
+        LastContextTag = contextTag;
+        LastRawRequestJson = payload;
+        LastRawResponseJson = null;
+        LastAssistantContent = null;
+        LastResponseCode = 0;
+        LastTraceSessionId = null;
+        LastTraceRequestId = null;
+        LastTraceContextTag = contextTag;
 
         if (LogRequestSummary)
         {
@@ -118,7 +139,13 @@ public sealed class OpenAIClient : MonoBehaviour
 
         try
         {
-            try { traceId = ChatTraceLogger.LogRequest(contextTag, "https://api.openai.com/v1/chat/completions", usedModel, messages, payload); }
+            try
+            {
+                traceId = ChatTraceLogger.LogRequest(contextTag, "https://api.openai.com/v1/chat/completions", usedModel, messages, payload);
+                LastTraceSessionId = ChatTraceLogger.CurrentSessionId;
+                LastTraceRequestId = traceId?.ToString();
+                LastTraceContextTag = contextTag;
+            }
             catch (Exception logEx) { Debug.LogWarning($"[OpenAIClient] Trace log request failed: {logEx.Message}"); }
 
             req = new UnityWebRequest("https://api.openai.com/v1/chat/completions", "POST");
@@ -131,6 +158,9 @@ public sealed class OpenAIClient : MonoBehaviour
 
             responseCode = (int)req.responseCode;
             responseBody = req.downloadHandler.text ?? "";
+
+            LastResponseCode = responseCode;
+            LastRawResponseJson = responseBody;
 
             if (req.result != UnityWebRequest.Result.Success)
             {
@@ -151,6 +181,8 @@ public sealed class OpenAIClient : MonoBehaviour
             if (string.IsNullOrWhiteSpace(text))
                 throw new Exception("Model returned empty content.");
 
+            LastAssistantContent = text;
+
             if (LogFullResponse)
             {
                 Debug.Log($"[OpenAIClient] === FULL RESPONSE BODY ===\n{responseBody}\n=== END RESPONSE ===");
@@ -162,6 +194,9 @@ public sealed class OpenAIClient : MonoBehaviour
         }
         catch (Exception ex)
         {
+            LastResponseCode = responseCode;
+            if (responseBody != null)
+                LastRawResponseJson = responseBody;
             if (!errorLogged)
                 TryLogError(traceId, ex.Message, responseCode, responseBody, ex.GetType().Name, ex.StackTrace);
             throw;
@@ -421,4 +456,5 @@ public sealed class OpenAIClient : MonoBehaviour
         try { ChatTraceLogger.LogError(traceId, summary, responseCode, responseBody, exceptionType, stackTrace); }
         catch (Exception ex) { Debug.LogWarning($"[OpenAIClient] Trace log error failed: {ex.Message}"); }
     }
+}
 }

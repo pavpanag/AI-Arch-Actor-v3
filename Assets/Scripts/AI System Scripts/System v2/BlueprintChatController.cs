@@ -10,6 +10,20 @@ using UnityEngine;
 
 public sealed class BlueprintChatController : MonoBehaviour
 {
+    public enum OpenAIModelPreset
+    {
+        [InspectorName("GPT-5.4")]
+        Gpt54 = 7,
+        [InspectorName("GPT-5.4 mini")]
+        Gpt54Mini = 6,
+        [InspectorName("GPT-4.1")]
+        Gpt41 = 3,
+        [InspectorName("GPT-4.1 mini")]
+        Gpt41Mini = 2,
+        [InspectorName("GPT-4o mini")]
+        Gpt4oMini = 0
+    }
+
     [Header("Scene refs")]
     public OpenAIClient OpenAI;
     public TMP_InputField UserInput;
@@ -20,7 +34,8 @@ public sealed class BlueprintChatController : MonoBehaviour
     public TMP_Text DirectingDisplay;
 
     [Header("Config")]
-    public string Model = "gpt-4o-mini";
+    [InspectorName("Model (OpenAI Dropdown)")]
+    public OpenAIModelPreset Model = OpenAIModelPreset.Gpt4oMini;
 
     [Header("UI")]
     [Tooltip("Max number of lines to keep in the on-screen ConversationLog (rolling)")]
@@ -79,6 +94,16 @@ public sealed class BlueprintChatController : MonoBehaviour
     private readonly List<string> _displayLines = new List<string>();
     private string _directingNotes = ""; // local cache; persisted in DirectingNotesStore
     private string _directingPreview = "";
+
+    private string SelectedModelId => Model switch
+    {
+        OpenAIModelPreset.Gpt54 => "gpt-5.4",
+        OpenAIModelPreset.Gpt54Mini => "gpt-5.4-mini",
+        OpenAIModelPreset.Gpt41 => "gpt-4.1",
+        OpenAIModelPreset.Gpt41Mini => "gpt-4.1-mini",
+        OpenAIModelPreset.Gpt4oMini => "gpt-4o-mini",
+        _ => "gpt-4o-mini"
+    };
 
     private CancellationTokenSource _cts;
 
@@ -381,7 +406,7 @@ Previous JSON was:
         CallParseValidateAsync(List<OpenAIClient.Msg> messages, string contextTag, string directing, string systemPrompt)
     {
         LogRequestDebug(contextTag, directing, systemPrompt, messages);
-        var jsonText = await OpenAI.ChatCompletionsJsonAsync(messages, model: Model, contextTag: contextTag);
+        var jsonText = await OpenAI.ChatCompletionsJsonAsync(messages, model: SelectedModelId, contextTag: contextTag);
 
         (string color, string reply, string explanation) parsed = ParseColorReply(jsonText);
         var ok = ValidateChatJson(jsonText, parsed, out var errors);
@@ -517,7 +542,7 @@ DIALOGUE CHUNK:
         {
             new OpenAIClient.Msg("system", system),
             new OpenAIClient.Msg("user", user)
-        }, model: Model);
+        }, model: SelectedModelId);
 
         if (_cts.IsCancellationRequested) return priorSummary ?? "";
 

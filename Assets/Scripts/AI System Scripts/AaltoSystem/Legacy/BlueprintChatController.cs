@@ -8,8 +8,25 @@ using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 
+namespace AaltoSystemV3
+{
+
 public sealed class BlueprintChatController : MonoBehaviour
 {
+    public enum OpenAIModelPreset
+    {
+        [InspectorName("GPT-5.4")]
+        Gpt54 = 7,
+        [InspectorName("GPT-5.4 mini")]
+        Gpt54Mini = 6,
+        [InspectorName("GPT-4.1")]
+        Gpt41 = 3,
+        [InspectorName("GPT-4.1 mini")]
+        Gpt41Mini = 2,
+        [InspectorName("GPT-4o mini")]
+        Gpt4oMini = 0
+    }
+
     [Header("Scene refs")]
     public OpenAIClient OpenAI;
     public TMP_InputField UserInput;
@@ -20,7 +37,8 @@ public sealed class BlueprintChatController : MonoBehaviour
     public TMP_Text DirectingDisplay;
 
     [Header("Config")]
-    public string Model = "gpt-4o-mini";
+    [InspectorName("Model (OpenAI Dropdown)")]
+    public OpenAIModelPreset Model = OpenAIModelPreset.Gpt4oMini;
 
     [Header("UI")]
     [Tooltip("Max number of lines to keep in the on-screen ConversationLog (rolling)")]
@@ -79,6 +97,16 @@ public sealed class BlueprintChatController : MonoBehaviour
     private readonly List<string> _displayLines = new List<string>();
     private string _directingNotes = ""; // local cache; persisted in DirectingNotesStore
     private string _directingPreview = "";
+
+    private string SelectedModelId => Model switch
+    {
+        OpenAIModelPreset.Gpt54 => "gpt-5.4",
+        OpenAIModelPreset.Gpt54Mini => "gpt-5.4-mini",
+        OpenAIModelPreset.Gpt41 => "gpt-4.1",
+        OpenAIModelPreset.Gpt41Mini => "gpt-4.1-mini",
+        OpenAIModelPreset.Gpt4oMini => "gpt-4o-mini",
+        _ => "gpt-4o-mini"
+    };
 
     private CancellationTokenSource _cts;
 
@@ -303,6 +331,7 @@ public sealed class BlueprintChatController : MonoBehaviour
 
             var messages = new List<OpenAIClient.Msg> { new OpenAIClient.Msg("system", system) };
             messages.AddRange(_history.Select(h => new OpenAIClient.Msg(h.Role, h.Content)));
+            var dialogueWindowUsed = BuildDialogueWindowUsed(messages);
 
             // first attempt
             var (ok, parsed, jsonText, errors) = await CallParseValidateAsync(messages, "Chat:Turn", directing, system);
@@ -359,11 +388,45 @@ Previous JSON was:
             if (TryExtractLightBehaviorFromJson(jsonText, out var lb))
             {
                 Append($"LightBehavior → Hue:{lb.hue}, Brightness:{lb.brightness}, Saturation:{lb.saturation}, On:{lb.on}, Effect:{lb.effect}");
-                try { ApplyLightBehavior(lb, Math.Max(0, NumLightsToSet)); } catch (Exception e) { Append($"[lights] {e.Message}"); }
+                bool executionSucceeded = true;
+                string executionResult = "Applied structured light behavior.";
+                try { ApplyLightBehavior(lb, Math.Max(0, NumLightsToSet)); }
+                catch (Exception e)
+                {
+                    executionSucceeded = false;
+                    executionResult = e.Message;
+                    Append($"[lights] {e.Message}");
+                }
+
+                LogScenicDecision(
+                    latestMoveText: userText,
+                    dialogueWindowUsed: dialogueWindowUsed,
+                    intendedAction: parsed.reply,
+                    selectedActionLabel: string.IsNullOrWhiteSpace(lb.effect) ? parsed.color : lb.effect,
+                    reason: parsed.explanation,
+                    executionSucceeded: executionSucceeded,
+                    executionResult: executionResult);
             }
             else
             {
-                try { ApplyColorToLights(_lastColor, Math.Max(0, NumLightsToSet)); } catch (Exception e) { Append($"[lights] {e.Message}"); }
+                bool executionSucceeded = true;
+                string executionResult = "Applied color fallback lighting.";
+                try { ApplyColorToLights(_lastColor, Math.Max(0, NumLightsToSet)); }
+                catch (Exception e)
+                {
+                    executionSucceeded = false;
+                    executionResult = e.Message;
+                    Append($"[lights] {e.Message}");
+                }
+
+                LogScenicDecision(
+                    latestMoveText: userText,
+                    dialogueWindowUsed: dialogueWindowUsed,
+                    intendedAction: parsed.reply,
+                    selectedActionLabel: parsed.color,
+                    reason: parsed.explanation,
+                    executionSucceeded: executionSucceeded,
+                    executionResult: executionResult);
             }
         }
         catch (OperationCanceledException)
@@ -381,7 +444,7 @@ Previous JSON was:
         CallParseValidateAsync(List<OpenAIClient.Msg> messages, string contextTag, string directing, string systemPrompt)
     {
         LogRequestDebug(contextTag, directing, systemPrompt, messages);
-        var jsonText = await OpenAI.ChatCompletionsJsonAsync(messages, model: Model, contextTag: contextTag);
+        var jsonText = await OpenAI.ChatCompletionsJsonAsync(messages, model: SelectedModelId, contextTag: contextTag);
 
         (string color, string reply, string explanation) parsed = ParseColorReply(jsonText);
         var ok = ValidateChatJson(jsonText, parsed, out var errors);
@@ -517,7 +580,7 @@ DIALOGUE CHUNK:
         {
             new OpenAIClient.Msg("system", system),
             new OpenAIClient.Msg("user", user)
-        }, model: Model);
+        }, model: SelectedModelId);
 
         if (_cts.IsCancellationRequested) return priorSummary ?? "";
 
@@ -638,6 +701,59 @@ DIALOGUE CHUNK:
         {
             _pendingAppends.Enqueue(line);
         }
+    }
+
+    private void LogScenicDecision(
+        string latestMoveText,
+        string dialogueWindowUsed,
+        string intendedAction,
+        string selectedActionLabel,
+        string reason,
+        bool executionSucceeded,
+        string executionResult)
+    {
+        try
+        {
+            ScenicEventLogger.LogEvent(
+                latestMoveText: latestMoveText,
+                dialogueWindowUsed: dialogueWindowUsed,
+                characterSummary: _memorySummary,
+                previousObjective: "n/a (legacy color flow)",
+                previousStance: "n/a (legacy color flow)",
+                updatedObjective: "n/a (legacy color flow)",
+                updatedStance: "n/a (legacy color flow)",
+                intendedAction: intendedAction,
+                selectedActionLabel: selectedActionLabel,
+                resolvedMemoryId: string.Empty,
+                resolvedMemoryLabel: string.Empty,
+                reason: reason,
+                executionSucceeded: executionSucceeded,
+                executionResult: executionResult,
+                rawResponseReference: ChatTraceLogger.LatestResponseFilePath
+            );
+        }
+        catch (Exception ex)
+        {
+            Append($"[scenic-log] Failed to write scenic event: {ex.Message}");
+        }
+    }
+
+    private static string BuildDialogueWindowUsed(List<OpenAIClient.Msg> messages, int maxChars = 2400)
+    {
+        if (messages == null || messages.Count == 0) return "";
+
+        var sb = new StringBuilder();
+        for (int i = 0; i < messages.Count; i++)
+        {
+            if (sb.Length > 0) sb.Append(" | ");
+            sb.Append(messages[i].role);
+            sb.Append(": ");
+            sb.Append(messages[i].content ?? "");
+        }
+
+        var full = sb.ToString();
+        if (full.Length <= maxChars) return full;
+        return full.Substring(0, maxChars) + "...[truncated]";
     }
 
     // Add directing-note helper (explicit commit). Appends to persistent store and updates UI.
@@ -991,4 +1107,5 @@ DIALOGUE CHUNK:
 
         _ = HandleChatAsync(text);
     }
+}
 }

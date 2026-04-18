@@ -16,6 +16,20 @@ using LivePositions;
 [DisallowMultipleComponent]
 public class POIStateDirector : MonoBehaviour
 {
+    public enum OpenAIModelPreset
+    {
+        [InspectorName("GPT-5.4")]
+        Gpt54 = 7,
+        [InspectorName("GPT-5.4 mini")]
+        Gpt54Mini = 6,
+        [InspectorName("GPT-4.1")]
+        Gpt41 = 3,
+        [InspectorName("GPT-4.1 mini")]
+        Gpt41Mini = 2,
+        [InspectorName("GPT-4o mini")]
+        Gpt4oMini = 0
+    }
+
     [Serializable]
     public class POI
     {
@@ -44,8 +58,8 @@ public class POIStateDirector : MonoBehaviour
     [Header("LLM / OpenAI Settings")]
     [Tooltip("Your OpenAI API key (kept local).")]
     public string apiKey = "";
-    [Tooltip("Model to use (e.g., gpt-4o-mini)")]
-    public string model = "gpt-4o-mini";
+    [InspectorName("Model (OpenAI Dropdown)")]
+    public OpenAIModelPreset model = OpenAIModelPreset.Gpt4oMini;
 
     [TextArea(3, 6), Tooltip("Directorial instructions passed as system text to the LLM. Use clear rules like: 'If more than 2 people near lamp A, suggest a light behavior.'")]
     public string directorialInstructions = "";
@@ -82,6 +96,16 @@ public class POIStateDirector : MonoBehaviour
     [Serializable] public class ChatResponse { public Choice[] choices; }
 
     // Use the global ModelResponse / LightBehavior defined in ConversationWithLight.cs
+
+    private string SelectedModelId => model switch
+    {
+        OpenAIModelPreset.Gpt54 => "gpt-5.4",
+        OpenAIModelPreset.Gpt54Mini => "gpt-5.4-mini",
+        OpenAIModelPreset.Gpt41 => "gpt-4.1",
+        OpenAIModelPreset.Gpt41Mini => "gpt-4.1-mini",
+        OpenAIModelPreset.Gpt4oMini => "gpt-4o-mini",
+        _ => "gpt-4o-mini"
+    };
 
     void Awake()
     {
@@ -237,7 +261,7 @@ public class POIStateDirector : MonoBehaviour
                 string systemPrompt = augmentWithExamples ? BuildSystemPrompt() : directorialInstructions;
 
                 string body = $@"{{
-    ""model"": ""{model}"",
+    ""model"": ""{SelectedModelId}"",
     ""response_format"": {{""type"": ""json_object""}},
     ""messages"": [
         {{""role"": ""system"", ""content"": ""{EscapeJson(systemPrompt)}""}},

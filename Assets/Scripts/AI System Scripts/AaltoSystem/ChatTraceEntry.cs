@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 
+namespace AaltoSystemV3
+{
+
 /// <summary>
 /// POCO for a single traced OpenAI API call + response.
 /// All fields are serialized to JSONL for offline analysis.
@@ -67,4 +70,5 @@ public class ChatTraceEntry
 	public ResponsePayload response;
 	public ErrorPayload error;
 	public List<string> warnings;
+}
 }

@@ -8,8 +8,25 @@ using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 
+namespace AaltoSystemV3
+{
+
 public sealed class BlueprintInterviewController : MonoBehaviour
 {
+    public enum OpenAIModelPreset
+    {
+        [InspectorName("GPT-5.4")]
+        Gpt54 = 7,
+        [InspectorName("GPT-5.4 mini")]
+        Gpt54Mini = 6,
+        [InspectorName("GPT-4.1")]
+        Gpt41 = 3,
+        [InspectorName("GPT-4.1 mini")]
+        Gpt41Mini = 2,
+        [InspectorName("GPT-4o mini")]
+        Gpt4oMini = 0
+    }
+
     [Header("Scene refs")]
     public OpenAIClient OpenAI;
     public TMP_InputField DramaturgyInput;
@@ -20,7 +37,8 @@ public sealed class BlueprintInterviewController : MonoBehaviour
     public TMP_Text DirectingDisplay;
 
     [Header("Config")]
-    public string Model = "gpt-4o-mini";
+    [InspectorName("Model (OpenAI Dropdown)")]
+    public OpenAIModelPreset Model = OpenAIModelPreset.Gpt4oMini;
     public int MaxClarificationQuestions = 4;
 
     [Header("UI")]
@@ -57,6 +75,16 @@ public sealed class BlueprintInterviewController : MonoBehaviour
     private readonly Dictionary<string, string> _raw = new();
     private string _transcript = "";
     private string _blueprintJson = ""; // raw JSON object text from model (root)
+
+    private string SelectedModelId => Model switch
+    {
+        OpenAIModelPreset.Gpt54 => "gpt-5.4",
+        OpenAIModelPreset.Gpt54Mini => "gpt-5.4-mini",
+        OpenAIModelPreset.Gpt41 => "gpt-4.1",
+        OpenAIModelPreset.Gpt41Mini => "gpt-4.1-mini",
+        OpenAIModelPreset.Gpt4oMini => "gpt-4o-mini",
+        _ => "gpt-4o-mini"
+    };
 
     private string LatestBlueprintPath =>
         Path.Combine(Application.persistentDataPath, "latest_blueprint.json");
@@ -543,7 +571,7 @@ Schema:
 
         LogRequestDebug(contextTag, directing, system, messages);
 
-        var content = await OpenAI.ChatCompletionsJsonAsync(messages, model: Model, contextTag: contextTag);
+        var content = await OpenAI.ChatCompletionsJsonAsync(messages, model: SelectedModelId, contextTag: contextTag);
         // basic validation: ensure returned text looks like a JSON object
         if (!LooksLikeJsonObject(content))
             throw new Exception("Model did not return a JSON object.");
@@ -907,4 +935,5 @@ Schema:
         }
         return Color.white;
     }
+}
 }

@@ -40,6 +40,20 @@ namespace DirectingSystem
 
     public class DirectingLight : MonoBehaviour
     {
+        public enum OpenAIModelPreset
+        {
+            [InspectorName("GPT-5.4")]
+            Gpt54 = 7,
+            [InspectorName("GPT-5.4 mini")]
+            Gpt54Mini = 6,
+            [InspectorName("GPT-4.1")]
+            Gpt41 = 3,
+            [InspectorName("GPT-4.1 mini")]
+            Gpt41Mini = 2,
+            [InspectorName("GPT-4o mini")]
+            Gpt4oMini = 0
+        }
+
         [Header("UI References")]
         public TMP_InputField dramaturgyInput;   // General dramaturgy (world rules)
         public TMP_InputField directingInput;    // Directorial instructions (strict)
@@ -68,7 +82,8 @@ namespace DirectingSystem
 
         [Header("OpenAI")]
         public string apiKey = "";           
-        public string model = "gpt-4o-mini"; 
+        [InspectorName("Model (OpenAI Dropdown)")]
+        public OpenAIModelPreset model = OpenAIModelPreset.Gpt4oMini; 
 
         private string currentDramaturgy = "";
         private string currentDirecting = "";
@@ -113,6 +128,16 @@ namespace DirectingSystem
             return s.Replace("\\", "\\\\").Replace("\"", "\\\"");
         }
 
+        string SelectedModelId => model switch
+        {
+            OpenAIModelPreset.Gpt54 => "gpt-5.4",
+            OpenAIModelPreset.Gpt54Mini => "gpt-5.4-mini",
+            OpenAIModelPreset.Gpt41 => "gpt-4.1",
+            OpenAIModelPreset.Gpt41Mini => "gpt-4.1-mini",
+            OpenAIModelPreset.Gpt4oMini => "gpt-4o-mini",
+            _ => "gpt-4o-mini"
+        };
+
         IEnumerator SendToModel(string userText, string directingText, string dramaturgyText)
         {
             string safeUser = EscapeJson(userText);
@@ -129,7 +154,7 @@ namespace DirectingSystem
                 $"Do not return flat fields. Do not omit reasoning. Respond with JSON only.";
 
             string body = $@"{{
-                ""model"": ""{model}"",
+                ""model"": ""{SelectedModelId}"",
                 ""response_format"": {{""type"": ""json_object""}},
                 ""messages"": [
                     {{""role"": ""system"", ""content"": ""You are the consciousness of a room. Always respond with a single JSON object containing light_behavior and reasoning. Keep the reasoning concise (1–2 sentences)."" }},

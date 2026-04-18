@@ -44,6 +44,20 @@ public class ChatResponse
 
 public class ConversationWithLight : MonoBehaviour
 {
+    public enum OpenAIModelPreset
+    {
+        [InspectorName("GPT-5.4")]
+        Gpt54 = 7,
+        [InspectorName("GPT-5.4 mini")]
+        Gpt54Mini = 6,
+        [InspectorName("GPT-4.1")]
+        Gpt41 = 3,
+        [InspectorName("GPT-4.1 mini")]
+        Gpt41Mini = 2,
+        [InspectorName("GPT-4o mini")]
+        Gpt4oMini = 0
+    }
+
     [Header("UI References")]
     public TMP_InputField userInput;
     public TMP_Text conversationLog;
@@ -53,7 +67,8 @@ public class ConversationWithLight : MonoBehaviour
 
     [Header("OpenAI")]
     public string apiKey = "";
-    public string model = "gpt-4o-mini"; // use gpt-4o / gpt-4o-mini for response_format
+    [InspectorName("Model (OpenAI Dropdown)")]
+    public OpenAIModelPreset model = OpenAIModelPreset.Gpt4oMini; // use gpt-4o / gpt-4o-mini for response_format
 
     void Start()
     {
@@ -75,6 +90,16 @@ public class ConversationWithLight : MonoBehaviour
         return s.Replace("\\", "\\\\").Replace("\"", "\\\"");
     }
 
+    string SelectedModelId => model switch
+    {
+        OpenAIModelPreset.Gpt54 => "gpt-5.4",
+        OpenAIModelPreset.Gpt54Mini => "gpt-5.4-mini",
+        OpenAIModelPreset.Gpt41 => "gpt-4.1",
+        OpenAIModelPreset.Gpt41Mini => "gpt-4.1-mini",
+        OpenAIModelPreset.Gpt4oMini => "gpt-4o-mini",
+        _ => "gpt-4o-mini"
+    };
+
     IEnumerator SendToModel(string userText)
     {
         string safeUser = EscapeJson(userText);
@@ -90,7 +115,7 @@ public class ConversationWithLight : MonoBehaviour
             $"Respond with JSON only.";
 
         string body = $@"{{
-            ""model"": ""{model}"",
+            ""model"": ""{SelectedModelId}"",
             ""response_format"": {{""type"": ""json_object""}},
             ""messages"": [
                 {{""role"": ""system"", ""content"": ""You are the consciousness of a room. You reply through changes in light."" }},
