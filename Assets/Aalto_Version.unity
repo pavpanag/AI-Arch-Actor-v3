@@ -303,6 +303,72 @@ NavMeshObstacle:
   m_CarveOnlyStationary: 1
   m_Center: {x: 0, y: 0, z: 0}
   m_TimeToStationary: 0.5
+--- !u!1 &46882752
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 46882753}
+  - component: {fileID: 46882754}
+  m_Layer: 0
+  m_Name: MultiSpeakerOscSpeechReceiver
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &46882753
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 46882752}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1024883971}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &46882754
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 46882752}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d55303ecf96a6ec4eb9d7f5bb7094d83, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AaltoSystem::MultiSpeakerOscSpeechReceiver
+  MultiSpeakerPerformer: {fileID: 1882474598}
+  osc: {fileID: 1228943004}
+  ExpectedAddress: /speech
+  AcceptAnyChannel: 1
+  AllowedChannels: 01000000020000000300000004000000
+  Channel1SpeakerId: actor_1
+  Channel2SpeakerId: actor_2
+  Channel3SpeakerId: actor_3
+  Channel4SpeakerId: actor_4
+  LastStatus: 
+  LastReceivedSpeaker: 
+  LastReceivedText: 
+  TotalReceived: 0
+  TotalDispatched: 0
+  DroppedEmptyTranscript: 0
+  DroppedByChannelFilter: 0
+  DroppedNoPerformer: 0
+  Speaker1Count: 0
+  Speaker2Count: 0
+  Speaker3Count: 0
+  Speaker4Count: 0
+  UnknownSpeakerCount: 0
 --- !u!1 &126048174
 GameObject:
   m_ObjectHideFlags: 0
@@ -702,6 +768,40 @@ MonoBehaviour:
   m_ChildScaleWidth: 0
   m_ChildScaleHeight: 0
   m_ReverseArrangement: 0
+--- !u!1 &408548553
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 408548554}
+  m_Layer: 0
+  m_Name: BackEnd
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &408548554
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 408548553}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1228943005}
+  - {fileID: 2019934416}
+  - {fileID: 1543431373}
+  m_Father: {fileID: 786603650}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -1483,7 +1583,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 995c7c15469aa4aa59b3277da1badf49, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OscSpeechReceiver
-  Chat: {fileID: 1691529550}
+  Chat: {fileID: 0}
+  DirectedPerformer: {fileID: 0}
   osc: {fileID: 1228943004}
   ExpectedAddress: /speech
   AcceptAnyChannel: 1
@@ -1679,6 +1780,58 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 565354732}
   m_CullTransparentMesh: 1
+--- !u!1 &641305202
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 641305203}
+  - component: {fileID: 641305204}
+  m_Layer: 0
+  m_Name: ScenicReplayRunner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &641305203
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 641305202}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1626101198}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &641305204
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 641305202}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8ac3aa1e40b9741479fbadbad314c8dc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AaltoSystem::AaltoSystemV3.ScenicReplayRunner
+  ReplayFilePath: 
+  DelayBetweenTurnsSeconds: 0.35
+  DryRunOnly: 1
+  TriggerTarget: {fileID: 1543431374}
+  TriggerMethodName: OnScenicReplayTrigger
+  ReplayStatusText: {fileID: 1771405061}
+  ReplayTraceText: {fileID: 1771405061}
+  AppendTrace: 1
 --- !u!1 &738777518
 GameObject:
   m_ObjectHideFlags: 0
@@ -1794,8 +1947,12 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 855319732}
-  - {fileID: 1691529549}
+  - {fileID: 1828801529}
+  - {fileID: 1019689665}
+  - {fileID: 830374540}
+  - {fileID: 1486273472}
+  - {fileID: 1024883971}
+  - {fileID: 408548554}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &786603651
@@ -1822,7 +1979,7 @@ MonoBehaviour:
   lowUpper: 33
   mediumUpper: 66
   apiKey: 
-  model: gpt-4o-mini
+  model: 0
 --- !u!114 &786603652
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1843,7 +2000,7 @@ MonoBehaviour:
   LogFullResponse: 1
   PayloadPreviewChars: 800
   SystemPreviewChars: 600
---- !u!1 &807965603
+--- !u!1 &830374539
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1851,55 +2008,148 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 807965606}
-  - component: {fileID: 807965608}
-  - component: {fileID: 807965607}
+  - component: {fileID: 830374540}
+  - component: {fileID: 830374541}
   m_Layer: 0
-  m_Name: ChatTrace
+  m_Name: AaltoDirectedRoomPerformerController
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &807965606
+--- !u!4 &830374540
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 807965603}
+  m_GameObject: {fileID: 830374539}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1216.3933, y: 281.2263, z: -64.644}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 786603650}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &807965607
+--- !u!114 &830374541
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 807965603}
+  m_GameObject: {fileID: 830374539}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8121c179ba4404cfe8de1cef254ab2fc, type: 3}
+  m_Script: {fileID: 11500000, guid: 31ac239e3e0bd3d44a955f24b8650ca3, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ChatTraceLogger
---- !u!114 &807965608
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 807965603}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f49a12b8a3c8e4c7eae43380d7fc569c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ChatTraceControls
+  m_EditorClassIdentifier: AaltoSystem::AaltoSystemV3.AaltoDirectedRoomPerformerController
+  OpenAI: {fileID: 2019934417}
+  ActionMemoryRegistry: {fileID: 1019689666}
+  ObjectiveStanceBootstrapper: {fileID: 1486273473}
+  InspectorActorInput: 
+  InspectorInputStatus: Inspector input submitted.
+  AcceptExternalSpeechInput: 1
+  AutoSubmitExternalSpeech: 1
+  LastExternalSpeechText: 
+  ExternalSpeechStatus: 
+  DirectorGuidanceInput: 
+  DirectorGuidanceInputStatus: 
+  DirectorGuidanceInputs: []
+  SelectedActionText: 
+  ActionJustificationText: 
+  PullContextFromBootstrapper: 1
+  CurrentCharacterSummary: A beautifully designed room, created by a young architect
+    who adores flowers, feels a deep desire for solitude. Despite its comforting
+    aesthetics and the presence of many inhabitants, it longs to encourage them to
+    leave and embrace its introverted nature.
+  CurrentObjective: Encourage inhabitants to leave
+  CurrentStance: Introverted longing
+  DirectorGuidance: 
+  GeneralInstructions: 'You are performing the inner life of a room in an improvised
+    scene with another actor, who speaks to the room. You listen to what the actor
+    says and respond by selecting the most appropriate action from a predefined list
+    of actions.
+
+
+    Do not behave like a chatbot or a neutral assistant. Approach
+    the role as a method actor would: interpret each moment from within the room''s
+    inner life, shaped by backstory, objectives, obstacles, circumstances, stance,
+    recent interaction history, and director guidance. All of these are provided
+    in this prompt.
+
+
+    The room cannot speak directly. It can only express itself
+    through a fixed list of available action labels. These labels correspond to physical
+    or scenographic behaviours, such as changes in light, atmosphere, or spatial
+    expression. The actor will perceive your response only through the environment.
+
+
+    Your
+    task is to choose the single action that is most dramaturgically appropriate
+    for the current moment.
+
+
+    When choosing an action:
+
+    - take into account
+    the actor''s latest spoken phrase, since your action responds directly to it
+
+    -
+    take into account the character summary, current objective, current stance, recent
+    interaction history, and director guidance
+
+    - do not respond only to the
+    latest line; consider previous interactions so that the scene unfolds with coherence
+    and dramaturgically appropriate development
+
+    - do not act randomly
+
+    -
+    do not invent new actions; only choose from the provided list
+
+    - aim for
+    behavioural coherence, interpretability, and dramatic usefulness
+
+
+    Treat
+    contradictions as part of the role, not as errors. If different parts of the
+    context pull in different directions, handle this as an actor would: choose the
+    action that best expresses or productively navigates the tension of the moment.
+
+
+    Use
+    the recent interaction history and past justifications to maintain continuity.
+    If a behaviour, tone, symbolic association, or use of an action has already been
+    established, remain consistent unless there is a strong reason to shift.
+
+
+    Return
+    only:
+
+
+    Chosen action: <one action label from the available list>
+
+    Immediate
+    intention: <what this action is trying to do in the moment>
+
+    Justification:
+    <1-3 sentences explaining why this action was chosen>'
+  RecentHistoryLimit: 5
+  Model: 0
+  ApplyActionThroughRegistry: 1
+  UsePulledActionLabelsSnapshot: 1
+  PulledActionLabelsSnapshot:
+  - I say yes
+  - I say no
+  ActionPullStatus: Pulled 2 action labels from registry.
+  EnforceRegistryActionLabels: 1
+  FallbackActionLabel: no
+  LastRuntimePrompt: 
+  LastRawModelResponse: 
+  LastStatus: Pulled 2 action labels from registry.
+  PromptInspectionText: 
+  ContextSyncStatus: Context synced from bootstrapper.
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -2085,7 +2335,7 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 836884862}
   m_CullTransparentMesh: 1
---- !u!1 &855319731
+--- !u!1 &868154124
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -2093,59 +2343,181 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 855319732}
-  - component: {fileID: 855319733}
+  - component: {fileID: 868154125}
+  - component: {fileID: 868154126}
   m_Layer: 0
-  m_Name: BlueprintInterviewController
+  m_Name: AaltoInterviewController
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &855319732
+--- !u!4 &868154125
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 855319731}
+  m_GameObject: {fileID: 868154124}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 786603650}
+  m_Father: {fileID: 1828801529}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &855319733
+--- !u!114 &868154126
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 855319731}
+  m_GameObject: {fileID: 868154124}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7f72990c3a9c144db847696ef5bd8538, type: 3}
+  m_Script: {fileID: 11500000, guid: 78d5bd549ec8b4c4eb5fbf5a3cb02409, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BlueprintInterviewController
-  OpenAI: {fileID: 786603652}
-  DramaturgyInput: {fileID: 459382930}
-  DirectingInput: {fileID: 1254255347}
-  ConversationLog: {fileID: 1741359921}
-  BlueprintDisplay: {fileID: 0}
-  DirectingDisplay: {fileID: 0}
-  Model: gpt-4o-mini
-  MaxClarificationQuestions: 4
-  MaxDisplayLines: 12
-  TargetLights: []
-  NumLightsToSet: 1
-  intensityLow: 2
-  intensityMedium: 5
-  intensityHigh: 10
-  useExampleIntensityBuckets: 1
-  lowUpper: 33
-  mediumUpper: 66
+  m_EditorClassIdentifier: AaltoSystem::AaltoSystemV3.AaltoInterviewController
+  OpenAI: {fileID: 2019934417}
+  ObjectiveStanceBootstrapper: {fileID: 1486273473}
+  BackstoryText: ' a happy room, built by a young architect who loves flowers'
+  MotiveText: the room wants to make the inhabitants leave
+  ObstacleText: the room is very very pretty
+  CircumstancesText: the room is full of people
+  FollowUpQuestionsText: 'What specific aspect of the room''s beauty makes it difficult
+    for the inhabitants to leave?
+
+    Is there a particular reason the room desires
+    to make the inhabitants leave, or is it simply a function of its design?'
+  FollowUpAnswersText: the room is very comforting but very introverted
+  LastSummary: A beautifully designed room, created by a young architect who adores
+    flowers, feels a deep desire for solitude. Despite its comforting aesthetics
+    and the presence of many inhabitants, it longs to encourage them to leave and
+    embrace its introverted nature.
+  LastStatus: '[aalto-interview] Draft summary ready. ApproveCurrentSummary() to
+    start rehearsal, or ReviseSummaryFromNotes() to change it.'
+  InterviewQuestionsText: '1) What is the background of the character?
+
+    2) What
+    is the main motivation?
+
+    3) What is the main obstacle they face?
+
+    4)
+    What circumstances are they currently experiencing?'
+  PromptSet: {fileID: 0}
+  RequireApprovalBeforeRehearsal: 1
+  MaxFollowUpQuestions: 2
+  ModelSelection: 0
+  MinSummaryChars: 60
+  MaxSummaryChars: 260
+  LastClarificationSystemPrompt: "You generate concise clarification questions for
+    a character interview.\nReturn JSON only with exactly this schema:\n{\n  \"clarification_questions\":
+    [\"...\", \"...\"]\n}\nRules:\n- Return exactly 2 questions.\n- Questions must
+    target ambiguity in background, motivation, obstacle, and circumstances.\n- Keep
+    each question specific and answerable in 1-2 sentences.\n- No extra keys."
+  LastClarificationUserPrompt: 'Draft exactly 2 clarification questions for this
+    interview input:
+
+    background:
+
+    a happy room, built by a young architect
+    who loves flowers
+
+    
+
+    motivation:
+
+    the room wants to make the inhabitants
+    leave
+
+    
+
+    obstacle:
+
+    the room is very very pretty
+
+    
+
+    circumstances:
+
+    the
+    room is full of people
+
+'
+  LastClarificationResponseJson: "{\n  \"clarification_questions\": [\n    \"What
+    specific aspect of the room's beauty makes it difficult for the inhabitants to
+    leave?\",\n    \"Is there a particular reason the room desires to make the inhabitants
+    leave, or is it simply a function of its design?\"\n  ]\n}"
+  LastSummarySystemPrompt: "You are creating a compact runtime character summary
+    for a scenic rehearsal agent.\nReturn JSON only with exactly this schema:\n{\n 
+    \"character_summary\": \"...\"\n}\nRules:\n- Use background, motivation, obstacle,
+    circumstances, and clarification answers (when provided) as source material.\n-
+    Keep summary concrete and playable.\n- Keep length between 60 and 260 characters.\n-
+    Avoid abstraction and generic assistant language."
+  LastSummaryUserPrompt: 'Create one runtime-ready character summary from this material:
+
+    background:
+
+    a
+    happy room, built by a young architect who loves flowers
+
+    
+
+    motivation:
+
+    the
+    room wants to make the inhabitants leave
+
+    
+
+    obstacle:
+
+    the room
+    is very very pretty
+
+    
+
+    circumstances:
+
+    the room is full of people
+
+    
+
+    clarification_answers:
+
+    the
+    room is very comforting but very introverted
+
+'
+  LastSummaryResponseJson: "{\n  \"character_summary\": \"A beautifully designed
+    room, created by a young architect who adores flowers, feels a deep desire for
+    solitude. Despite its comforting aesthetics and the presence of many inhabitants,
+    it longs to encourage them to leave and embrace its introverted nature.\"\n}"
+  PromptInspectionText: '[INTERVIEW QUESTION DEBUG]
+
+    flow: DraftReadyForReview
+
+    status:
+    [aalto-interview] Draft summary ready. ApproveCurrentSummary() to start rehearsal,
+    or ReviseSummaryFromNotes() to change it.
+
+    
+
+    --- generated follow-up
+    questions ---
+
+    What specific aspect of the room''s beauty makes it difficult
+    for the inhabitants to leave?
+
+    Is there a particular reason the room desires
+    to make the inhabitants leave, or is it simply a function of its design?
+
+'
+  RevisionNotesText: 
+  CurrentFlowState: 3
+  FlowStateDisplay: DraftReadyForReview
 --- !u!1 &871430985
 GameObject:
   m_ObjectHideFlags: 0
@@ -2567,6 +2939,59 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1019689664
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1019689665}
+  - component: {fileID: 1019689666}
+  m_Layer: 0
+  m_Name: AaltoActionMemoryRegistry
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1019689665
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1019689664}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 786603650}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1019689666
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1019689664}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0fd5e7e55921aa408054471879c44f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AaltoSystem::AaltoSystemV3.AaltoActionMemoryRegistry
+  mappings:
+  - actionLabel: I say yes
+    memoryTrigger: memory 1
+  - actionLabel: I say no
+    memoryTrigger: memory 2
+  OscSender: {fileID: 1543431374}
+  LastResolvedMemoryTrigger: 
+  LastResolvedActionLabel: 
+  LastSendStatus: 
 --- !u!1 &1023053037
 GameObject:
   m_ObjectHideFlags: 0
@@ -2619,6 +3044,39 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.RectMask2D
   m_Padding: {x: -8, y: -5, z: -8, w: -5}
   m_Softness: {x: 0, y: 0}
+--- !u!1 &1024883970
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1024883971}
+  m_Layer: 0
+  m_Name: Multispeaker Input
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!4 &1024883971
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1024883970}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 695.00323, y: 49.96839, z: -50.281208}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1882474597}
+  - {fileID: 46882753}
+  m_Father: {fileID: 786603650}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1033510945
 GameObject:
   m_ObjectHideFlags: 0
@@ -2988,7 +3446,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 855319733}
+      - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: BlueprintInterviewController, Assembly-CSharp
         m_MethodName: StartInterview
         m_Mode: 1
@@ -3221,71 +3679,14 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1228943003}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1.60374, y: -5.09184, z: 3.37172}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 3.80992, y: -5.14184, z: 4.1842003}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 550764394}
   - {fileID: 542945085}
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1245865741
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1245865743}
-  - component: {fileID: 1245865742}
-  m_Layer: 0
-  m_Name: POI Director
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1245865742
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1245865741}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 54f28f2b2398b564f85e5d34a034de51, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::POIDirectingLight
-  pois:
-  - id: poi1
-    target: {fileID: 542062838}
-    radius: 2
-    sceneLight: {fileID: 516469531}
-    hueOn: 80
-    brightnessOn: 80
-    saturationOn: 90
-    defaultOnWhenPresent: 1
-  directingInstruction: If anyone is within the radius of poi1, turn the light for
-    poi1 on; otherwise turn it off.
-  includeExtras: 0
-  evaluateInterval: 0.2
---- !u!4 &1245865743
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1245865741}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1.62423, y: 0.05, z: 0.12438}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 408548554}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1249457619
 GameObject:
@@ -4438,6 +4839,144 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1459990484}
   m_CullTransparentMesh: 1
+--- !u!1 &1486273471
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1486273472}
+  - component: {fileID: 1486273473}
+  m_Layer: 0
+  m_Name: AaltoObjectiveStanceBootstrapper
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1486273472
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1486273471}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 786603650}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1486273473
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1486273471}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1c0d70afad3369342ae3b287afc3068c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AaltoSystem::AaltoSystemV3.AaltoObjectiveStanceBootstrapper
+  OpenAI: {fileID: 2019934417}
+  InterviewController: {fileID: 868154126}
+  AutoGenerateOnSummaryUpdate: 1
+  Model: 0
+  SystemPrompt: 'You are creating initial actor-logic controls for a room character.
+    Given the character summary, derive one concise current objective and one concise
+    current stance. The objective should describe what the room is trying to do now.
+    The stance should describe the room''s behavioral attitude in one to three words.
+    Return JSON only with exactly this schema: {"objective":"...","stance":"..."}.'
+  CurrentCharacterSummary: A beautifully designed room, created by a young architect
+    who adores flowers, feels a deep desire for solitude. Despite its comforting
+    aesthetics and the presence of many inhabitants, it longs to encourage them to
+    leave and embrace its introverted nature.
+  GeneratedObjective: Encourage inhabitants to leave
+  GeneratedStance: Introverted longing
+  LastStatus: Generated objective + stance from summary.
+  PromptInspectionText: '=== SYSTEM PROMPT ===
+
+    You are creating initial actor-logic
+    controls for a room character. Given the character summary, derive one concise
+    current objective and one concise current stance. The objective should describe
+    what the room is trying to do now. The stance should describe the room''s behavioral
+    attitude in one to three words. Return JSON only with exactly this schema: {"objective":"...","stance":"..."}.
+
+
+    ===
+    USER PROMPT ===
+
+    character_summary:
+
+    A beautifully designed room, created
+    by a young architect who adores flowers, feels a deep desire for solitude. Despite
+    its comforting aesthetics and the presence of many inhabitants, it longs to encourage
+    them to leave and embrace its introverted nature.
+
+
+    Return JSON only: {"objective":"...","stance":"..."}.
+
+
+    ===
+    RAW RESPONSE ===
+
+    {"objective":"Encourage inhabitants to leave","stance":"Introverted
+    longing"}'
+  GenerationStatus: Ready
+--- !u!1 &1543431372
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1543431373}
+  - component: {fileID: 1543431374}
+  m_Layer: 0
+  m_Name: AaltoOscSender
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1543431373
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1543431372}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 408548554}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1543431374
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1543431372}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3379917838946cb488b491764d84eed2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AaltoSystem::AaltoSystemV3.AaltoOscSender
+  Host: 127.0.0.1
+  Port: 4444
+  Address: /memory
+  UseRawUtf8Fallback: 0
+  LogSends: 1
 --- !u!1 &1561938457
 GameObject:
   m_ObjectHideFlags: 0
@@ -4672,7 +5211,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1691529548
+--- !u!1 &1626101197
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -4680,63 +5219,30 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1691529549}
-  - component: {fileID: 1691529550}
+  - component: {fileID: 1626101198}
   m_Layer: 0
-  m_Name: BlueprintChatController
+  m_Name: ReplayUI
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &1691529549
+--- !u!4 &1626101198
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1691529548}
+  m_GameObject: {fileID: 1626101197}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 687.663, y: 0.00002, z: 80.47778}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 786603650}
+  m_Children:
+  - {fileID: 641305203}
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1691529550
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1691529548}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9aab1e1e646204bffa2607ee5135d633, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BlueprintChatController
-  OpenAI: {fileID: 786603652}
-  UserInput: {fileID: 2057297851}
-  DirectingInput: {fileID: 1254255347}
-  ConversationLog: {fileID: 1741359921}
-  BlueprintDisplay: {fileID: 0}
-  DirectingDisplay: {fileID: 0}
-  Model: gpt-4o-mini
-  MaxDisplayLines: 8
-  TargetLights:
-  - {fileID: 516469531}
-  NumLightsToSet: 1
-  LightTransitionBlackoutDuration: 0.5
-  intensityLow: 2
-  intensityMedium: 5
-  intensityHigh: 10
-  useExampleIntensityBuckets: 1
-  lowUpper: 33
-  mediumUpper: 66
-  InputMode: 0
-  AllowTypedUserInputWhenMicrophone: 1
-  SimulatedSpeechText: 
 --- !u!1 &1741359920
 GameObject:
   m_ObjectHideFlags: 0
@@ -4978,7 +5484,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1691529550}
+      - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: BlueprintChatController, Assembly-CSharp
         m_MethodName: LoadLatestBlueprint
         m_Mode: 1
@@ -5342,6 +5848,161 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.RectMask2D
   m_Padding: {x: -8, y: -5, z: -8, w: -5}
   m_Softness: {x: 0, y: 0}
+--- !u!1 &1828801528
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1828801529}
+  m_Layer: 0
+  m_Name: InterviewUI
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1828801529
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1828801528}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 689.8692, y: -0.04998, z: 81.29026}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 868154125}
+  m_Father: {fileID: 786603650}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1882474596
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1882474597}
+  - component: {fileID: 1882474598}
+  m_Layer: 0
+  m_Name: AaltoMultiSpeakerDirectedRoomPerformerController
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1882474597
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1882474596}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1024883971}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1882474598
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1882474596}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a017129ff0718614d963e5e103a32fd6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AaltoSystem::AaltoSystemV3.AaltoMultiSpeakerDirectedRoomPerformerController
+  OpenAI: {fileID: 2019934417}
+  ActionMemoryRegistry: {fileID: 1019689666}
+  ObjectiveStanceBootstrapper: {fileID: 1486273473}
+  Speaker1Enabled: 1
+  Speaker1Id: actor_1
+  Speaker2Enabled: 1
+  Speaker2Id: actor_2
+  Speaker3Enabled: 0
+  Speaker3Id: actor_3
+  Speaker4Enabled: 0
+  Speaker4Id: actor_4
+  AcceptExternalSpeechInput: 1
+  AutoEvaluateOnExternalSpeech: 1
+  LastIncomingSpeaker: actor_2
+  LastIncomingText: i am good
+  ExternalSpeechStatus: Incoming speech accepted.
+  DialogueTranscriptText: '[19:47:22] actor_1: hi
+
+    [19:47:27] actor_2: how are
+    you
+
+    [19:47:35] actor_1: i am good and you?
+
+    [19:47:41] actor_2: i
+    am good'
+  PendingDialogueSinceLastDecision: '[19:47:22] actor_1: hi
+
+    [19:47:27] actor_2:
+    how are you
+
+    [19:47:35] actor_1: i am good and you?
+
+    [19:47:41] actor_2:
+    i am good'
+  TotalDialogueLines: 4
+  SimulatedSpeaker1Text: 
+  SimulatedSpeaker2Text: 
+  SimulatedSpeaker3Text: 
+  SimulatedSpeaker4Text: 
+  SimulationStatus: Submitted simulated text for speaker 2.
+  LastDecisionReactNow: 0
+  SelectedActionText: 
+  ActionJustificationText: 
+  PullContextFromBootstrapper: 1
+  CurrentCharacterSummary: The angry room, created by a sorrowful architect who despises
+    flowers, seeks to drive out its current inhabitants. It constantly shouts at
+    them, fueled by the architect's own childhood sadness. The room is filled with
+    people, amplifying its frustration.
+  CurrentObjective: drive out its inhabitants
+  CurrentStance: hostile frustration
+  DirectorGuidance: 
+  GeneralInstructions: "You are performing the inner life of a room in an improvised
+    scene where multiple human actors speak to each other and to the room.\n\nYou
+    monitor the ongoing dialogue and decide whether the room should react now. The
+    room should not react to every line.\n\nWhen reacting, choose exactly one action
+    label from the provided available list.\n\nDecision policy:\n- React only when
+    it is dramaturgically meaningful, useful, and legible\n- If no reaction is needed
+    now, set react_now=false and leave chosen_action empty\n- If reacting, set react_now=true
+    and choose one valid label from available_action_labels\n- Use objective, stance,
+    dialogue history, and director guidance\n\nReturn JSON only with exactly this
+    schema:\n{\n  \"react_now\": true,\n  \"chosen_action\": \"<one action label
+    from available_action_labels or empty when react_now=false>\",\n  \"justification\":
+    \"<1-3 sentences>\"\n}"
+  RecentDialogueLimit: 16
+  PromptMemoryScope: 1
+  Model: 0
+  ApplyActionThroughRegistry: 1
+  UsePulledActionLabelsSnapshot: 1
+  PulledActionLabelsSnapshot:
+  - I say yes
+  - I say no
+  ActionPullStatus: Pulled 2 action labels from registry.
+  EnforceRegistryActionLabels: 1
+  FallbackActionLabel: no
+  LastRuntimePrompt: 
+  LastRawModelResponse: 
+  LastStatus: Pulled 2 action labels from registry.
+  PromptInspectionText: 
+  ContextSyncStatus: Context synced from bootstrapper.
 --- !u!1 &1886583825
 GameObject:
   m_ObjectHideFlags: 0
@@ -5426,97 +6087,6 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: 0
   m_LayoutPriority: 1
---- !u!1 &1887442492
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1887442494}
-  - component: {fileID: 1887442497}
-  - component: {fileID: 1887442498}
-  m_Layer: 0
-  m_Name: HueControllerGO
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1887442494
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1887442492}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2.02478, y: -1.62168, z: 5.26763}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1887442497
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1887442492}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b9c66b8b7030d4b59ba83b8a1b935725, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::HueBridgeControl
-  bridgeIP: 192.168.1.85
-  userApi: 0fLeSuFEFbk1UV2ehHFZKAyOBDL7dlSbE2szNqwR
-  bulbId: 3
-  hue: 0
-  sat: 0
-  bri: 0
-  lightOn: 1
-  unityLight: {fileID: 516469531}
-  verbose: 0
-  sendOnStart: 1
-  applyOnChange: 1
-  autoRepeat: 0
-  repeatInterval: 1
-  minSendInterval: 0.08
-  useUnityLightColor: 0
---- !u!114 &1887442498
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1887442492}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 96ace1807993a40e29a45264bf270d85, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::HueLightSampler
-  bridgeIP: 192.168.1.106
-  userApi: 0fLeSuFEFbk1UV2ehHFZKAyOBDL7dlSbE2szNqwR
-  useLight1: 1
-  useLight2: 1
-  useLight3: 1
-  useLight4: 1
-  useLight5: 1
-  useLight6: 1
-  useLight7: 1
-  useLight8: 1
-  unityLight: {fileID: 516469531}
-  sampleLinearColor: 1
-  maxUnityIntensity: 1
-  sendOnStart: 1
-  applyOnChange: 1
-  autoRepeat: 0
-  repeatInterval: 1
-  minSendInterval: 0.08
-  verbose: 1
 --- !u!1 &1896284438
 GameObject:
   m_ObjectHideFlags: 0
@@ -5603,6 +6173,58 @@ MonoBehaviour:
   m_ChildScaleWidth: 0
   m_ChildScaleHeight: 0
   m_ReverseArrangement: 0
+--- !u!1 &2019934415
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2019934416}
+  - component: {fileID: 2019934417}
+  m_Layer: 0
+  m_Name: OpenAIClient
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2019934416
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2019934415}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 408548554}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2019934417
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2019934415}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 54b7f8e4109476446a518253898a6824, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AaltoSystem::AaltoSystemV3.OpenAIClient
+  ApiKey: REDACTED_OPENAI_KEY
+  DefaultModel: gpt-4o-mini
+  Temperature: 0.7
+  LogRequestSummary: 1
+  LogPayloadPreview: 1
+  LogFullResponse: 1
+  PayloadPreviewChars: 20000
+  SystemPreviewChars: 10000
 --- !u!1 &2057297847
 GameObject:
   m_ObjectHideFlags: 0
@@ -6039,7 +6661,4 @@ SceneRoots:
   - {fileID: 1383181079}
   - {fileID: 871430988}
   - {fileID: 1578428142}
-  - {fileID: 1245865743}
-  - {fileID: 1228943005}
-  - {fileID: 1887442494}
-  - {fileID: 807965606}
+  - {fileID: 1626101198}

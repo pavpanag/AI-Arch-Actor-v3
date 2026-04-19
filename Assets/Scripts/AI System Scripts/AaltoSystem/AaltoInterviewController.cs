@@ -268,6 +268,16 @@ namespace AaltoSystemV3
             }
         }
 
+        public void GenerateFollowUpQuestions()
+        {
+            GenerateClarificationQuestionsFromInputs();
+        }
+
+        public void SubmitFollowUpAnswersAndCreateSummary()
+        {
+            GenerateCharacterSummaryFromInputs();
+        }
+
         public void LoadLatestProfile()
         {
             try
@@ -396,10 +406,10 @@ namespace AaltoSystemV3
         }
 
         [ContextMenu("Aalto Interview/Generate Follow Up Questions")]
-        public void ContextGenerateClarifications() => GenerateClarificationQuestionsFromInputs();
+        public void ContextGenerateClarifications() => GenerateFollowUpQuestions();
 
         [ContextMenu("Aalto Interview/Generate Character Summary")]
-        public void ContextGenerateSummary() => GenerateCharacterSummaryFromInputs();
+        public void ContextGenerateSummary() => SubmitFollowUpAnswersAndCreateSummary();
 
         [ContextMenu("Aalto Interview/Load Latest Profile")]
         public void ContextLoadLatest() => LoadLatestProfile();
