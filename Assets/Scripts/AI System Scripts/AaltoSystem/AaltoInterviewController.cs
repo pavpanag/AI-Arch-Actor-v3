@@ -165,6 +165,14 @@ namespace AaltoSystemV3
             var obstacle = ObstacleText ?? string.Empty;
             var circumstances = CircumstancesText ?? string.Empty;
 
+            EmitInterviewEvent(
+                "interview.followup_questions_requested",
+                "{\"model\":\"" + AaltoLaunchSessionLogger.EscapeJson(SelectedModelId) + "\"," +
+                "\"backstory\":\"" + AaltoLaunchSessionLogger.EscapeJson(backstory) + "\"," +
+                "\"motive\":\"" + AaltoLaunchSessionLogger.EscapeJson(motive) + "\"," +
+                "\"obstacle\":\"" + AaltoLaunchSessionLogger.EscapeJson(obstacle) + "\"," +
+                "\"circumstances\":\"" + AaltoLaunchSessionLogger.EscapeJson(circumstances) + "\"}");
+
             InterviewQuestionsText = BuildInterviewQuestionsDisplay();
 
             if (string.IsNullOrWhiteSpace(backstory) &&
@@ -193,7 +201,19 @@ namespace AaltoSystemV3
 
                 if (followUps.Count > 0)
                 {
+                    var previousQuestions = FollowUpQuestionsText ?? string.Empty;
                     FollowUpQuestionsText = string.Join("\n", followUps.ToArray());
+                    EmitInterviewEvent(
+                        "interview.followup_questions_generated",
+                        "{\"questions\":\"" + AaltoLaunchSessionLogger.EscapeJson(FollowUpQuestionsText ?? string.Empty) + "\"," +
+                        "\"question_count\":" + followUps.Count + "}");
+                    if (!string.Equals(previousQuestions, FollowUpQuestionsText ?? string.Empty, StringComparison.Ordinal))
+                    {
+                        EmitInterviewEvent(
+                            "interview.followup_questions_changed",
+                            "{\"previous_questions\":\"" + AaltoLaunchSessionLogger.EscapeJson(previousQuestions) + "\"," +
+                            "\"new_questions\":\"" + AaltoLaunchSessionLogger.EscapeJson(FollowUpQuestionsText ?? string.Empty) + "\"}");
+                    }
                     _awaitingClarifications = true;
                     HasApprovedSummary = false;
                     SetFlowState(InterviewFlowState.AwaitingClarifications);
@@ -219,6 +239,16 @@ namespace AaltoSystemV3
             var motive = MotiveText ?? string.Empty;
             var obstacle = ObstacleText ?? string.Empty;
             var circumstances = CircumstancesText ?? string.Empty;
+            var followUpAnswers = FollowUpAnswersText ?? string.Empty;
+
+            EmitInterviewEvent(
+                "interview.summary_requested",
+                "{\"model\":\"" + AaltoLaunchSessionLogger.EscapeJson(SelectedModelId) + "\"," +
+                "\"backstory\":\"" + AaltoLaunchSessionLogger.EscapeJson(backstory) + "\"," +
+                "\"motive\":\"" + AaltoLaunchSessionLogger.EscapeJson(motive) + "\"," +
+                "\"obstacle\":\"" + AaltoLaunchSessionLogger.EscapeJson(obstacle) + "\"," +
+                "\"circumstances\":\"" + AaltoLaunchSessionLogger.EscapeJson(circumstances) + "\"," +
+                "\"followup_answers\":\"" + AaltoLaunchSessionLogger.EscapeJson(followUpAnswers) + "\"}");
 
             InterviewQuestionsText = BuildInterviewQuestionsDisplay();
 
@@ -253,7 +283,18 @@ namespace AaltoSystemV3
                     return;
                 }
 
+                var previousSummary = LastSummary ?? string.Empty;
                 LastSummary = summary.Trim();
+                EmitInterviewEvent(
+                    "interview.summary_generated",
+                    "{\"summary\":\"" + AaltoLaunchSessionLogger.EscapeJson(LastSummary ?? string.Empty) + "\"}");
+                if (!string.Equals(previousSummary, LastSummary ?? string.Empty, StringComparison.Ordinal))
+                {
+                    EmitInterviewEvent(
+                        "interview.summary_changed",
+                        "{\"previous_summary\":\"" + AaltoLaunchSessionLogger.EscapeJson(previousSummary) + "\"," +
+                        "\"new_summary\":\"" + AaltoLaunchSessionLogger.EscapeJson(LastSummary ?? string.Empty) + "\"}");
+                }
                 HasApprovedSummary = false;
                 SetRuntimeApprovalState(false);
                 _awaitingClarifications = false;
@@ -314,6 +355,10 @@ namespace AaltoSystemV3
                 SetRuntimeApprovalState(true);
                 SetFlowState(InterviewFlowState.RehearsalReady);
                 SetStatus("[aalto-interview] Loaded latest profile and applied to Aalto runtime.");
+                EmitInterviewEvent(
+                    "interview.profile_loaded",
+                    "{\"profile_path\":\"" + AaltoLaunchSessionLogger.EscapeJson(LatestProfilePath) + "\"," +
+                    "\"summary\":\"" + AaltoLaunchSessionLogger.EscapeJson(LastSummary ?? string.Empty) + "\"}");
             }
             catch (Exception ex)
             {
@@ -354,6 +399,10 @@ namespace AaltoSystemV3
 
                 SetFlowState(InterviewFlowState.RehearsalReady);
                 SetStatus("[aalto-interview] Summary approved. Rehearsal can begin.");
+                EmitInterviewEvent(
+                    "interview.summary_approved",
+                    "{\"profile_path\":\"" + AaltoLaunchSessionLogger.EscapeJson(LatestProfilePath) + "\"," +
+                    "\"summary\":\"" + AaltoLaunchSessionLogger.EscapeJson(LastSummary ?? string.Empty) + "\"}");
             }
             catch (Exception ex)
             {
@@ -383,6 +432,10 @@ namespace AaltoSystemV3
             {
                 SetFlowState(InterviewFlowState.RevisingDraft);
                 SetStatus("[aalto-interview] Revising draft summary...");
+                EmitInterviewEvent(
+                    "interview.summary_revision_requested",
+                    "{\"revision_notes\":\"" + AaltoLaunchSessionLogger.EscapeJson(notes) + "\"," +
+                    "\"model\":\"" + AaltoLaunchSessionLogger.EscapeJson(SelectedModelId) + "\"}");
                 var revisedJson = await RequestRevisionAsync(LastSummary, notes);
 
                 if (!TryParseSummary(revisedJson, out var revised, out var error))
@@ -392,7 +445,18 @@ namespace AaltoSystemV3
                     return;
                 }
 
+                var previousSummary = LastSummary ?? string.Empty;
                 LastSummary = revised;
+                EmitInterviewEvent(
+                    "interview.summary_revised",
+                    "{\"summary\":\"" + AaltoLaunchSessionLogger.EscapeJson(LastSummary ?? string.Empty) + "\"}");
+                if (!string.Equals(previousSummary, LastSummary ?? string.Empty, StringComparison.Ordinal))
+                {
+                    EmitInterviewEvent(
+                        "interview.summary_changed",
+                        "{\"previous_summary\":\"" + AaltoLaunchSessionLogger.EscapeJson(previousSummary) + "\"," +
+                        "\"new_summary\":\"" + AaltoLaunchSessionLogger.EscapeJson(LastSummary ?? string.Empty) + "\"}");
+                }
                 HasApprovedSummary = false;
                 SetRuntimeApprovalState(false);
                 SetFlowState(InterviewFlowState.DraftReadyForReview);
@@ -447,6 +511,12 @@ namespace AaltoSystemV3
 
             var response = await OpenAI.ChatCompletionsJsonAsync(messages, model: SelectedModelId, contextTag: "Aalto:SummarizeCharacter");
             LastSummaryResponseJson = response;
+            EmitInterviewEvent(
+                "interview.model_exchange.summary",
+                "{\"model\":\"" + AaltoLaunchSessionLogger.EscapeJson(SelectedModelId) + "\"," +
+                "\"system_prompt\":\"" + AaltoLaunchSessionLogger.EscapeJson(system) + "\"," +
+                "\"user_prompt\":\"" + AaltoLaunchSessionLogger.EscapeJson(user) + "\"," +
+                "\"raw_response\":\"" + AaltoLaunchSessionLogger.EscapeJson(response ?? string.Empty) + "\"}");
             RefreshPromptInspectionText();
             return response;
         }
@@ -478,6 +548,12 @@ namespace AaltoSystemV3
 
             var response = await OpenAI.ChatCompletionsJsonAsync(messages, model: SelectedModelId, contextTag: "Aalto:ClarificationQuestions");
             LastClarificationResponseJson = response;
+            EmitInterviewEvent(
+                "interview.model_exchange.followup",
+                "{\"model\":\"" + AaltoLaunchSessionLogger.EscapeJson(SelectedModelId) + "\"," +
+                "\"system_prompt\":\"" + AaltoLaunchSessionLogger.EscapeJson(system) + "\"," +
+                "\"user_prompt\":\"" + AaltoLaunchSessionLogger.EscapeJson(LastClarificationUserPrompt ?? string.Empty) + "\"," +
+                "\"raw_response\":\"" + AaltoLaunchSessionLogger.EscapeJson(response ?? string.Empty) + "\"}");
             RefreshPromptInspectionText();
             return response;
         }
@@ -500,6 +576,12 @@ namespace AaltoSystemV3
 
             var response = await OpenAI.ChatCompletionsJsonAsync(messages, model: SelectedModelId, contextTag: "Aalto:ReviseCharacterSummary");
             LastSummaryResponseJson = response;
+            EmitInterviewEvent(
+                "interview.model_exchange.revision",
+                "{\"model\":\"" + AaltoLaunchSessionLogger.EscapeJson(SelectedModelId) + "\"," +
+                "\"system_prompt\":\"" + AaltoLaunchSessionLogger.EscapeJson(system) + "\"," +
+                "\"user_prompt\":\"" + AaltoLaunchSessionLogger.EscapeJson(user) + "\"," +
+                "\"raw_response\":\"" + AaltoLaunchSessionLogger.EscapeJson(response ?? string.Empty) + "\"}");
             RefreshPromptInspectionText();
             return response;
         }
@@ -670,7 +752,13 @@ namespace AaltoSystemV3
         {
             Debug.Log(msg);
             LastStatus = msg;
+            EmitInterviewEvent("interview.status", "{\"status\":\"" + AaltoLaunchSessionLogger.EscapeJson(msg ?? string.Empty) + "\"}");
             RefreshPromptInspectionText();
+        }
+
+        private static void EmitInterviewEvent(string eventType, string payloadJson)
+        {
+            AaltoLaunchSessionLogger.EmitEvent("AaltoInterviewController", eventType, payloadJson);
         }
 
         private static string DefaultClarificationSystemPrompt(int clarificationCount)

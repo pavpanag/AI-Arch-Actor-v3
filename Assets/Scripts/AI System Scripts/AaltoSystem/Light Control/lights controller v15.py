@@ -6,6 +6,7 @@ from pythonosc.dispatcher import Dispatcher
 from pythonosc.osc_server import BlockingOSCUDPServer
 import threading
 import os
+import json
 
 # Philips Hue Bridge configuration
 BRIDGE_IP = "192.168.1.106"
@@ -14,8 +15,186 @@ USER_API = "0fLeSuFEFbk1UV2ehHFZKAyOBDL7dlSbE2szNqwR"
 # Memory for storing light states
 memory = {i: [(0, 0, 0) for _ in range(8)] for i in range(1, 21)}  # Default to (0, 0, 0) for all lights
 current_memory = 1
-osc_active = False  # Tracks if OSC input is enabled
+osc_active = True  # Tracks if OSC input is enabled
 base_color_image = None
+logical_to_bridge_id = {}
+logical_to_uniqueid = {}
+uniqueid_to_bridge_id = {}
+bridge_lights_cache = {}
+light_labels = {}
+CONFIG_FILE = "lights_controller_config_v15.json"
+persistent_memories = {str(i): {} for i in range(1, 21)}
+
+def get_config_path():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(script_dir, CONFIG_FILE)
+
+def fetch_lights_data():
+    """Return Hue light dictionary keyed by bridge light ID."""
+    url = f"http://{BRIDGE_IP}/api/{USER_API}/lights"
+    response = requests.get(url, timeout=3)
+    response.raise_for_status()
+    lights = response.json()
+    return lights if isinstance(lights, dict) else {}
+
+def fetch_available_light_ids():
+    """Return sorted Hue bridge light IDs, prioritizing reachable lights."""
+    try:
+        lights = fetch_lights_data()
+    except requests.RequestException as e:
+        print(f"Failed to fetch lights from bridge: {e}")
+        return []
+
+    def _sort_key(light_id):
+        return int(light_id) if str(light_id).isdigit() else str(light_id)
+
+    reachable = [
+        light_id for light_id, light_data in lights.items()
+        if light_data.get("state", {}).get("reachable", True)
+    ]
+
+    candidates = reachable if reachable else list(lights.keys())
+    return sorted(candidates, key=_sort_key)
+
+def assign_light_mapping():
+    """Map controller slots 1-8 to currently available bridge light IDs."""
+    global logical_to_bridge_id, logical_to_uniqueid, uniqueid_to_bridge_id, bridge_lights_cache
+
+    try:
+        bridge_lights_cache = fetch_lights_data()
+    except requests.RequestException as e:
+        print(f"Failed to fetch lights from bridge: {e}")
+        bridge_lights_cache = {}
+        logical_to_bridge_id = {}
+        logical_to_uniqueid = {}
+        uniqueid_to_bridge_id = {}
+        return
+
+    def _sort_key(light_id):
+        return int(light_id) if str(light_id).isdigit() else str(light_id)
+
+    reachable = [
+        light_id for light_id, light_data in bridge_lights_cache.items()
+        if light_data.get("state", {}).get("reachable", True)
+    ]
+
+    available_light_ids = sorted(reachable if reachable else list(bridge_lights_cache.keys()), key=_sort_key)
+    logical_to_bridge_id = {
+        slot: available_light_ids[slot - 1]
+        for slot in range(1, min(9, len(available_light_ids) + 1))
+    }
+    logical_to_uniqueid = {
+        slot: bridge_lights_cache.get(bridge_id, {}).get("uniqueid")
+        for slot, bridge_id in logical_to_bridge_id.items()
+    }
+    uniqueid_to_bridge_id = {
+        light_data.get("uniqueid"): bridge_id
+        for bridge_id, light_data in bridge_lights_cache.items()
+        if light_data.get("uniqueid")
+    }
+
+    if not logical_to_bridge_id:
+        print("No Hue lights detected. Controls will not affect any light.")
+    else:
+        print("Light mapping (controller slot -> bridge light ID/name):")
+        for slot in range(1, 9):
+            bridge_id = logical_to_bridge_id.get(slot)
+            if bridge_id is None:
+                print(f"  {slot} -> (unassigned)")
+            else:
+                light_name = bridge_lights_cache.get(bridge_id, {}).get("name", "Unknown")
+                print(f"  {slot} -> {bridge_id} ({light_name})")
+
+def update_light_labels():
+    for slot, label in light_labels.items():
+        bridge_id = logical_to_bridge_id.get(slot)
+        if bridge_id is None:
+            label.config(text=f"Light {slot} (unassigned)")
+        else:
+            light_name = bridge_lights_cache.get(bridge_id, {}).get("name", "Unknown")
+            label.config(text=f"Light {slot} ({light_name}, ID {bridge_id})")
+
+def _memory_list_to_uniqueid_dict(memory_list):
+    slot_to_state = {}
+    for slot, (bri, hue, sat) in enumerate(memory_list, start=1):
+        uniqueid = logical_to_uniqueid.get(slot)
+        if uniqueid:
+            slot_to_state[uniqueid] = [int(bri), int(hue), int(sat)]
+    return slot_to_state
+
+def _uniqueid_dict_to_memory_list(uniqueid_state):
+    memory_list = [(0, 0, 0) for _ in range(8)]
+    for slot in range(1, 9):
+        uniqueid = logical_to_uniqueid.get(slot)
+        if not uniqueid:
+            continue
+        saved_state = uniqueid_state.get(uniqueid)
+        if isinstance(saved_state, list) and len(saved_state) == 3:
+            memory_list[slot - 1] = (int(saved_state[0]), int(saved_state[1]), int(saved_state[2]))
+    return memory_list
+
+def save_configuration():
+    try:
+        payload = {
+            "version": 1,
+            "current_memory": int(current_memory),
+            "persistent_memories": persistent_memories,
+        }
+        with open(get_config_path(), "w", encoding="utf-8") as config_file:
+            json.dump(payload, config_file, indent=2)
+        print(f"Configuration saved to {get_config_path()}")
+    except OSError as e:
+        print(f"Failed to save configuration: {e}")
+
+def load_configuration():
+    global current_memory, persistent_memories
+    config_path = get_config_path()
+    if not os.path.exists(config_path):
+        print("No saved configuration found. Using defaults.")
+        return
+
+    try:
+        with open(config_path, "r", encoding="utf-8") as config_file:
+            loaded = json.load(config_file)
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"Failed to load configuration: {e}")
+        return
+
+    loaded_memories = loaded.get("persistent_memories", {})
+    new_persistent_memories = {str(i): {} for i in range(1, 21)}
+    for memory_key, state_map in loaded_memories.items():
+        if memory_key in new_persistent_memories and isinstance(state_map, dict):
+            new_persistent_memories[memory_key] = state_map
+
+    persistent_memories = new_persistent_memories
+
+    loaded_current_memory = loaded.get("current_memory", 1)
+    if isinstance(loaded_current_memory, int) and 1 <= loaded_current_memory <= 20:
+        current_memory = loaded_current_memory
+
+    for memory_id in range(1, 21):
+        memory[memory_id] = _uniqueid_dict_to_memory_list(persistent_memories[str(memory_id)])
+
+    print(f"Configuration loaded from {config_path}")
+
+def _sync_current_memory_to_persistent():
+    persistent_memories[str(current_memory)] = _memory_list_to_uniqueid_dict(memory[current_memory])
+
+def save_current_memory_to_disk():
+    _sync_current_memory_to_persistent()
+    save_configuration()
+
+def load_configuration_and_apply():
+    load_configuration()
+    update_light_labels()
+    select_memory(current_memory)
+
+def refresh_light_mapping():
+    assign_light_mapping()
+    update_light_labels()
+    for memory_id in range(1, 21):
+        memory[memory_id] = _uniqueid_dict_to_memory_list(persistent_memories[str(memory_id)])
+    select_memory(current_memory)
 
 def get_base_color_image():
     global base_color_image
@@ -25,14 +204,19 @@ def get_base_color_image():
         base_color_image = Image.open(img_path).convert("RGB")
     return base_color_image
 
-def set_light_state(light_id, brightness, hue, saturation):
-    url = f"http://{BRIDGE_IP}/api/{USER_API}/lights/{light_id}/state"
+def set_light_state(light_slot, brightness, hue, saturation):
+    bridge_light_id = logical_to_bridge_id.get(light_slot)
+    if bridge_light_id is None:
+        print(f"Skipping Light {light_slot}: no mapped Hue bridge light ID.")
+        return
+
+    url = f"http://{BRIDGE_IP}/api/{USER_API}/lights/{bridge_light_id}/state"
     payload = {"on": True, "bri": brightness, "hue": hue, "sat": saturation} if brightness > 0 else {"on": False}
     response = requests.put(url, json=payload)
     if response.status_code == 200:
-        print(f"Light {light_id} set to brightness {brightness}, hue {hue}, saturation {saturation}")
+        print(f"Light {light_slot} (ID {bridge_light_id}) set to brightness {brightness}, hue {hue}, saturation {saturation}")
     else:
-        print(f"Failed to set light {light_id}")
+        print(f"Failed to set Light {light_slot} (ID {bridge_light_id})")
 
 def create_color_field_and_brightness_slider(parent, light_id, row, column):
     brightness = tk.IntVar(value=254)  # Default brightness
@@ -83,6 +267,7 @@ def create_color_field_and_brightness_slider(parent, light_id, row, column):
 
     label = tk.Label(parent, text=f"Light {light_id}")
     label.grid(row=row, column=column, padx=10, pady=5, sticky="ew")
+    light_labels[light_id] = label
 
     brightness_slider = tk.Scale(parent, from_=0, to=254, orient=tk.HORIZONTAL, variable=brightness, command=update_light)
     brightness_slider.grid(row=row + 1, column=column, padx=10, sticky="ew")
@@ -101,11 +286,15 @@ def create_color_field_and_brightness_slider(parent, light_id, row, column):
 def record_memory():
     global current_memory
     memory[current_memory] = [(brightness_vars[light_id].get(), hue_vars[light_id], sat_vars[light_id]) for light_id in range(1, 9)]
+    _sync_current_memory_to_persistent()
     print(f"Memory {current_memory} recorded: {memory[current_memory]}")
 
 def select_memory(memory_id):
     global current_memory
     current_memory = memory_id
+    persistent_state = persistent_memories.get(str(memory_id), {})
+    if isinstance(persistent_state, dict) and persistent_state:
+        memory[memory_id] = _uniqueid_dict_to_memory_list(persistent_state)
     active_memory_label.config(text=f"Active Memory: Memory {current_memory}")
     for light_id, (bri, hue, sat) in enumerate(memory[memory_id], start=1):
         brightness_vars[light_id].set(bri)
@@ -157,6 +346,9 @@ def start_osc_server():
     except OSError as e:
         port_label.config(text="OSC Port: Error")
         print(f"OSC server error: {e}")
+
+def on_app_close():
+    root.destroy()
 
 # Initialize Tkinter
 root = tk.Tk()
@@ -211,18 +403,23 @@ memories_frame.grid(row=0, column=1, padx=10, pady=10, sticky="n")
 active_memory_label = tk.Label(memories_frame, text="Active Memory: Memory 1", font=("Arial", 12))
 active_memory_label.grid(row=0, column=0, columnspan=5, padx=10, pady=10)
 
-port_label = tk.Label(memories_frame, text="OSC Port: Not Running", font=("Arial", 10))
+port_label = tk.Label(memories_frame, text="OSC Port: Starting...", font=("Arial", 10))
 port_label.grid(row=7, column=0, columnspan=5, padx=10, pady=10)
 
 brightness_vars = {i: None for i in range(1, 9)}
 hue_vars = {i: 0 for i in range(1, 9)}
 sat_vars = {i: 0 for i in range(1, 9)}
 
+assign_light_mapping()
+load_configuration()
+
 for light_id in range(1, 5):
     brightness_vars[light_id] = create_color_field_and_brightness_slider(lights_frame, light_id, 0, light_id - 1)
 
 for light_id in range(5, 9):
     brightness_vars[light_id] = create_color_field_and_brightness_slider(lights_frame, light_id, 5, light_id - 5)
+
+update_light_labels()
 
 for i in range(1, 21):
     btn_memory = tk.Button(memories_frame, text=f"Memory {i}", command=lambda i=i: select_memory(i))
@@ -231,7 +428,23 @@ for i in range(1, 21):
 btn_record = tk.Button(memories_frame, text="Record", command=record_memory)
 btn_record.grid(row=5, column=0, columnspan=5, padx=10, pady=10)
 
-osc_button = tk.Button(memories_frame, text="OSC Input: OFF", command=toggle_osc)
+osc_button = tk.Button(memories_frame, text="OSC Input: ON", command=toggle_osc)
 osc_button.grid(row=6, column=0, columnspan=5, padx=10, pady=10)
+
+if osc_active:
+    threading.Thread(target=start_osc_server, daemon=True).start()
+
+btn_refresh_ids = tk.Button(memories_frame, text="Refresh Light IDs", command=refresh_light_mapping)
+btn_refresh_ids.grid(row=8, column=0, columnspan=5, padx=10, pady=10)
+
+btn_save_config = tk.Button(memories_frame, text="Save Configuration", command=save_current_memory_to_disk)
+btn_save_config.grid(row=9, column=0, columnspan=5, padx=10, pady=10)
+
+btn_load_config = tk.Button(memories_frame, text="Load Configuration", command=load_configuration_and_apply)
+btn_load_config.grid(row=10, column=0, columnspan=5, padx=10, pady=10)
+
+select_memory(current_memory)
+
+root.protocol("WM_DELETE_WINDOW", on_app_close)
 
 root.mainloop()

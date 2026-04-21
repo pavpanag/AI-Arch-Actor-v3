@@ -1,0 +1,31 @@
+{
+    "exportedAtUtc": "2026-04-21T05:28:39.5260215Z",
+    "currentTakeNumber": 1,
+    "archivedTakeCount": 0,
+    "archivedTakes": [],
+    "currentTake": {
+        "takeNumber": 1,
+        "capturedAtUtc": "2026-04-21T05:28:39.5260215Z",
+        "turnCount": 2,
+        "turns": [
+            {
+                "latestDialogueLine": "[05:28:02] actor_1: hi",
+                "pendingDialogueBatch": "[05:28:02] actor_1: hi",
+                "selectedResponse": "I say yes",
+                "justification": "The greeting from actor_1 presents an opportunity for the room to respond positively, reinforcing its role as a comforting space. This reaction can help set a more relaxed tone as the interaction unfolds.",
+                "reactNow": true,
+                "showDetails": false,
+                "showJustification": false
+            },
+            {
+                "latestDialogueLine": "[05:28:07] actor_2: hey",
+                "pendingDialogueBatch": "[05:28:07] actor_2: hey",
+                "selectedResponse": "I say yes",
+                "justification": "The casual greetings between the actors create a moment of connection that the room can acknowledge with a soothing affirmation, reinforcing its role as a comforting space for its occupants.",
+                "reactNow": true,
+                "showDetails": false,
+                "showJustification": false
+            }
+        ]
+    }
+}

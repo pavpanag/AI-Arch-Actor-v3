@@ -106,6 +106,41 @@ namespace AaltoSystemV3
             return false;
         }
 
+        public bool TrySendMemoryTrigger(string memoryTrigger, out string error)
+        {
+            error = null;
+            LastResolvedActionLabel = "(direct)";
+            LastResolvedMemoryTrigger = null;
+            LastSendStatus = null;
+
+            var trigger = (memoryTrigger ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(trigger))
+            {
+                error = "Memory trigger is empty.";
+                LastSendStatus = error;
+                return false;
+            }
+
+            LastResolvedMemoryTrigger = trigger;
+
+            if (OscSender == null)
+            {
+                error = "OSC sender is not assigned.";
+                LastSendStatus = error;
+                return false;
+            }
+
+            if (OscSender.TrySendMemoryTrigger(trigger, out var sendError))
+            {
+                LastSendStatus = $"Sent direct memory trigger '{trigger}'";
+                return true;
+            }
+
+            error = sendError;
+            LastSendStatus = error;
+            return false;
+        }
+
         [ContextMenu("Action Memory/Reset Default Mappings")]
         public void ResetDefaultMappings()
         {

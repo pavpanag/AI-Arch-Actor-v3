@@ -204,13 +204,20 @@ namespace AaltoSystemV3
                 };
 
                 SetStatus("Generating initial objective and stance...");
+                EmitBootstrapperEvent("bootstrap.request_prepared",
+                    "{\"model\":\"" + AaltoLaunchSessionLogger.EscapeJson(SelectedModelId) + "\"," +
+                    "\"summary\":\"" + AaltoLaunchSessionLogger.EscapeJson(summary) + "\"}");
                 var raw = await OpenAI.ChatCompletionsJsonAsync(
                     messages,
                     model: SelectedModelId,
                     contextTag: "Aalto:BootstrapObjectiveStance");
+                EmitBootstrapperEvent("bootstrap.model_response",
+                    "{\"raw_response\":\"" + AaltoLaunchSessionLogger.EscapeJson(raw ?? string.Empty) + "\"}");
 
                 if (!TryParse(raw, out var objective, out var stance, out var error))
                 {
+                    EmitBootstrapperEvent("bootstrap.parse_failed",
+                        "{\"error\":\"" + AaltoLaunchSessionLogger.EscapeJson(error ?? string.Empty) + "\"}");
                     SetStatus("Parse failed: " + error);
                     PromptInspectionText = BuildInspection(SystemPrompt, userPrompt, raw);
                     return false;
@@ -219,6 +226,9 @@ namespace AaltoSystemV3
                 GeneratedObjective = objective;
                 GeneratedStance = stance;
                 _lastGeneratedSummary = summary;
+                EmitBootstrapperEvent("bootstrap.generated",
+                    "{\"objective\":\"" + AaltoLaunchSessionLogger.EscapeJson(GeneratedObjective ?? string.Empty) + "\"," +
+                    "\"stance\":\"" + AaltoLaunchSessionLogger.EscapeJson(GeneratedStance ?? string.Empty) + "\"}");
 
                 PromptInspectionText = BuildInspection(SystemPrompt, userPrompt, raw);
                 SetStatus("Generated objective + stance from summary.");
@@ -227,6 +237,8 @@ namespace AaltoSystemV3
             }
             catch (Exception ex)
             {
+                EmitBootstrapperEvent("bootstrap.error",
+                    "{\"message\":\"" + AaltoLaunchSessionLogger.EscapeJson(ex.Message) + "\"}");
                 SetStatus("Error: " + ex.Message);
                 GenerationStatus = "Error";
                 return false;
@@ -319,6 +331,12 @@ namespace AaltoSystemV3
         {
             LastStatus = status ?? string.Empty;
             Debug.Log("[AaltoObjectiveStanceBootstrapper] " + LastStatus);
+            EmitBootstrapperEvent("bootstrap.status", "{\"status\":\"" + AaltoLaunchSessionLogger.EscapeJson(LastStatus) + "\"}");
+        }
+
+        private static void EmitBootstrapperEvent(string eventType, string payloadJson)
+        {
+            AaltoLaunchSessionLogger.EmitEvent("AaltoObjectiveStanceBootstrapper", eventType, payloadJson);
         }
     }
 }

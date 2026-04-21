@@ -1,6 +1,9 @@
 using UnityEditor;
 using UnityEngine;
 using AaltoSystemV3;
+using System;
+using System.IO;
+using System.Collections.Generic;
 
 [CustomEditor(typeof(AaltoDirectedRoomPerformerController))]
 public sealed class AaltoDirectedRoomPerformerControllerEditor : Editor
@@ -10,17 +13,18 @@ public sealed class AaltoDirectedRoomPerformerControllerEditor : Editor
     SerializedProperty objectiveStanceBootstrapperProperty;
 
     SerializedProperty inspectorActorInputProperty;
-    SerializedProperty inspectorInputStatusProperty;
     SerializedProperty acceptExternalSpeechInputProperty;
     SerializedProperty autoSubmitExternalSpeechProperty;
     SerializedProperty lastExternalSpeechTextProperty;
-    SerializedProperty externalSpeechStatusProperty;
     SerializedProperty directorGuidanceInputProperty;
-    SerializedProperty directorGuidanceInputStatusProperty;
     SerializedProperty directorGuidanceInputsProperty;
 
     SerializedProperty selectedActionTextProperty;
     SerializedProperty actionJustificationTextProperty;
+
+    SerializedProperty dialogLogLimitProperty;
+    SerializedProperty dialogLogCompactModeProperty;
+    SerializedProperty dialogTurnsProperty;
 
     SerializedProperty pullContextFromBootstrapperProperty;
     SerializedProperty currentCharacterSummaryProperty;
@@ -32,6 +36,10 @@ public sealed class AaltoDirectedRoomPerformerControllerEditor : Editor
     SerializedProperty recentHistoryLimitProperty;
     SerializedProperty modelProperty;
     SerializedProperty applyActionThroughRegistryProperty;
+    SerializedProperty selectedActionStateModeProperty;
+    SerializedProperty neutralMemoryTriggerProperty;
+    SerializedProperty responsePulseSecondsProperty;
+    SerializedProperty executionModeStatusProperty;
     SerializedProperty usePulledActionLabelsSnapshotProperty;
     SerializedProperty pulledActionLabelsSnapshotProperty;
     SerializedProperty actionPullStatusProperty;
@@ -51,17 +59,18 @@ public sealed class AaltoDirectedRoomPerformerControllerEditor : Editor
         objectiveStanceBootstrapperProperty = serializedObject.FindProperty("ObjectiveStanceBootstrapper");
 
         inspectorActorInputProperty = serializedObject.FindProperty("InspectorActorInput");
-        inspectorInputStatusProperty = serializedObject.FindProperty("InspectorInputStatus");
         acceptExternalSpeechInputProperty = serializedObject.FindProperty("AcceptExternalSpeechInput");
         autoSubmitExternalSpeechProperty = serializedObject.FindProperty("AutoSubmitExternalSpeech");
         lastExternalSpeechTextProperty = serializedObject.FindProperty("LastExternalSpeechText");
-        externalSpeechStatusProperty = serializedObject.FindProperty("ExternalSpeechStatus");
         directorGuidanceInputProperty = serializedObject.FindProperty("DirectorGuidanceInput");
-        directorGuidanceInputStatusProperty = serializedObject.FindProperty("DirectorGuidanceInputStatus");
         directorGuidanceInputsProperty = serializedObject.FindProperty("DirectorGuidanceInputs");
 
         selectedActionTextProperty = serializedObject.FindProperty("SelectedActionText");
         actionJustificationTextProperty = serializedObject.FindProperty("ActionJustificationText");
+
+        dialogLogLimitProperty = serializedObject.FindProperty("DialogLogLimit");
+        dialogLogCompactModeProperty = serializedObject.FindProperty("DialogLogCompactMode");
+        dialogTurnsProperty = serializedObject.FindProperty("DialogTurns");
 
         pullContextFromBootstrapperProperty = serializedObject.FindProperty("PullContextFromBootstrapper");
         currentCharacterSummaryProperty = serializedObject.FindProperty("CurrentCharacterSummary");
@@ -73,6 +82,10 @@ public sealed class AaltoDirectedRoomPerformerControllerEditor : Editor
         recentHistoryLimitProperty = serializedObject.FindProperty("RecentHistoryLimit");
         modelProperty = serializedObject.FindProperty("Model");
         applyActionThroughRegistryProperty = serializedObject.FindProperty("ApplyActionThroughRegistry");
+        selectedActionStateModeProperty = serializedObject.FindProperty("SelectedActionStateMode");
+        neutralMemoryTriggerProperty = serializedObject.FindProperty("NeutralMemoryTrigger");
+        responsePulseSecondsProperty = serializedObject.FindProperty("ResponsePulseSeconds");
+        executionModeStatusProperty = serializedObject.FindProperty("ExecutionModeStatus");
         usePulledActionLabelsSnapshotProperty = serializedObject.FindProperty("UsePulledActionLabelsSnapshot");
         pulledActionLabelsSnapshotProperty = serializedObject.FindProperty("PulledActionLabelsSnapshot");
         actionPullStatusProperty = serializedObject.FindProperty("ActionPullStatus");
@@ -91,11 +104,12 @@ public sealed class AaltoDirectedRoomPerformerControllerEditor : Editor
         serializedObject.Update();
 
         DrawQuickActionsSection();
-        DrawSceneRefsSection();
         DrawLiveInputsSection();
+        DrawDialogLogSection();
         DrawRuntimeContextSection();
         DrawConfigSection();
         DrawDebugSection();
+        DrawSceneRefsSection();
 
         serializedObject.ApplyModifiedProperties();
     }
@@ -117,6 +131,59 @@ public sealed class AaltoDirectedRoomPerformerControllerEditor : Editor
             EditorUtility.SetDirty(controller);
         }
 
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Start New Take"))
+        {
+            serializedObject.ApplyModifiedProperties();
+            controller.StartNewTake();
+            EditorUtility.SetDirty(controller);
+            serializedObject.Update();
+        }
+
+        if (GUILayout.Button("Export Dialogs (JSON + CSV)"))
+        {
+            serializedObject.ApplyModifiedProperties();
+
+            var defaultFileName = "AaltoDialogArchive_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".json";
+            var savePath = EditorUtility.SaveFilePanel(
+                "Export Dialog Archive (JSON + CSV)",
+                Application.dataPath,
+                defaultFileName,
+                "json");
+
+            if (!string.IsNullOrWhiteSpace(savePath))
+            {
+                try
+                {
+                    var folder = Path.GetDirectoryName(savePath);
+                    var baseName = Path.GetFileNameWithoutExtension(savePath);
+                    var jsonPath = Path.Combine(folder ?? Application.dataPath, baseName + ".json");
+                    var csvPath = Path.Combine(folder ?? Application.dataPath, baseName + ".csv");
+
+                    var json = controller.BuildDialogArchiveExportJson();
+                    var csv = controller.BuildDialogArchiveExportCsv();
+
+                    File.WriteAllText(jsonPath, json);
+                    File.WriteAllText(csvPath, csv);
+
+                    EditorUtility.DisplayDialog(
+                        "Dialog Export",
+                        "Dialog archive exported as both JSON and CSV.\n\n" +
+                        "JSON: " + jsonPath + "\n" +
+                        "CSV: " + csvPath,
+                        "OK");
+                }
+                catch (Exception ex)
+                {
+                    EditorUtility.DisplayDialog("Dialog Export Failed", ex.Message, "OK");
+                }
+            }
+
+            serializedObject.Update();
+        }
+        EditorGUILayout.EndHorizontal();
+
         EditorGUILayout.Space(6f);
     }
 
@@ -133,11 +200,11 @@ public sealed class AaltoDirectedRoomPerformerControllerEditor : Editor
         var controller = (AaltoDirectedRoomPerformerController)target;
 
         EditorGUILayout.Space(8f);
-        EditorGUILayout.LabelField("Live Inputs", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Simulated Speech", EditorStyles.boldLabel);
 
         EditorGUILayout.PropertyField(inspectorActorInputProperty);
 
-        if (GUILayout.Button("Submit Simulated Actor Input"))
+        if (GUILayout.Button("Submit Simulated Speech"))
         {
             serializedObject.ApplyModifiedProperties();
             controller.SubmitTurnFromInspectorInput();
@@ -145,21 +212,18 @@ public sealed class AaltoDirectedRoomPerformerControllerEditor : Editor
             serializedObject.Update();
         }
 
-        EditorGUILayout.PropertyField(inspectorInputStatusProperty);
-
-        EditorGUILayout.Space(6f);
-        EditorGUILayout.LabelField("Spoken Input", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(acceptExternalSpeechInputProperty);
-        EditorGUILayout.PropertyField(autoSubmitExternalSpeechProperty);
-        EditorGUILayout.PropertyField(lastExternalSpeechTextProperty);
-        EditorGUILayout.PropertyField(externalSpeechStatusProperty);
-
         EditorGUILayout.Space(4f);
         EditorGUILayout.LabelField("Room Response", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(selectedActionTextProperty);
         EditorGUILayout.PropertyField(actionJustificationTextProperty);
 
         EditorGUILayout.Space(6f);
+        EditorGUILayout.LabelField("Spoken Input", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(acceptExternalSpeechInputProperty);
+        EditorGUILayout.PropertyField(autoSubmitExternalSpeechProperty);
+        EditorGUILayout.PropertyField(lastExternalSpeechTextProperty);
+
+        EditorGUILayout.Space(4f);
         EditorGUILayout.PropertyField(directorGuidanceInputProperty);
 
         EditorGUILayout.BeginHorizontal();
@@ -179,8 +243,6 @@ public sealed class AaltoDirectedRoomPerformerControllerEditor : Editor
             serializedObject.Update();
         }
         EditorGUILayout.EndHorizontal();
-
-        EditorGUILayout.PropertyField(directorGuidanceInputStatusProperty);
 
         EditorGUILayout.LabelField("Director Guidance Inputs", EditorStyles.boldLabel);
         for (int i = 0; i < directorGuidanceInputsProperty.arraySize; i++)
@@ -211,18 +273,168 @@ public sealed class AaltoDirectedRoomPerformerControllerEditor : Editor
         EditorGUILayout.PropertyField(directorGuidanceProperty);
     }
 
+    void DrawDialogLogSection()
+    {
+        EditorGUILayout.Space(8f);
+        EditorGUILayout.LabelField("Dialog Log", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(dialogLogLimitProperty);
+        EditorGUILayout.PropertyField(dialogLogCompactModeProperty);
+
+        if (dialogTurnsProperty == null || dialogTurnsProperty.arraySize == 0)
+        {
+            EditorGUILayout.HelpBox("No dialog turns yet.", MessageType.Info);
+            return;
+        }
+
+        for (int i = 0; i < dialogTurnsProperty.arraySize; i++)
+        {
+            var turnProperty = dialogTurnsProperty.GetArrayElementAtIndex(i);
+            var actorLineProperty = turnProperty.FindPropertyRelative("actorLine");
+            var selectedResponseProperty = turnProperty.FindPropertyRelative("selectedResponse");
+            var justificationProperty = turnProperty.FindPropertyRelative("justification");
+            var showDetailsProperty = turnProperty.FindPropertyRelative("showDetails");
+            var showJustificationProperty = turnProperty.FindPropertyRelative("showJustification");
+
+            var actorText = (actorLineProperty.stringValue ?? string.Empty).Trim();
+            var responseText = (selectedResponseProperty.stringValue ?? string.Empty).Trim();
+            var header = $"Turn {i + 1}: {(string.IsNullOrWhiteSpace(actorText) ? "(empty actor line)" : actorText)}";
+
+            EditorGUILayout.BeginVertical("box");
+            if (dialogLogCompactModeProperty.boolValue)
+            {
+                var compactLine = $"Turn {i + 1} | Actor: {actorText}  |  Response: {responseText}";
+                if (string.IsNullOrWhiteSpace(actorText) && string.IsNullOrWhiteSpace(responseText))
+                    compactLine = $"Turn {i + 1} | (empty dialog turn)";
+
+                showDetailsProperty.boolValue = EditorGUILayout.Foldout(
+                    showDetailsProperty.boolValue,
+                    compactLine,
+                    true);
+
+                if (showDetailsProperty.boolValue)
+                {
+                    EditorGUILayout.Space(2f);
+                    EditorGUILayout.LabelField("Justification", EditorStyles.miniBoldLabel);
+                    DrawAutoHeightSelectableLabel((justificationProperty.stringValue ?? string.Empty).Trim(), 60f);
+                }
+            }
+            else
+            {
+                EditorGUILayout.LabelField(header, EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("Actor", EditorStyles.miniBoldLabel);
+                EditorGUILayout.SelectableLabel(actorText, EditorStyles.textArea, GUILayout.MinHeight(34f));
+                EditorGUILayout.LabelField("Selected Response", EditorStyles.miniBoldLabel);
+                EditorGUILayout.SelectableLabel(responseText, EditorStyles.textArea, GUILayout.MinHeight(34f));
+
+                var toggleLabel = showJustificationProperty.boolValue ? "Hide Justification" : "Show Justification";
+                if (GUILayout.Button(toggleLabel))
+                {
+                    showJustificationProperty.boolValue = !showJustificationProperty.boolValue;
+                }
+
+                if (showJustificationProperty.boolValue)
+                {
+                    EditorGUILayout.LabelField("Justification", EditorStyles.miniBoldLabel);
+                    DrawAutoHeightSelectableLabel((justificationProperty.stringValue ?? string.Empty).Trim(), 60f);
+                }
+            }
+
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.Space(2f);
+        }
+    }
+
     void DrawConfigSection()
     {
+        var controller = (AaltoDirectedRoomPerformerController)target;
+
         EditorGUILayout.Space(8f);
         EditorGUILayout.LabelField("Prompt + Config", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(generalInstructionsProperty);
         EditorGUILayout.PropertyField(recentHistoryLimitProperty);
         EditorGUILayout.PropertyField(modelProperty);
         EditorGUILayout.PropertyField(applyActionThroughRegistryProperty);
+        EditorGUILayout.PropertyField(selectedActionStateModeProperty);
+        DrawNeutralMemoryTriggerSelector(controller);
+        EditorGUILayout.PropertyField(responsePulseSecondsProperty);
+        EditorGUILayout.PropertyField(executionModeStatusProperty);
         EditorGUILayout.PropertyField(usePulledActionLabelsSnapshotProperty);
         EditorGUILayout.PropertyField(pulledActionLabelsSnapshotProperty);
         EditorGUILayout.PropertyField(enforceRegistryActionLabelsProperty);
         EditorGUILayout.PropertyField(fallbackActionLabelProperty);
+    }
+
+    void DrawNeutralMemoryTriggerSelector(AaltoDirectedRoomPerformerController controller)
+    {
+        if (controller == null || controller.ActionMemoryRegistry == null || controller.ActionMemoryRegistry.mappings == null)
+        {
+            EditorGUILayout.PropertyField(neutralMemoryTriggerProperty);
+            return;
+        }
+
+        var options = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < controller.ActionMemoryRegistry.mappings.Count; i++)
+        {
+            var mapping = controller.ActionMemoryRegistry.mappings[i];
+            if (mapping == null)
+                continue;
+
+            var trigger = (mapping.memoryTrigger ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(trigger))
+                continue;
+            if (!seen.Add(trigger))
+                continue;
+
+            options.Add(trigger);
+        }
+
+        if (options.Count == 0)
+        {
+            EditorGUILayout.PropertyField(neutralMemoryTriggerProperty);
+            return;
+        }
+
+        var current = (neutralMemoryTriggerProperty.stringValue ?? string.Empty).Trim();
+        var displayOptions = new List<string>(options);
+        var selectedIndex = -1;
+        for (int i = 0; i < options.Count; i++)
+        {
+            if (string.Equals(options[i], current, StringComparison.OrdinalIgnoreCase))
+            {
+                selectedIndex = i;
+                break;
+            }
+        }
+
+        if (selectedIndex < 0 && !string.IsNullOrWhiteSpace(current))
+        {
+            displayOptions.Add("(custom) " + current);
+            selectedIndex = displayOptions.Count - 1;
+        }
+
+        if (selectedIndex < 0)
+            selectedIndex = 0;
+
+        var newIndex = EditorGUILayout.Popup("Neutral Memory Trigger", selectedIndex, displayOptions.ToArray());
+        if (newIndex >= 0 && newIndex < options.Count)
+        {
+            neutralMemoryTriggerProperty.stringValue = options[newIndex];
+        }
+
+        if (newIndex >= options.Count)
+        {
+            EditorGUILayout.PropertyField(neutralMemoryTriggerProperty);
+        }
+    }
+
+    static void DrawAutoHeightSelectableLabel(string text, float minHeight)
+    {
+        var content = new GUIContent(text ?? string.Empty);
+        var width = Mathf.Max(120f, EditorGUIUtility.currentViewWidth - 48f);
+        var desiredHeight = EditorStyles.textArea.CalcHeight(content, width);
+        var finalHeight = Mathf.Max(minHeight, desiredHeight + 6f);
+        EditorGUILayout.SelectableLabel(content.text, EditorStyles.textArea, GUILayout.Height(finalHeight));
     }
 
     void DrawDebugSection()

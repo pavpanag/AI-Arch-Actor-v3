@@ -496,6 +496,12 @@ public class OSC : MonoBehaviour
 
 
 	void Update() {
+    if (messagesReceived == null)
+    {
+      messagesReceived = new ArrayList();
+      return;
+    }
+
 		if ((DebugLogPackets || DebugLogMessages) && DebugStatusIntervalSeconds > 0f)
 		{
 			if (Time.unscaledTime >= _dbgNextStatusTime)
@@ -608,6 +614,9 @@ public class OSC : MonoBehaviour
 
 					lock(ReadThreadLock) {
 						if ( paused == false ) {
+              if (messagesReceived == null)
+                messagesReceived = new ArrayList();
+
 							ArrayList newMessages = OSC.PacketToOscMessages(buffer, length);
 							messagesReceived.AddRange(newMessages);
 						}

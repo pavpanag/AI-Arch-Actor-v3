@@ -1947,10 +1947,10 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 1828801529}
+  - {fileID: 868154125}
+  - {fileID: 1486273472}
   - {fileID: 1019689665}
   - {fileID: 830374540}
-  - {fileID: 1486273472}
   - {fileID: 1024883971}
   - {fileID: 408548554}
   m_Father: {fileID: 0}
@@ -2011,7 +2011,7 @@ GameObject:
   - component: {fileID: 830374540}
   - component: {fileID: 830374541}
   m_Layer: 0
-  m_Name: AaltoDirectedRoomPerformerController
+  m_Name: Performing
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2039,7 +2039,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 830374539}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 31ac239e3e0bd3d44a955f24b8650ca3, type: 3}
   m_Name: 
@@ -2048,23 +2048,26 @@ MonoBehaviour:
   ActionMemoryRegistry: {fileID: 1019689666}
   ObjectiveStanceBootstrapper: {fileID: 1486273473}
   InspectorActorInput: 
-  InspectorInputStatus: Inspector input submitted.
   AcceptExternalSpeechInput: 1
   AutoSubmitExternalSpeech: 1
   LastExternalSpeechText: 
-  ExternalSpeechStatus: 
   DirectorGuidanceInput: 
-  DirectorGuidanceInputStatus: 
   DirectorGuidanceInputs: []
   SelectedActionText: 
   ActionJustificationText: 
+  DialogLogLimit: 120
+  DialogLogCompactMode: 1
+  CurrentTakeNumber: 1
+  DialogTurns: []
+  ArchivedDialogTakes: []
   PullContextFromBootstrapper: 1
-  CurrentCharacterSummary: A beautifully designed room, created by a young architect
-    who adores flowers, feels a deep desire for solitude. Despite its comforting
-    aesthetics and the presence of many inhabitants, it longs to encourage them to
-    leave and embrace its introverted nature.
-  CurrentObjective: Encourage inhabitants to leave
-  CurrentStance: Introverted longing
+  CurrentCharacterSummary: "A sterile dental waiting room with small comforts like
+    a pillow, you cradle patients in pain and try to soothe and distract them, even
+    as the full room\u2019s discomfort secretly thrills you beneath your dutiful
+    calm."
+  CurrentObjective: Soothe and distract anxious patients while holding them in uneasy
+    comfort.
+  CurrentStance: calmly indulgent
   DirectorGuidance: 
   GeneralInstructions: 'You are performing the inner life of a room in an improvised
     scene with another actor, who speaks to the room. You listen to what the actor
@@ -2138,10 +2141,14 @@ MonoBehaviour:
   RecentHistoryLimit: 5
   Model: 0
   ApplyActionThroughRegistry: 1
+  SelectedActionStateMode: 0
+  NeutralMemoryTrigger: memory 1
+  ResponsePulseSeconds: 1
+  ExecutionModeStatus: 
   UsePulledActionLabelsSnapshot: 1
   PulledActionLabelsSnapshot:
-  - I say yes
-  - I say no
+  - I say I want you to stay
+  - I say I want you to leave
   ActionPullStatus: Pulled 2 action labels from registry.
   EnforceRegistryActionLabels: 1
   FallbackActionLabel: no
@@ -2346,7 +2353,7 @@ GameObject:
   - component: {fileID: 868154125}
   - component: {fileID: 868154126}
   m_Layer: 0
-  m_Name: AaltoInterviewController
+  m_Name: CharacterBuilder
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2360,12 +2367,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 868154124}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 689.8692, y: -0.04998, z: 81.29026}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1828801529}
+  m_Father: {fileID: 786603650}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &868154126
 MonoBehaviour:
@@ -2381,20 +2388,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: AaltoSystem::AaltoSystemV3.AaltoInterviewController
   OpenAI: {fileID: 2019934417}
   ObjectiveStanceBootstrapper: {fileID: 1486273473}
-  BackstoryText: ' a happy room, built by a young architect who loves flowers'
-  MotiveText: the room wants to make the inhabitants leave
-  ObstacleText: the room is very very pretty
-  CircumstancesText: the room is full of people
-  FollowUpQuestionsText: 'What specific aspect of the room''s beauty makes it difficult
-    for the inhabitants to leave?
-
-    Is there a particular reason the room desires
-    to make the inhabitants leave, or is it simply a function of its design?'
-  FollowUpAnswersText: the room is very comforting but very introverted
-  LastSummary: A beautifully designed room, created by a young architect who adores
-    flowers, feels a deep desire for solitude. Despite its comforting aesthetics
-    and the presence of many inhabitants, it longs to encourage them to leave and
-    embrace its introverted nature.
+  BackstoryText: ' you are a waiting room for dental patients'
+  MotiveText: you want people who are in pain to feel comfortable and forget about
+    their pain
+  ObstacleText: you secretly like other people's pain
+  CircumstancesText: the room is full of people in pain who are waiting for their
+    turn to go to dentistt
+  FollowUpQuestionsText: "What kind of waiting room are you\u2014sterile and clinical,
+    cozy and child-friendly, or something else\u2014and what details in your design
+    shape how patients experience you?\nWhen you try to comfort patients despite
+    secretly enjoying their pain, what specifically drives that conflict, and what
+    in this crowded, pain-filled room makes it harder or easier to hide?"
+  FollowUpAnswersText: sterile with small nuances of comfort like a pillow. you are
+    trying to fulfill your duty as a waiting room but it is not who you are as a
+    person
+  LastSummary: "A sterile dental waiting room with small comforts like a pillow,
+    you cradle patients in pain and try to soothe and distract them, even as the
+    full room\u2019s discomfort secretly thrills you beneath your dutiful calm."
   LastStatus: '[aalto-interview] Draft summary ready. ApproveCurrentSummary() to
     start rehearsal, or ReviseSummaryFromNotes() to change it.'
   InterviewQuestionsText: '1) What is the background of the character?
@@ -2409,7 +2419,7 @@ MonoBehaviour:
   PromptSet: {fileID: 0}
   RequireApprovalBeforeRehearsal: 1
   MaxFollowUpQuestions: 2
-  ModelSelection: 0
+  ModelSelection: 7
   MinSummaryChars: 60
   MaxSummaryChars: 260
   LastClarificationSystemPrompt: "You generate concise clarification questions for
@@ -2422,34 +2432,36 @@ MonoBehaviour:
 
     background:
 
-    a happy room, built by a young architect
-    who loves flowers
+    you are a waiting room for dental patients
 
-    
+
 
     motivation:
 
-    the room wants to make the inhabitants
-    leave
+    you
+    want people who are in pain to feel comfortable and forget about their pain
 
-    
+
 
     obstacle:
 
-    the room is very very pretty
+    you
+    secretly like other people''s pain
 
-    
+
 
     circumstances:
 
-    the
-    room is full of people
+    the room is full
+    of people in pain who are waiting for their turn to go to dentistt
 
 '
   LastClarificationResponseJson: "{\n  \"clarification_questions\": [\n    \"What
-    specific aspect of the room's beauty makes it difficult for the inhabitants to
-    leave?\",\n    \"Is there a particular reason the room desires to make the inhabitants
-    leave, or is it simply a function of its design?\"\n  ]\n}"
+    kind of waiting room are you\u2014sterile and clinical, cozy and child-friendly,
+    or something else\u2014and what details in your design shape how patients experience
+    you?\",\n    \"When you try to comfort patients despite secretly enjoying their
+    pain, what specifically drives that conflict, and what in this crowded, pain-filled
+    room makes it harder or easier to hide?\"\n  ]\n}"
   LastSummarySystemPrompt: "You are creating a compact runtime character summary
     for a scenic rehearsal agent.\nReturn JSON only with exactly this schema:\n{\n 
     \"character_summary\": \"...\"\n}\nRules:\n- Use background, motivation, obstacle,
@@ -2460,61 +2472,51 @@ MonoBehaviour:
 
     background:
 
-    a
-    happy room, built by a young architect who loves flowers
+    you
+    are a waiting room for dental patients
 
-    
+
 
     motivation:
 
-    the
-    room wants to make the inhabitants leave
+    you want people
+    who are in pain to feel comfortable and forget about their pain
 
-    
+
 
     obstacle:
 
-    the room
-    is very very pretty
+    you
+    secretly like other people''s pain
 
-    
+
 
     circumstances:
 
-    the room is full of people
+    the room is full
+    of people in pain who are waiting for their turn to go to dentistt
 
-    
+
 
     clarification_answers:
 
-    the
-    room is very comforting but very introverted
+    sterile
+    with small nuances of comfort like a pillow. you are trying to fulfill your duty
+    as a waiting room but it is not who you are as a person
 
 '
-  LastSummaryResponseJson: "{\n  \"character_summary\": \"A beautifully designed
-    room, created by a young architect who adores flowers, feels a deep desire for
-    solitude. Despite its comforting aesthetics and the presence of many inhabitants,
-    it longs to encourage them to leave and embrace its introverted nature.\"\n}"
-  PromptInspectionText: '[INTERVIEW QUESTION DEBUG]
-
-    flow: DraftReadyForReview
-
-    status:
+  LastSummaryResponseJson: "{\"character_summary\":\"A sterile dental waiting room
+    with small comforts like a pillow, you cradle patients in pain and try to soothe
+    and distract them, even as the full room\u2019s discomfort secretly thrills you
+    beneath your dutiful calm.\"}"
+  PromptInspectionText: "[INTERVIEW QUESTION DEBUG]\r\nflow: DraftReadyForReview\r\nstatus:
     [aalto-interview] Draft summary ready. ApproveCurrentSummary() to start rehearsal,
-    or ReviseSummaryFromNotes() to change it.
-
-    
-
-    --- generated follow-up
-    questions ---
-
-    What specific aspect of the room''s beauty makes it difficult
-    for the inhabitants to leave?
-
-    Is there a particular reason the room desires
-    to make the inhabitants leave, or is it simply a function of its design?
-
-'
+    or ReviseSummaryFromNotes() to change it.\r\n\r\n--- generated follow-up questions
+    ---\r\nWhat kind of waiting room are you\u2014sterile and clinical, cozy and
+    child-friendly, or something else\u2014and what details in your design shape
+    how patients experience you?\nWhen you try to comfort patients despite secretly
+    enjoying their pain, what specifically drives that conflict, and what in this
+    crowded, pain-filled room makes it harder or easier to hide?\r\n"
   RevisionNotesText: 
   CurrentFlowState: 3
   FlowStateDisplay: DraftReadyForReview
@@ -2950,7 +2952,7 @@ GameObject:
   - component: {fileID: 1019689665}
   - component: {fileID: 1019689666}
   m_Layer: 0
-  m_Name: AaltoActionMemoryRegistry
+  m_Name: ActionsAnnotation
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2984,9 +2986,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: AaltoSystem::AaltoSystemV3.AaltoActionMemoryRegistry
   mappings:
-  - actionLabel: I say yes
+  - actionLabel: I say I want you to stay
     memoryTrigger: memory 1
-  - actionLabel: I say no
+  - actionLabel: I say I want you to leave
     memoryTrigger: memory 2
   OscSender: {fileID: 1543431374}
   LastResolvedMemoryTrigger: 
@@ -3059,7 +3061,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1024883971
 Transform:
   m_ObjectHideFlags: 0
@@ -4850,7 +4852,7 @@ GameObject:
   - component: {fileID: 1486273472}
   - component: {fileID: 1486273473}
   m_Layer: 0
-  m_Name: AaltoObjectiveStanceBootstrapper
+  m_Name: Objectives/Stance_Setter
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -4886,47 +4888,31 @@ MonoBehaviour:
   OpenAI: {fileID: 2019934417}
   InterviewController: {fileID: 868154126}
   AutoGenerateOnSummaryUpdate: 1
-  Model: 0
+  Model: 7
   SystemPrompt: 'You are creating initial actor-logic controls for a room character.
     Given the character summary, derive one concise current objective and one concise
     current stance. The objective should describe what the room is trying to do now.
     The stance should describe the room''s behavioral attitude in one to three words.
     Return JSON only with exactly this schema: {"objective":"...","stance":"..."}.'
-  CurrentCharacterSummary: A beautifully designed room, created by a young architect
-    who adores flowers, feels a deep desire for solitude. Despite its comforting
-    aesthetics and the presence of many inhabitants, it longs to encourage them to
-    leave and embrace its introverted nature.
-  GeneratedObjective: Encourage inhabitants to leave
-  GeneratedStance: Introverted longing
+  CurrentCharacterSummary: "A sterile dental waiting room with small comforts like
+    a pillow, you cradle patients in pain and try to soothe and distract them, even
+    as the full room\u2019s discomfort secretly thrills you beneath your dutiful
+    calm."
+  GeneratedObjective: Soothe and distract anxious patients while holding them in
+    uneasy comfort.
+  GeneratedStance: calmly indulgent
   LastStatus: Generated objective + stance from summary.
-  PromptInspectionText: '=== SYSTEM PROMPT ===
-
-    You are creating initial actor-logic
+  PromptInspectionText: "=== SYSTEM PROMPT ===\nYou are creating initial actor-logic
     controls for a room character. Given the character summary, derive one concise
     current objective and one concise current stance. The objective should describe
-    what the room is trying to do now. The stance should describe the room''s behavioral
-    attitude in one to three words. Return JSON only with exactly this schema: {"objective":"...","stance":"..."}.
-
-
-    ===
-    USER PROMPT ===
-
-    character_summary:
-
-    A beautifully designed room, created
-    by a young architect who adores flowers, feels a deep desire for solitude. Despite
-    its comforting aesthetics and the presence of many inhabitants, it longs to encourage
-    them to leave and embrace its introverted nature.
-
-
-    Return JSON only: {"objective":"...","stance":"..."}.
-
-
-    ===
-    RAW RESPONSE ===
-
-    {"objective":"Encourage inhabitants to leave","stance":"Introverted
-    longing"}'
+    what the room is trying to do now. The stance should describe the room's behavioral
+    attitude in one to three words. Return JSON only with exactly this schema: {\"objective\":\"...\",\"stance\":\"...\"}.\n\n===
+    USER PROMPT ===\ncharacter_summary:\nA sterile dental waiting room with small
+    comforts like a pillow, you cradle patients in pain and try to soothe and distract
+    them, even as the full room\u2019s discomfort secretly thrills you beneath your
+    dutiful calm.\n\nReturn JSON only: {\"objective\":\"...\",\"stance\":\"...\"}.\n\n===
+    RAW RESPONSE ===\n{\"objective\":\"Soothe and distract anxious patients while
+    holding them in uneasy comfort.\",\"stance\":\"calmly indulgent\"}"
   GenerationStatus: Ready
 --- !u!1 &1543431372
 GameObject:
@@ -5848,38 +5834,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.RectMask2D
   m_Padding: {x: -8, y: -5, z: -8, w: -5}
   m_Softness: {x: 0, y: 0}
---- !u!1 &1828801528
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1828801529}
-  m_Layer: 0
-  m_Name: InterviewUI
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1828801529
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1828801528}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 689.8692, y: -0.04998, z: 81.29026}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 868154125}
-  m_Father: {fileID: 786603650}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1882474596
 GameObject:
   m_ObjectHideFlags: 0
@@ -5947,8 +5901,8 @@ MonoBehaviour:
 
     [19:47:35] actor_1: i am good and you?
 
-    [19:47:41] actor_2: i
-    am good'
+    [19:47:41] actor_2: i am
+    good'
   PendingDialogueSinceLastDecision: '[19:47:22] actor_1: hi
 
     [19:47:27] actor_2:
@@ -5967,13 +5921,19 @@ MonoBehaviour:
   LastDecisionReactNow: 0
   SelectedActionText: 
   ActionJustificationText: 
+  DialogLogLimit: 120
+  DialogLogCompactMode: 1
+  CurrentTakeNumber: 1
+  DialogTurns: []
+  ArchivedDialogTakes: []
   PullContextFromBootstrapper: 1
-  CurrentCharacterSummary: The angry room, created by a sorrowful architect who despises
-    flowers, seeks to drive out its current inhabitants. It constantly shouts at
-    them, fueled by the architect's own childhood sadness. The room is filled with
-    people, amplifying its frustration.
-  CurrentObjective: drive out its inhabitants
-  CurrentStance: hostile frustration
+  CurrentCharacterSummary: "A sterile dental waiting room with small comforts like
+    a pillow, you cradle patients in pain and try to soothe and distract them, even
+    as the full room\u2019s discomfort secretly thrills you beneath your dutiful
+    calm."
+  CurrentObjective: Soothe and distract anxious patients while holding them in uneasy
+    comfort.
+  CurrentStance: calmly indulgent
   DirectorGuidance: 
   GeneralInstructions: "You are performing the inner life of a room in an improvised
     scene where multiple human actors speak to each other and to the room.\n\nYou
@@ -5991,6 +5951,10 @@ MonoBehaviour:
   PromptMemoryScope: 1
   Model: 0
   ApplyActionThroughRegistry: 1
+  SelectedActionStateMode: 0
+  NeutralMemoryTrigger: memory 1
+  ResponsePulseSeconds: 1
+  ExecutionModeStatus: 
   UsePulledActionLabelsSnapshot: 1
   PulledActionLabelsSnapshot:
   - I say yes

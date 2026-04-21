@@ -14,6 +14,14 @@ namespace AaltoSystemV3
     /// </summary>
     public sealed class AaltoDirectedRoomPerformerController : MonoBehaviour
     {
+        public enum ActionStateMode
+        {
+            [InspectorName("Hold Response State")]
+            HoldResponseState = 0,
+            [InspectorName("Pulse Then Return To Neutral")]
+            PulseThenReturnToNeutral = 1
+        }
+
         public enum OpenAIModelPreset
         {
             [InspectorName("GPT-5.4")]
@@ -36,13 +44,10 @@ namespace AaltoSystemV3
         [InspectorName("Objective/Stance Bootstrapper (Primary Source)")]
         public AaltoObjectiveStanceBootstrapper ObjectiveStanceBootstrapper;
 
-        [Header("User Input")]
+        [Header("Simulated Speech")]
         [TextArea(1, 4)]
-        [InspectorName("Actor Speaking (Simulated Input)")]
+        [InspectorName("Simulated Speech Input")]
         public string InspectorActorInput;
-        [TextArea(1, 3)]
-        [InspectorName("Inspector Input Status")]
-        public string InspectorInputStatus;
 
         [Header("Spoken Input")]
         [Tooltip("If true, ReceiveExternalSpeech accepts spoken transcripts from OSC/Vosk bridge.")]
@@ -55,17 +60,9 @@ namespace AaltoSystemV3
         [InspectorName("Latest Spoken Transcript")]
         public string LastExternalSpeechText;
 
-        [TextArea(1, 3)]
-        [InspectorName("Spoken Input Status")]
-        public string ExternalSpeechStatus;
-
         [TextArea(2, 6)]
         [InspectorName("Director Guidance Input")]
         public string DirectorGuidanceInput;
-
-        [TextArea(1, 3)]
-        [InspectorName("Director Guidance Input Status")]
-        public string DirectorGuidanceInputStatus;
 
         [InspectorName("Director Guidance Inputs")]
         public List<string> DirectorGuidanceInputs = new List<string>();
@@ -77,6 +74,23 @@ namespace AaltoSystemV3
         [TextArea(2, 6)]
         [InspectorName("Action Justification (Agent Produced)")]
         public string ActionJustificationText;
+
+        [Header("Dialog Log")]
+        [Tooltip("Maximum number of dialog turns kept in the inspector log.")]
+        [Range(10, 500)]
+        public int DialogLogLimit = 120;
+
+        [Tooltip("If true, dialog log renders as one-line entries with foldout details.")]
+        public bool DialogLogCompactMode = true;
+
+        [InspectorName("Current Take Number")]
+        public int CurrentTakeNumber = 1;
+
+        [InspectorName("Dialog Turns (Agent Produced)")]
+        public List<DialogTurnEntry> DialogTurns = new List<DialogTurnEntry>();
+
+        [InspectorName("Archived Takes (Agent Produced)")]
+        public List<DialogTakeArchiveEntry> ArchivedDialogTakes = new List<DialogTakeArchiveEntry>();
 
         [Header("Runtime Context")]
         [Tooltip("If true, the performer pulls summary/objective/stance from ObjectiveStanceBootstrapper before each turn.")]
@@ -133,6 +147,23 @@ namespace AaltoSystemV3
         [Tooltip("If true, selected action is sent through ActionMemoryRegistry.TrySendMemoryTriggerForActionLabel.")]
         public bool ApplyActionThroughRegistry = true;
 
+        [Tooltip("Choose whether the selected response remains active, or briefly pulses then returns to a neutral memory trigger.")]
+        [InspectorName("Action State Mode")]
+        public ActionStateMode SelectedActionStateMode = ActionStateMode.HoldResponseState;
+
+        [Tooltip("Neutral memory trigger used when mode is Pulse Then Return To Neutral (example: 'memory 1').")]
+        [InspectorName("Neutral Memory Trigger")]
+        public string NeutralMemoryTrigger = "memory 1";
+
+        [Tooltip("How long the selected response should remain before returning to the neutral memory trigger.")]
+        [Range(0.1f, 5f)]
+        [InspectorName("Response Pulse Seconds")]
+        public float ResponsePulseSeconds = 1f;
+
+        [TextArea(1, 3)]
+        [InspectorName("Execution Mode Status")]
+        public string ExecutionModeStatus;
+
         [Tooltip("If true, prompt action labels come only from the manually pulled snapshot (no automatic registry fallback).")]
         public bool UsePulledActionLabelsSnapshot = true;
 
@@ -163,12 +194,49 @@ namespace AaltoSystemV3
 
         private readonly Queue<string> _recentInteractions = new Queue<string>();
         private CancellationTokenSource _cts;
+        private CancellationTokenSource _neutralReturnCts;
 
         [Serializable]
         private sealed class DecisionResponse
         {
             public string chosen_action;
             public string justification;
+        }
+
+        [Serializable]
+        public sealed class DialogTurnEntry
+        {
+            [TextArea(1, 3)]
+            public string actorLine;
+
+            [TextArea(1, 3)]
+            public string selectedResponse;
+
+            [TextArea(2, 6)]
+            public string justification;
+
+            public bool showDetails;
+
+            public bool showJustification;
+        }
+
+        [Serializable]
+        public sealed class DialogTakeArchiveEntry
+        {
+            public int takeNumber;
+            public string capturedAtUtc;
+            public int turnCount;
+            public List<DialogTurnEntry> turns = new List<DialogTurnEntry>();
+        }
+
+        [Serializable]
+        private sealed class DialogArchiveExportPayload
+        {
+            public string exportedAtUtc;
+            public int currentTakeNumber;
+            public int archivedTakeCount;
+            public List<DialogTakeArchiveEntry> archivedTakes = new List<DialogTakeArchiveEntry>();
+            public DialogTakeArchiveEntry currentTake;
         }
 
         private string SelectedModelId => Model switch
@@ -194,6 +262,8 @@ namespace AaltoSystemV3
 
         private void OnDestroy()
         {
+            CancelPendingNeutralReturn();
+
             if (_cts != null)
             {
                 _cts.Cancel();
@@ -208,12 +278,12 @@ namespace AaltoSystemV3
             text = text.Trim();
             if (string.IsNullOrWhiteSpace(text))
             {
-                InspectorInputStatus = "No inspector actor input provided.";
                 return;
             }
 
             InspectorActorInput = string.Empty;
-            InspectorInputStatus = "Inspector input submitted.";
+            EmitPerformerEvent("performer.turn_submitted",
+                "{\"source\":\"inspector\",\"text\":\"" + AaltoLaunchSessionLogger.EscapeJson(text) + "\"}");
 
             _ = HandleTurnAsync(text);
         }
@@ -222,6 +292,8 @@ namespace AaltoSystemV3
         {
             var text = (latestActorInput ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(text)) return;
+            EmitPerformerEvent("performer.turn_submitted",
+                "{\"source\":\"api\",\"text\":\"" + AaltoLaunchSessionLogger.EscapeJson(text) + "\"}");
             _ = HandleTurnAsync(text);
         }
 
@@ -230,29 +302,28 @@ namespace AaltoSystemV3
             var transcript = (text ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(transcript))
             {
-                ExternalSpeechStatus = "Ignored empty spoken transcript.";
                 return;
             }
 
             LastExternalSpeechText = transcript;
             Debug.Log("[AaltoDirectedRoomPerformer] Received external speech: " + transcript);
+            EmitPerformerEvent("performer.external_speech_received",
+                "{\"text\":\"" + AaltoLaunchSessionLogger.EscapeJson(transcript) + "\"}");
 
             if (!AcceptExternalSpeechInput)
             {
-                ExternalSpeechStatus = "Ignored spoken transcript: spoken input is disabled.";
+                EmitPerformerEvent("performer.external_speech_ignored",
+                    "{\"text\":\"" + AaltoLaunchSessionLogger.EscapeJson(transcript) + "\",\"reason\":\"spoken_input_disabled\"}");
                 return;
             }
 
             if (AutoSubmitExternalSpeech)
             {
-                ExternalSpeechStatus = "Spoken transcript submitted.";
                 SubmitTurn(transcript);
             }
             else
             {
                 InspectorActorInput = transcript;
-                ExternalSpeechStatus = "Spoken transcript received. Ready in simulated input field.";
-                InspectorInputStatus = "Simulated input populated from spoken transcript.";
             }
         }
 
@@ -261,34 +332,29 @@ namespace AaltoSystemV3
             var guidance = (DirectorGuidanceInput ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(guidance))
             {
-                DirectorGuidanceInputStatus = "No director guidance input provided.";
                 return;
             }
 
             DirectorGuidanceInputs.Add(guidance);
             DirectorGuidanceInput = string.Empty;
             RebuildDirectorGuidanceFromInputs();
-            DirectorGuidanceInputStatus = "Director guidance added.";
         }
 
         public void RemoveDirectorGuidanceAt(int index)
         {
             if (index < 0 || index >= DirectorGuidanceInputs.Count)
             {
-                DirectorGuidanceInputStatus = "Invalid director guidance index.";
                 return;
             }
 
             DirectorGuidanceInputs.RemoveAt(index);
             RebuildDirectorGuidanceFromInputs();
-            DirectorGuidanceInputStatus = "Director guidance removed.";
         }
 
         public void ClearDirectorGuidanceInputs()
         {
             DirectorGuidanceInputs.Clear();
             RebuildDirectorGuidanceFromInputs();
-            DirectorGuidanceInputStatus = "All director guidance inputs cleared.";
         }
 
         private async Task HandleTurnAsync(string latestActorInput)
@@ -312,6 +378,12 @@ namespace AaltoSystemV3
 
                 var runtimePrompt = BuildRuntimePrompt(latestActorInput, availableActions);
                 LastRuntimePrompt = runtimePrompt;
+                EmitPerformerEvent("performer.request_prepared",
+                    "{\"model\":\"" + AaltoLaunchSessionLogger.EscapeJson(SelectedModelId) + "\"," +
+                    "\"latest_actor_input\":\"" + AaltoLaunchSessionLogger.EscapeJson(latestActorInput) + "\"," +
+                    "\"available_action_labels\":\"" + AaltoLaunchSessionLogger.EscapeJson(BuildActionLabelCsv(availableActions)) + "\"," +
+                    "\"action_memory_pairs\":\"" + AaltoLaunchSessionLogger.EscapeJson(BuildActionMemoryPairsSnapshot()) + "\"," +
+                    "\"runtime_prompt\":\"" + AaltoLaunchSessionLogger.EscapeJson(runtimePrompt) + "\"}");
 
                 var messages = new List<OpenAIClient.Msg>
                 {
@@ -326,6 +398,8 @@ namespace AaltoSystemV3
                     contextTag: "Aalto:DirectedRoomPerformer");
 
                 LastRawModelResponse = response;
+                EmitPerformerEvent("performer.model_response",
+                    "{\"raw_response\":\"" + AaltoLaunchSessionLogger.EscapeJson(response ?? string.Empty) + "\"}");
 
                 if (!TryParseDecision(response, out var action, out var justification, out var parseError))
                 {
@@ -347,29 +421,31 @@ namespace AaltoSystemV3
 
                 SelectedActionText = resolvedAction;
                 ActionJustificationText = (justification ?? string.Empty).Trim();
+                EmitPerformerEvent("performer.decision_resolved",
+                    "{\"chosen_action\":\"" + AaltoLaunchSessionLogger.EscapeJson(SelectedActionText ?? string.Empty) + "\"," +
+                    "\"justification\":\"" + AaltoLaunchSessionLogger.EscapeJson(ActionJustificationText ?? string.Empty) + "\"}");
 
                 var historyLine =
                     "actor: " + latestActorInput.Trim() +
                     " | action: " + SelectedActionText +
                     " | why: " + ActionJustificationText;
                 EnqueueHistory(historyLine);
+                AddDialogTurn(latestActorInput, SelectedActionText, ActionJustificationText);
 
-                if (ApplyActionThroughRegistry && ActionMemoryRegistry != null && !string.IsNullOrWhiteSpace(SelectedActionText))
-                {
-                    if (ActionMemoryRegistry.TrySendMemoryTriggerForActionLabel(SelectedActionText, out var sendError))
-                        SetStatus("Action applied: " + SelectedActionText);
-                    else
-                        SetStatus("Action resolved but registry send failed: " + sendError);
-                }
-                else
-                {
-                    SetStatus("Action resolved: " + SelectedActionText);
-                }
+                await ApplyActionDispatchAsync(SelectedActionText);
+
+                EmitTurnRecord(
+                    latestActorInput,
+                    availableActions,
+                    string.IsNullOrWhiteSpace(ExecutionModeStatus) || ExecutionModeStatus.IndexOf("failed", StringComparison.OrdinalIgnoreCase) < 0,
+                    ExecutionModeStatus);
 
                 RefreshPromptInspection();
             }
             catch (Exception ex)
             {
+                EmitPerformerEvent("performer.error",
+                    "{\"message\":\"" + AaltoLaunchSessionLogger.EscapeJson(ex.Message) + "\"}");
                 SetStatus("Error: " + ex.Message);
                 RefreshPromptInspection();
             }
@@ -502,6 +578,10 @@ namespace AaltoSystemV3
         {
             var pulled = BuildActionLabelListFromRegistry();
             PulledActionLabelsSnapshot = pulled;
+            EmitPerformerEvent("performer.action_labels_pulled",
+                "{\"count\":" + pulled.Count + "," +
+                "\"available_action_labels\":\"" + AaltoLaunchSessionLogger.EscapeJson(BuildActionLabelCsv(pulled)) + "\"," +
+                "\"action_memory_pairs\":\"" + AaltoLaunchSessionLogger.EscapeJson(BuildActionMemoryPairsSnapshot()) + "\"}");
 
             if (pulled.Count == 0)
             {
@@ -552,12 +632,337 @@ namespace AaltoSystemV3
             return labels;
         }
 
+        private static string BuildActionLabelCsv(List<string> labels)
+        {
+            if (labels == null || labels.Count == 0)
+                return string.Empty;
+
+            return string.Join(",", labels);
+        }
+
+        private string BuildActionMemoryPairsSnapshot()
+        {
+            if (ActionMemoryRegistry == null || ActionMemoryRegistry.mappings == null || ActionMemoryRegistry.mappings.Count == 0)
+                return string.Empty;
+
+            var pairs = new List<string>();
+            for (int i = 0; i < ActionMemoryRegistry.mappings.Count; i++)
+            {
+                var mapping = ActionMemoryRegistry.mappings[i];
+                if (mapping == null)
+                    continue;
+
+                var label = (mapping.actionLabel ?? string.Empty).Trim();
+                var memory = (mapping.memoryTrigger ?? string.Empty).Trim();
+                if (string.IsNullOrWhiteSpace(label) || string.IsNullOrWhiteSpace(memory))
+                    continue;
+
+                pairs.Add(label + "=>" + memory);
+            }
+
+            return string.Join("|", pairs);
+        }
+
         private void EnqueueHistory(string line)
         {
             _recentInteractions.Enqueue((line ?? string.Empty).Trim());
             var max = Mathf.Max(1, RecentHistoryLimit);
             while (_recentInteractions.Count > max)
                 _recentInteractions.Dequeue();
+        }
+
+        private void AddDialogTurn(string actorLine, string selectedResponse, string justification)
+        {
+            if (DialogTurns == null)
+                DialogTurns = new List<DialogTurnEntry>();
+
+            DialogTurns.Add(new DialogTurnEntry
+            {
+                actorLine = (actorLine ?? string.Empty).Trim(),
+                selectedResponse = (selectedResponse ?? string.Empty).Trim(),
+                justification = (justification ?? string.Empty).Trim(),
+                showDetails = false,
+                showJustification = false
+            });
+
+            var max = Mathf.Max(1, DialogLogLimit);
+            while (DialogTurns.Count > max)
+                DialogTurns.RemoveAt(0);
+        }
+
+        private async Task ApplyActionDispatchAsync(string selectedAction)
+        {
+            if (!ApplyActionThroughRegistry || ActionMemoryRegistry == null || string.IsNullOrWhiteSpace(selectedAction))
+            {
+                EmitPerformerEvent("performer.action_dispatch",
+                    "{\"chosen_action\":\"" + AaltoLaunchSessionLogger.EscapeJson(selectedAction ?? string.Empty) + "\",\"applied_through_registry\":false}");
+                ExecutionModeStatus = "Registry dispatch disabled or unavailable. Action was resolved only.";
+                SetStatus("Action resolved: " + selectedAction);
+                return;
+            }
+
+            if (!ActionMemoryRegistry.TrySendMemoryTriggerForActionLabel(selectedAction, out var sendError))
+            {
+                EmitPerformerEvent("performer.action_dispatch",
+                    "{\"chosen_action\":\"" + AaltoLaunchSessionLogger.EscapeJson(selectedAction) + "\"," +
+                    "\"resolved_memory_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(ActionMemoryRegistry.LastResolvedMemoryTrigger ?? string.Empty) + "\"," +
+                    "\"registry_send\":\"failed\",\"error\":\"" + AaltoLaunchSessionLogger.EscapeJson(sendError ?? string.Empty) + "\"}");
+                ExecutionModeStatus = "Dispatch failed. Response state was not applied.";
+                SetStatus("Action resolved but registry send failed: " + sendError);
+                return;
+            }
+
+            EmitPerformerEvent("performer.action_dispatch",
+                "{\"chosen_action\":\"" + AaltoLaunchSessionLogger.EscapeJson(selectedAction) + "\"," +
+                "\"resolved_memory_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(ActionMemoryRegistry.LastResolvedMemoryTrigger ?? string.Empty) + "\"," +
+                "\"registry_send\":\"ok\",\"mode\":\"" + AaltoLaunchSessionLogger.EscapeJson(SelectedActionStateMode.ToString()) + "\"}");
+
+            if (SelectedActionStateMode == ActionStateMode.HoldResponseState)
+            {
+                CancelPendingNeutralReturn();
+                ExecutionModeStatus = "Hold mode active. Response state remains until another action is applied.";
+                SetStatus("Action applied: " + selectedAction);
+                return;
+            }
+
+            var neutralTrigger = (NeutralMemoryTrigger ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(neutralTrigger))
+            {
+                ExecutionModeStatus = "Pulse mode active, but neutral memory trigger is empty.";
+                SetStatus("Action applied, but neutral return is not configured.");
+                return;
+            }
+
+            CancelPendingNeutralReturn();
+            _neutralReturnCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
+            var returnToken = _neutralReturnCts.Token;
+
+            var pulseSeconds = Mathf.Max(0.1f, ResponsePulseSeconds);
+            ExecutionModeStatus =
+                "Pulse mode active. Applied '" + selectedAction + "' then returning to neutral trigger '" + neutralTrigger +
+                "' after " + pulseSeconds.ToString("0.00") + "s.";
+            SetStatus("Action pulsed: " + selectedAction + " (returning to neutral soon)");
+
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(pulseSeconds), returnToken);
+            }
+            catch (TaskCanceledException)
+            {
+                return;
+            }
+
+            if (_cts == null || _cts.IsCancellationRequested || returnToken.IsCancellationRequested)
+                return;
+
+            if (ActionMemoryRegistry.TrySendMemoryTrigger(neutralTrigger, out var neutralError))
+            {
+                EmitPerformerEvent("performer.neutral_return",
+                    "{\"neutral_memory_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(neutralTrigger) + "\",\"send\":\"ok\"}");
+                ExecutionModeStatus = "Pulse mode completed. Returned to neutral trigger '" + neutralTrigger + "'.";
+                SetStatus("Returned to neutral: " + neutralTrigger);
+            }
+            else
+            {
+                EmitPerformerEvent("performer.neutral_return",
+                    "{\"neutral_memory_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(neutralTrigger) + "\",\"send\":\"failed\",\"error\":\"" + AaltoLaunchSessionLogger.EscapeJson(neutralError ?? string.Empty) + "\"}");
+                ExecutionModeStatus = "Pulse mode failed to return to neutral. " + neutralError;
+                SetStatus("Action applied but neutral return failed: " + neutralError);
+            }
+        }
+
+        private void CancelPendingNeutralReturn()
+        {
+            if (_neutralReturnCts == null)
+                return;
+
+            if (!_neutralReturnCts.IsCancellationRequested)
+                _neutralReturnCts.Cancel();
+
+            _neutralReturnCts.Dispose();
+            _neutralReturnCts = null;
+        }
+
+        [ContextMenu("Directed Performer/Start New Take")]
+        public void StartNewTake()
+        {
+            CancelPendingNeutralReturn();
+            ArchiveCurrentTakeIfNeeded();
+
+            _recentInteractions.Clear();
+            DialogTurns?.Clear();
+
+            InspectorActorInput = string.Empty;
+            LastExternalSpeechText = string.Empty;
+            SelectedActionText = string.Empty;
+            ActionJustificationText = string.Empty;
+            LastRuntimePrompt = string.Empty;
+            LastRawModelResponse = string.Empty;
+            PromptInspectionText = string.Empty;
+
+            CurrentTakeNumber = Mathf.Max(1, CurrentTakeNumber + 1);
+            SetStatus($"Started new take #{CurrentTakeNumber}. Active dialog memory cleared.");
+        }
+
+        public string BuildDialogArchiveExportJson()
+        {
+            var payload = new DialogArchiveExportPayload
+            {
+                exportedAtUtc = DateTime.UtcNow.ToString("o"),
+                currentTakeNumber = Mathf.Max(1, CurrentTakeNumber),
+                archivedTakeCount = ArchivedDialogTakes != null ? ArchivedDialogTakes.Count : 0,
+                archivedTakes = CloneTakeArchiveList(ArchivedDialogTakes),
+                currentTake = new DialogTakeArchiveEntry
+                {
+                    takeNumber = Mathf.Max(1, CurrentTakeNumber),
+                    capturedAtUtc = DateTime.UtcNow.ToString("o"),
+                    turnCount = DialogTurns != null ? DialogTurns.Count : 0,
+                    turns = CloneDialogTurns(DialogTurns)
+                }
+            };
+
+            return JsonUtility.ToJson(payload, true);
+        }
+
+        public string BuildDialogArchiveExportCsv()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("take_type,take_number,take_captured_at_utc,turn_index,actor_line,selected_response,justification");
+
+            if (ArchivedDialogTakes != null)
+            {
+                for (int i = 0; i < ArchivedDialogTakes.Count; i++)
+                {
+                    var take = ArchivedDialogTakes[i];
+                    if (take == null)
+                        continue;
+
+                    AppendTakeRows(sb, "archived", take.takeNumber, take.capturedAtUtc, take.turns);
+                }
+            }
+
+            AppendTakeRows(
+                sb,
+                "current",
+                Mathf.Max(1, CurrentTakeNumber),
+                DateTime.UtcNow.ToString("o"),
+                DialogTurns);
+
+            return sb.ToString();
+        }
+
+        private void ArchiveCurrentTakeIfNeeded()
+        {
+            if (DialogTurns == null || DialogTurns.Count == 0)
+                return;
+
+            if (ArchivedDialogTakes == null)
+                ArchivedDialogTakes = new List<DialogTakeArchiveEntry>();
+
+            var takeEntry = new DialogTakeArchiveEntry
+            {
+                takeNumber = Mathf.Max(1, CurrentTakeNumber),
+                capturedAtUtc = DateTime.UtcNow.ToString("o"),
+                turnCount = DialogTurns.Count,
+                turns = CloneDialogTurns(DialogTurns)
+            };
+
+            ArchivedDialogTakes.Add(takeEntry);
+        }
+
+        private static List<DialogTurnEntry> CloneDialogTurns(List<DialogTurnEntry> source)
+        {
+            var clone = new List<DialogTurnEntry>();
+            if (source == null)
+                return clone;
+
+            for (int i = 0; i < source.Count; i++)
+            {
+                var entry = source[i];
+                if (entry == null)
+                    continue;
+
+                clone.Add(new DialogTurnEntry
+                {
+                    actorLine = entry.actorLine,
+                    selectedResponse = entry.selectedResponse,
+                    justification = entry.justification,
+                    showDetails = entry.showDetails,
+                    showJustification = entry.showJustification
+                });
+            }
+
+            return clone;
+        }
+
+        private static List<DialogTakeArchiveEntry> CloneTakeArchiveList(List<DialogTakeArchiveEntry> source)
+        {
+            var clone = new List<DialogTakeArchiveEntry>();
+            if (source == null)
+                return clone;
+
+            for (int i = 0; i < source.Count; i++)
+            {
+                var take = source[i];
+                if (take == null)
+                    continue;
+
+                clone.Add(new DialogTakeArchiveEntry
+                {
+                    takeNumber = take.takeNumber,
+                    capturedAtUtc = take.capturedAtUtc,
+                    turnCount = take.turnCount,
+                    turns = CloneDialogTurns(take.turns)
+                });
+            }
+
+            return clone;
+        }
+
+        private static void AppendTakeRows(
+            StringBuilder sb,
+            string takeType,
+            int takeNumber,
+            string takeCapturedAtUtc,
+            List<DialogTurnEntry> turns)
+        {
+            if (sb == null)
+                return;
+
+            if (turns == null || turns.Count == 0)
+            {
+                sb.Append(CsvEscape(takeType)).Append(',')
+                    .Append(CsvEscape(takeNumber.ToString())).Append(',')
+                    .Append(CsvEscape(takeCapturedAtUtc)).Append(',')
+                    .Append(CsvEscape(string.Empty)).Append(',')
+                    .Append(CsvEscape(string.Empty)).Append(',')
+                    .Append(CsvEscape(string.Empty)).Append(',')
+                    .Append(CsvEscape(string.Empty))
+                    .AppendLine();
+                return;
+            }
+
+            for (int i = 0; i < turns.Count; i++)
+            {
+                var turn = turns[i];
+
+                sb.Append(CsvEscape(takeType)).Append(',')
+                    .Append(CsvEscape(takeNumber.ToString())).Append(',')
+                    .Append(CsvEscape(takeCapturedAtUtc)).Append(',')
+                    .Append(CsvEscape((i + 1).ToString())).Append(',')
+                    .Append(CsvEscape(turn != null ? turn.actorLine : string.Empty)).Append(',')
+                    .Append(CsvEscape(turn != null ? turn.selectedResponse : string.Empty)).Append(',')
+                    .Append(CsvEscape(turn != null ? turn.justification : string.Empty))
+                    .AppendLine();
+            }
+        }
+
+        private static string CsvEscape(string value)
+        {
+            var text = value ?? string.Empty;
+            text = text.Replace("\r\n", "\n").Replace('\r', '\n');
+            text = text.Replace("\"", "\"\"");
+            return "\"" + text + "\"";
         }
 
         private void RebuildDirectorGuidanceFromInputs()
@@ -691,12 +1096,14 @@ namespace AaltoSystemV3
         {
             LastStatus = status ?? string.Empty;
             Debug.Log("[AaltoDirectedRoomPerformer] " + LastStatus);
+            EmitPerformerEvent("performer.status", "{\"status\":\"" + AaltoLaunchSessionLogger.EscapeJson(LastStatus) + "\"}");
         }
 
         [ContextMenu("Directed Performer/Clear Runtime History")]
         public void ClearRuntimeHistory()
         {
             _recentInteractions.Clear();
+            DialogTurns?.Clear();
             LastStatus = "Runtime history cleared.";
         }
 
@@ -705,6 +1112,51 @@ namespace AaltoSystemV3
         {
             RefreshPromptInspection();
             LastStatus = "Prompt inspection refreshed.";
+        }
+
+        private static void EmitPerformerEvent(string eventType, string payloadJson)
+        {
+            AaltoLaunchSessionLogger.EmitEvent("AaltoDirectedRoomPerformer", eventType, payloadJson);
+        }
+
+        private void EmitTurnRecord(string latestActorInput, List<string> availableActions, bool executionSucceeded, string executionResult)
+        {
+            var payload =
+                "{"
+                + "\"run_id\":\"" + AaltoLaunchSessionLogger.EscapeJson(AaltoLaunchSessionLogger.CurrentRunId) + "\"," +
+                "\"turn_type\":\"single_speaker\"," +
+                "\"actor_input\":\"" + AaltoLaunchSessionLogger.EscapeJson(latestActorInput ?? string.Empty) + "\"," +
+                "\"interpreted_intent\":\"" + AaltoLaunchSessionLogger.EscapeJson(SelectedActionText ?? string.Empty) + "\"," +
+                "\"character_state\":{" +
+                    "\"summary\":\"" + AaltoLaunchSessionLogger.EscapeJson(CurrentCharacterSummary ?? string.Empty) + "\"," +
+                    "\"objective\":\"" + AaltoLaunchSessionLogger.EscapeJson(CurrentObjective ?? string.Empty) + "\"," +
+                    "\"stance\":\"" + AaltoLaunchSessionLogger.EscapeJson(CurrentStance ?? string.Empty) + "\"}," +
+                "\"available_actions\":" + BuildJsonStringArray(availableActions) + "," +
+                "\"selected_action\":\"" + AaltoLaunchSessionLogger.EscapeJson(SelectedActionText ?? string.Empty) + "\"," +
+                "\"decision_note\":\"" + AaltoLaunchSessionLogger.EscapeJson(ActionJustificationText ?? string.Empty) + "\"," +
+                "\"execution\":{" +
+                    "\"succeeded\":" + (executionSucceeded ? "true" : "false") + "," +
+                    "\"result\":\"" + AaltoLaunchSessionLogger.EscapeJson(executionResult ?? string.Empty) + "\"}}";
+
+            EmitPerformerEvent("performer.turn_record", payload);
+        }
+
+        private static string BuildJsonStringArray(List<string> values)
+        {
+            if (values == null || values.Count == 0)
+                return "[]";
+
+            var sb = new StringBuilder();
+            sb.Append("[");
+            for (var i = 0; i < values.Count; i++)
+            {
+                if (i > 0)
+                    sb.Append(",");
+
+                sb.Append("\"").Append(AaltoLaunchSessionLogger.EscapeJson(values[i] ?? string.Empty)).Append("\"");
+            }
+            sb.Append("]");
+            return sb.ToString();
         }
     }
 }

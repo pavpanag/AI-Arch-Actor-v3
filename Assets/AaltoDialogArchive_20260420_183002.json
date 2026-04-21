@@ -1,0 +1,49 @@
+{
+    "exportedAtUtc": "2026-04-20T15:30:03.6937555Z",
+    "currentTakeNumber": 2,
+    "archivedTakeCount": 1,
+    "archivedTakes": [
+        {
+            "takeNumber": 1,
+            "capturedAtUtc": "2026-04-20T15:29:48.9337203Z",
+            "turnCount": 2,
+            "turns": [
+                {
+                    "actorLine": "hi",
+                    "selectedResponse": "I say I want you to stay",
+                    "justification": "The greeting of 'hi' suggests a tentative engagement from the patient, and the room's objective is to soothe their anxiety. By expressing a desire for them to stay, the room reinforces its role as a comforting presence, inviting the patient to relax and find solace amidst their discomfort.",
+                    "showDetails": false,
+                    "showJustification": false
+                },
+                {
+                    "actorLine": "hoq AA",
+                    "selectedResponse": "I say I want you to stay",
+                    "justification": "The room continues to nurture the patient's anxiety by reinforcing the idea of comfort and safety. The previous interaction established a tone of reassurance, and by expressing a desire for them to stay, the room maintains its calming presence, inviting the patient to embrace the small comforts it offers amidst their discomfort.",
+                    "showDetails": false,
+                    "showJustification": false
+                }
+            ]
+        }
+    ],
+    "currentTake": {
+        "takeNumber": 2,
+        "capturedAtUtc": "2026-04-20T15:30:03.6937555Z",
+        "turnCount": 2,
+        "turns": [
+            {
+                "actorLine": "sss",
+                "selectedResponse": "I say I want you to stay",
+                "justification": "The sound 'sss' suggests a sigh or a moment of discomfort from a patient. The room, embodying a sterile yet comforting presence, would respond by inviting the patient to stay, offering a sense of security amidst their anxiety. This aligns with the objective to soothe and distract, reinforcing the calm yet indulgent stance of the room.",
+                "showDetails": false,
+                "showJustification": false
+            },
+            {
+                "actorLine": "ddd",
+                "selectedResponse": "I say I want you to stay",
+                "justification": "The sound 'ddd' implies a deeper sense of discomfort or hesitation from the patient, and the room responds by reinforcing the invitation to remain. This aligns with the current objective of soothing and providing comfort, allowing the patient to feel secure in their decision to stay despite their anxiety.",
+                "showDetails": false,
+                "showJustification": false
+            }
+        ]
+    }
+}

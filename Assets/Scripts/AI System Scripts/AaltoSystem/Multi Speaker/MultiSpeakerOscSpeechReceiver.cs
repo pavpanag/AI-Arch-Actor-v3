@@ -92,12 +92,22 @@ public sealed class MultiSpeakerOscSpeechReceiver : MonoBehaviour
                 if (MultiSpeakerPerformer == null)
                 {
                     DroppedNoPerformer++;
+                    EmitReceiverEvent(
+                        "receiver.dispatch_dropped",
+                        "{\"speaker_id\":\"" + AaltoLaunchSessionLogger.EscapeJson(item.speakerId ?? string.Empty) + "\"," +
+                        "\"text\":\"" + AaltoLaunchSessionLogger.EscapeJson(item.text ?? string.Empty) + "\"," +
+                        "\"reason\":\"no_performer\"}");
                     SetStatus("Dropped transcript: MultiSpeakerPerformer is not assigned.");
                     continue;
                 }
 
                 MultiSpeakerPerformer.ReceiveExternalSpeech(item.speakerId, item.text);
                 TotalDispatched++;
+                EmitReceiverEvent(
+                    "receiver.dispatched",
+                    "{\"speaker_id\":\"" + AaltoLaunchSessionLogger.EscapeJson(item.speakerId ?? string.Empty) + "\"," +
+                    "\"text\":\"" + AaltoLaunchSessionLogger.EscapeJson(item.text ?? string.Empty) + "\"," +
+                    "\"channel\":" + item.channel + "}");
                 SetStatus("Dispatched speech from " + item.speakerId + ": " + item.text);
             }
         }
@@ -198,12 +208,18 @@ public sealed class MultiSpeakerOscSpeechReceiver : MonoBehaviour
         if (string.IsNullOrWhiteSpace(transcript))
         {
             DroppedEmptyTranscript++;
+            EmitReceiverEvent("receiver.ingress_dropped", "{\"reason\":\"empty_transcript\"}");
             return;
         }
 
         if (!AcceptAnyChannel && (AllowedChannels == null || !AllowedChannels.Contains(channel)))
         {
             DroppedByChannelFilter++;
+            EmitReceiverEvent(
+                "receiver.ingress_dropped",
+                "{\"reason\":\"channel_filter\",\"channel\":" + channel + ",\"speaker_id\":\"" +
+                AaltoLaunchSessionLogger.EscapeJson(speakerId) + "\",\"text\":\"" +
+                AaltoLaunchSessionLogger.EscapeJson(transcript) + "\"}");
             return;
         }
 
@@ -213,6 +229,11 @@ public sealed class MultiSpeakerOscSpeechReceiver : MonoBehaviour
             LastReceivedSpeaker = speakerId;
             LastReceivedText = transcript;
             IncrementSpeakerCounter(speakerId);
+            EmitReceiverEvent(
+                "receiver.ingress_received",
+                "{\"speaker_id\":\"" + AaltoLaunchSessionLogger.EscapeJson(speakerId) + "\"," +
+                "\"text\":\"" + AaltoLaunchSessionLogger.EscapeJson(transcript) + "\"," +
+                "\"channel\":" + channel + "}");
             _pending.Enqueue(new PendingSpeech
             {
                 speakerId = speakerId,
@@ -370,5 +391,11 @@ public sealed class MultiSpeakerOscSpeechReceiver : MonoBehaviour
     {
         LastStatus = status ?? string.Empty;
         Debug.Log("[MultiSpeakerOscSpeechReceiver] " + LastStatus);
+        EmitReceiverEvent("receiver.status", "{\"status\":\"" + AaltoLaunchSessionLogger.EscapeJson(LastStatus) + "\"}");
+    }
+
+    private static void EmitReceiverEvent(string eventType, string payloadJson)
+    {
+        AaltoLaunchSessionLogger.EmitEvent("MultiSpeakerOscSpeechReceiver", eventType, payloadJson);
     }
 }
