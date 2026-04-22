@@ -176,7 +176,7 @@ namespace AaltoSystemV3
         private static string EnsureFolderPath()
         {
             if (!string.IsNullOrWhiteSpace(_folderPath)) return _folderPath;
-            _folderPath = Path.Combine(Application.persistentDataPath, "scenic_event_logs");
+            _folderPath = Path.Combine(AaltoLaunchSessionLogger.ResolveFullEventLogsDirectory(), "scenic-events");
             Directory.CreateDirectory(_folderPath);
             return _folderPath;
         }
@@ -185,7 +185,19 @@ namespace AaltoSystemV3
         {
             if (!string.IsNullOrWhiteSpace(_sessionFilePath)) return _sessionFilePath;
             var folder = EnsureFolderPath();
-            _sessionFilePath = Path.Combine(folder, $"scenic_{_sessionId}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.jsonl");
+            var sessionShort = _sessionId ?? string.Empty;
+            if (sessionShort.Length > 8)
+                sessionShort = sessionShort.Substring(0, 8);
+            if (string.IsNullOrWhiteSpace(sessionShort))
+                sessionShort = "session";
+
+            var runId = string.IsNullOrWhiteSpace(AaltoLaunchSessionLogger.CurrentRunId)
+                ? "RUN_000"
+                : AaltoLaunchSessionLogger.CurrentRunId;
+
+            _sessionFilePath = Path.Combine(
+                folder,
+                $"scenic-events__{runId}__sid_{sessionShort}__{DateTime.UtcNow:yyyy-MM-dd_HH-mm-ss}.jsonl");
             return _sessionFilePath;
         }
     }

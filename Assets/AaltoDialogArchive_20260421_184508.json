@@ -1,0 +1,12 @@
+{
+    "exportedAtUtc": "2026-04-21T15:45:20.5445468Z",
+    "currentTakeNumber": 1,
+    "archivedTakeCount": 0,
+    "archivedTakes": [],
+    "currentTake": {
+        "takeNumber": 1,
+        "capturedAtUtc": "2026-04-21T15:45:20.5445468Z",
+        "turnCount": 0,
+        "turns": []
+    }
+}

@@ -5,6 +5,14 @@ using AaltoSystemV3;
 
 public sealed class OscSpeechReceiver : MonoBehaviour
 {
+    [Serializable]
+    private sealed class PendingSpeech
+    {
+        public string speakerId;
+        public int channel;
+        public string text;
+    }
+
     [Header("Wiring")]
     public BlueprintChatController Chat;
     public AaltoDirectedRoomPerformerController DirectedPerformer;
@@ -20,7 +28,7 @@ public sealed class OscSpeechReceiver : MonoBehaviour
     public bool AcceptAnyChannel = true;
     public List<int> AllowedChannels = new List<int> { 1 };
 
-    private readonly Queue<string> _pending = new Queue<string>();
+    private readonly Queue<PendingSpeech> _pending = new Queue<PendingSpeech>();
     private readonly object _lock = new object();
 
     private bool _registered;
@@ -56,13 +64,46 @@ public sealed class OscSpeechReceiver : MonoBehaviour
         {
             while (_pending.Count > 0)
             {
-                var t = _pending.Dequeue();
+                var item = _pending.Dequeue();
+                var t = item != null ? item.text : string.Empty;
                 ResolveTargetsIfNeeded();
                 Debug.Log($"[{nameof(OscSpeechReceiver)}] Dispatching transcript: \"{t}\"");
-                if (Chat != null) Chat.ReceiveExternalSpeech(t);
-                if (DirectedPerformer != null) DirectedPerformer.ReceiveExternalSpeech(t);
-                if (Chat == null && DirectedPerformer == null)
+
+                var sentToChat = false;
+                var sentToPerformer = false;
+
+                if (Chat != null)
+                {
+                    Chat.ReceiveExternalSpeech(t);
+                    sentToChat = true;
+                }
+
+                if (DirectedPerformer != null)
+                {
+                    DirectedPerformer.ReceiveExternalSpeech(t);
+                    sentToPerformer = true;
+                }
+
+                if (!sentToChat && !sentToPerformer)
+                {
                     Debug.LogWarning($"[{nameof(OscSpeechReceiver)}] No target assigned, dropped transcript: \"{t}\"");
+                    EmitReceiverEvent(
+                        "receiver.dispatch_dropped",
+                        "{\"speaker_id\":\"" + AaltoLaunchSessionLogger.EscapeJson(item?.speakerId ?? string.Empty) + "\"," +
+                        "\"text\":\"" + AaltoLaunchSessionLogger.EscapeJson(t ?? string.Empty) + "\"," +
+                        "\"channel\":" + (item != null ? item.channel : 0) + "," +
+                        "\"reason\":\"no_target\"}");
+                }
+                else
+                {
+                    EmitReceiverEvent(
+                        "receiver.dispatched",
+                        "{\"speaker_id\":\"" + AaltoLaunchSessionLogger.EscapeJson(item?.speakerId ?? string.Empty) + "\"," +
+                        "\"text\":\"" + AaltoLaunchSessionLogger.EscapeJson(t ?? string.Empty) + "\"," +
+                        "\"channel\":" + (item != null ? item.channel : 0) + "," +
+                        "\"sent_to_chat\":" + (sentToChat ? "true" : "false") + "," +
+                        "\"sent_to_performer\":" + (sentToPerformer ? "true" : "false") + "}");
+                }
             }
         }
     }
@@ -194,19 +235,39 @@ public sealed class OscSpeechReceiver : MonoBehaviour
         if (!AcceptAnyChannel && (AllowedChannels == null || !AllowedChannels.Contains(channel)))
         {
             Debug.Log($"[{nameof(OscSpeechReceiver)}] Channel {channel} not allowed. AcceptAnyChannel={AcceptAnyChannel}. AllowedChannels={string.Join(",", AllowedChannels ?? new List<int>())}");
+            EmitReceiverEvent(
+                "receiver.ingress_dropped",
+                "{\"reason\":\"channel_filter\",\"channel\":" + channel + ",\"text\":\"" + AaltoLaunchSessionLogger.EscapeJson(transcript ?? string.Empty) + "\"}");
             return;
         }
 
         if (string.IsNullOrWhiteSpace(transcript))
         {
             Debug.LogWarning($"[{nameof(OscSpeechReceiver)}] Transcript is empty or whitespace, ignoring.");
+            EmitReceiverEvent("receiver.ingress_dropped", "{\"reason\":\"empty_transcript\"}");
             return;
         }
 
         lock (_lock)
         {
-            _pending.Enqueue(transcript);
+            var speakerId = channel != 0 ? ("channel_" + channel) : "unknown";
+            _pending.Enqueue(new PendingSpeech
+            {
+                speakerId = speakerId,
+                channel = channel,
+                text = transcript
+            });
             Debug.Log($"[{nameof(OscSpeechReceiver)}] Enqueued transcript: \"{transcript}\" (channel={channel})");
+            EmitReceiverEvent(
+                "receiver.ingress_received",
+                "{\"speaker_id\":\"" + AaltoLaunchSessionLogger.EscapeJson(speakerId) + "\"," +
+                "\"text\":\"" + AaltoLaunchSessionLogger.EscapeJson(transcript ?? string.Empty) + "\"," +
+                "\"channel\":" + channel + "}");
         }
+    }
+
+    private static void EmitReceiverEvent(string eventType, string payloadJson)
+    {
+        AaltoLaunchSessionLogger.EmitEvent(nameof(OscSpeechReceiver), eventType, payloadJson);
     }
 }

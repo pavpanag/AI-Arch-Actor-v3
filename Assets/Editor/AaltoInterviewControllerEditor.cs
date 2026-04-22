@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using AaltoSystemV3;
@@ -26,6 +28,21 @@ public sealed class AaltoInterviewControllerEditor : Editor
     SerializedProperty minSummaryCharsProperty;
     SerializedProperty maxSummaryCharsProperty;
 
+    private const double InputDebounceSeconds = 0.9;
+
+    private static bool _debounceHooked;
+    private static readonly Dictionary<string, PendingEdit> PendingEdits = new Dictionary<string, PendingEdit>(StringComparer.OrdinalIgnoreCase);
+
+    private sealed class PendingEdit
+    {
+        public int instanceId;
+        public string fieldKey;
+        public string previousValue;
+        public string newValue;
+        public double lastEditTime;
+        public string source;
+    }
+
     void OnEnable()
     {
         openAIProperty = serializedObject.FindProperty("OpenAI");
@@ -52,6 +69,7 @@ public sealed class AaltoInterviewControllerEditor : Editor
 
     public override void OnInspectorGUI()
     {
+        EnsureDebounceUpdateHook();
         serializedObject.Update();
 
         DrawSceneRefs();
@@ -76,10 +94,10 @@ public sealed class AaltoInterviewControllerEditor : Editor
         EditorGUILayout.Space(8f);
         EditorGUILayout.LabelField("Interview Workflow", EditorStyles.boldLabel);
 
-        EditorGUILayout.PropertyField(backstoryTextProperty);
-        EditorGUILayout.PropertyField(motiveTextProperty);
-        EditorGUILayout.PropertyField(obstacleTextProperty);
-        EditorGUILayout.PropertyField(circumstancesTextProperty);
+        DrawUserInputTextArea(controller, backstoryTextProperty, "backstory", "Back Story (User Input)");
+        DrawUserInputTextArea(controller, motiveTextProperty, "motive", "Motive (User Input)");
+        DrawUserInputTextArea(controller, obstacleTextProperty, "obstacle", "Obstacle (User Input)");
+        DrawUserInputTextArea(controller, circumstancesTextProperty, "circumstances", "Circumstances (User Input)");
 
         if (GUILayout.Button("Generate Follow Up Questions"))
         {
@@ -90,7 +108,7 @@ public sealed class AaltoInterviewControllerEditor : Editor
         }
 
         EditorGUILayout.PropertyField(followUpQuestionsTextProperty);
-        EditorGUILayout.PropertyField(followUpAnswersTextProperty);
+        DrawUserInputTextArea(controller, followUpAnswersTextProperty, "followup_answers", "Follow Up Answers (User Input)");
 
         if (GUILayout.Button("Submit Follow Up Answers And Create Summary"))
         {
@@ -120,5 +138,131 @@ public sealed class AaltoInterviewControllerEditor : Editor
         EditorGUILayout.PropertyField(modelSelectionProperty);
         EditorGUILayout.PropertyField(minSummaryCharsProperty);
         EditorGUILayout.PropertyField(maxSummaryCharsProperty);
+    }
+
+    private static void EnsureDebounceUpdateHook()
+    {
+        if (_debounceHooked)
+            return;
+
+        _debounceHooked = true;
+        EditorApplication.update += FlushDebouncedEdits;
+    }
+
+    private static void FlushDebouncedEdits()
+    {
+        if (PendingEdits.Count == 0)
+            return;
+
+        if (!Application.isPlaying)
+        {
+            PendingEdits.Clear();
+            return;
+        }
+
+        var now = EditorApplication.timeSinceStartup;
+        var ready = new List<string>();
+        foreach (var kv in PendingEdits)
+        {
+            if (now - kv.Value.lastEditTime >= InputDebounceSeconds)
+                ready.Add(kv.Key);
+        }
+
+        for (int i = 0; i < ready.Count; i++)
+        {
+            var key = ready[i];
+            if (!PendingEdits.TryGetValue(key, out var edit))
+                continue;
+
+            PendingEdits.Remove(key);
+
+            var payload =
+                "{\"field\":\"" + AaltoLaunchSessionLogger.EscapeJson(edit.fieldKey ?? string.Empty) + "\"," +
+                "\"previous\":\"" + AaltoLaunchSessionLogger.EscapeJson(edit.previousValue ?? string.Empty) + "\"," +
+                "\"current\":\"" + AaltoLaunchSessionLogger.EscapeJson(edit.newValue ?? string.Empty) + "\"}";
+
+            AaltoLaunchSessionLogger.EmitEvent(edit.source ?? "AaltoInterviewController", "interview.user_input_changed", payload);
+        }
+    }
+
+    private void DrawUserInputTextArea(AaltoInterviewController controller, SerializedProperty prop, string fieldKey, string label)
+    {
+        if (controller == null || prop == null)
+            return;
+
+        EditorGUILayout.LabelField(label, EditorStyles.boldLabel);
+
+        var previous = prop.stringValue ?? string.Empty;
+        EditorGUI.BeginChangeCheck();
+        var next = EditorGUILayout.TextArea(previous, GUILayout.MinHeight(44f));
+        if (EditorGUI.EndChangeCheck())
+        {
+            prop.stringValue = next ?? string.Empty;
+            QueueDebouncedEdit(controller, fieldKey, previous, prop.stringValue);
+        }
+
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Submit " + fieldKey, GUILayout.Width(160f)))
+        {
+            serializedObject.ApplyModifiedProperties();
+            EmitImmediateSubmit(controller, fieldKey, previous, prop.stringValue ?? string.Empty);
+            EditorUtility.SetDirty(controller);
+            serializedObject.Update();
+        }
+        if (GUILayout.Button("Clear", GUILayout.Width(70f)))
+        {
+            serializedObject.ApplyModifiedProperties();
+            var clearedPrev = prop.stringValue ?? string.Empty;
+            prop.stringValue = string.Empty;
+            QueueDebouncedEdit(controller, fieldKey, clearedPrev, prop.stringValue);
+            EmitImmediateSubmit(controller, fieldKey, clearedPrev, prop.stringValue);
+            EditorUtility.SetDirty(controller);
+            serializedObject.Update();
+        }
+        EditorGUILayout.EndHorizontal();
+
+        EditorGUILayout.Space(6f);
+    }
+
+    private static void QueueDebouncedEdit(AaltoInterviewController controller, string fieldKey, string previous, string current)
+    {
+        if (!Application.isPlaying)
+            return;
+
+        var id = controller != null ? controller.GetInstanceID() : 0;
+        var key = id.ToString() + "::" + (fieldKey ?? string.Empty);
+        var now = EditorApplication.timeSinceStartup;
+
+        if (!PendingEdits.TryGetValue(key, out var pending))
+        {
+            pending = new PendingEdit
+            {
+                instanceId = id,
+                fieldKey = fieldKey ?? string.Empty,
+                previousValue = previous ?? string.Empty,
+                newValue = current ?? string.Empty,
+                lastEditTime = now,
+                source = "AaltoInterviewController"
+            };
+            PendingEdits[key] = pending;
+            return;
+        }
+
+        // Keep the earliest previous value until we flush, so we preserve the whole edit burst.
+        pending.newValue = current ?? string.Empty;
+        pending.lastEditTime = now;
+    }
+
+    private static void EmitImmediateSubmit(AaltoInterviewController controller, string fieldKey, string previous, string current)
+    {
+        if (!Application.isPlaying)
+            return;
+
+        var payload =
+            "{\"field\":\"" + AaltoLaunchSessionLogger.EscapeJson(fieldKey ?? string.Empty) + "\"," +
+            "\"previous\":\"" + AaltoLaunchSessionLogger.EscapeJson(previous ?? string.Empty) + "\"," +
+            "\"current\":\"" + AaltoLaunchSessionLogger.EscapeJson(current ?? string.Empty) + "\"}";
+
+        AaltoLaunchSessionLogger.EmitEvent("AaltoInterviewController", "interview.user_input_submitted", payload);
     }
 }

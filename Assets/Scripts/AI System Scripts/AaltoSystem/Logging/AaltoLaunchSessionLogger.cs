@@ -15,6 +15,9 @@ namespace AaltoSystemV3
     public sealed class AaltoLaunchSessionLogger : MonoBehaviour
     {
         private const string RunCounterPrefsKey = "AaltoLaunchSessionLogger.RunCounter";
+        public const string ExportRootRelativePath = "Assets/Recordings/AaltoExports";
+        public const string FullEventLogsSubfolder = "full-event-logs";
+        public const string DialogArchivesSubfolder = "dialog-archives";
 
         [Serializable]
         private sealed class EventEnvelope
@@ -52,8 +55,64 @@ namespace AaltoSystemV3
             public long structured_event_count;
             public long raw_log_count;
             public long audio_note_count;
+            public long ux_timeline_row_count;
             public string audio_notes_folder;
+            public string ux_timeline_csv;
+            public string ux_timeline_jsonl;
             public bool closed_cleanly;
+        }
+
+        [Serializable]
+        private sealed class UxTimelineRow
+        {
+            public long row_id;
+            public string session_id;
+            public string run_id;
+            public string ts_utc;
+            public string ts_local;
+            public string source;
+            public string event_type;
+            public string system_mode;
+            public string take_number;
+            public string turn_index;
+            public string turn_id;
+            public string input_source;
+            public string actor_source;
+            public string actor_input;
+            public string pending_dialogue_batch;
+            public string prior_dialogue_context;
+            public string react_now;
+            public string selected_action;
+            public string selected_memory_trigger;
+            public string decision_note;
+            public string execution_succeeded;
+            public string execution_result;
+            public string registry_send;
+            public string neutral_return_send;
+            public string model;
+            public string raw_model_action;
+            public string fallback_used;
+            public string parse_error;
+            public string prompt_memory_scope;
+            public string prompt_memory_line_count;
+            public string pending_dialogue_line_count;
+            public string available_action_count;
+            public string director_guidance;
+            public string input_received_utc;
+            public string decision_started_utc;
+            public string model_response_utc;
+            public string action_dispatch_utc;
+            public string action_dispatch_completed_utc;
+            public string latency_input_to_model_ms;
+            public string latency_input_to_action_ms;
+            public string trace_request_id;
+            public long source_event_id;
+
+            // High-signal config snapshot fields (kept narrow on purpose).
+            public string action_labels_all;
+            public string action_labels_added;
+            public string action_labels_removed;
+            public string action_memory_pairs;
         }
 
         private static readonly object Gate = new object();
@@ -80,6 +139,8 @@ namespace AaltoSystemV3
         private string _manifestPath;
         private string _summaryPath;
         private string _transcriptsPath;
+        private string _uxTimelineCsvPath;
+        private string _uxTimelineJsonlPath;
         private string _audioNotesFolder;
 
         [Header("Run Overlay")]
@@ -113,12 +174,14 @@ namespace AaltoSystemV3
 
         private readonly Dictionary<string, long> _eventTypeCounts = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, long> _sourceCounts = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        private readonly List<EventEnvelope> _structuredEvents = new List<EventEnvelope>();
+        private long _uxTimelineRowCount;
 
         private static string BuildSessionFolderNameOpen(int runNumber, DateTime localStart)
         {
             var run = "RUN_" + Mathf.Max(0, runNumber).ToString("000");
             var stamp = localStart.ToString("yyyy-MM-dd_HH-mm-ss");
-            return run + "__session_" + stamp + "__to__OPEN";
+            return run + "__full-events__" + stamp + "__to__OPEN";
         }
 
         private static string BuildSessionFolderNameFinal(string openFolderName, DateTime localEnd)
@@ -130,6 +193,18 @@ namespace AaltoSystemV3
             return openFolderName + "__to__" + endStamp;
         }
 
+        private static string SessionFilePrefix(int runNumber, string sessionId)
+        {
+            var safeRun = "RUN_" + Mathf.Max(0, runNumber).ToString("000");
+            var sid = (sessionId ?? string.Empty).Trim();
+            if (sid.Length > 8)
+                sid = sid.Substring(0, 8);
+            if (string.IsNullOrWhiteSpace(sid))
+                sid = "session";
+
+            return safeRun + "__sid_" + sid;
+        }
+
         public static string CurrentSessionFolder
         {
             get
@@ -139,6 +214,26 @@ namespace AaltoSystemV3
                     return _instance != null ? _instance._sessionFolderOpen : string.Empty;
                 }
             }
+        }
+
+        public static string ResolveExportRootDirectory()
+        {
+#if UNITY_EDITOR
+            var projectRoot = Directory.GetParent(Application.dataPath)?.FullName;
+            if (!string.IsNullOrWhiteSpace(projectRoot))
+                return Path.GetFullPath(Path.Combine(projectRoot, ExportRootRelativePath));
+#endif
+            return Path.GetFullPath(Path.Combine(Application.persistentDataPath, "AaltoExports"));
+        }
+
+        public static string ResolveFullEventLogsDirectory()
+        {
+            return Path.Combine(ResolveExportRootDirectory(), FullEventLogsSubfolder);
+        }
+
+        public static string ResolveDialogArchivesDirectory()
+        {
+            return Path.Combine(ResolveExportRootDirectory(), DialogArchivesSubfolder);
         }
 
         public static bool IsAudioNoteRecording
@@ -303,7 +398,7 @@ namespace AaltoSystemV3
             PlayerPrefs.SetInt(RunCounterPrefsKey, CurrentRunNumber);
             PlayerPrefs.Save();
 
-            _rootFolder = Path.Combine(Application.persistentDataPath, "AaltoLaunchLogs");
+            _rootFolder = ResolveFullEventLogsDirectory();
             Directory.CreateDirectory(_rootFolder);
 
             _sessionFolderOpen = Path.Combine(_rootFolder, BuildSessionFolderNameOpen(CurrentRunNumber, _startLocal));
@@ -311,14 +406,18 @@ namespace AaltoSystemV3
             _audioNotesFolder = Path.Combine(_sessionFolderOpen, "audio-notes");
             Directory.CreateDirectory(_audioNotesFolder);
 
-            _eventsPath = Path.Combine(_sessionFolderOpen, "events.jsonl");
-            _rawLogsPath = Path.Combine(_sessionFolderOpen, "unity-raw.jsonl");
-            _eventsCsvPath = Path.Combine(_sessionFolderOpen, "events.csv");
-            _rawCsvPath = Path.Combine(_sessionFolderOpen, "unity-raw.csv");
-            _sqlitePath = Path.Combine(_sessionFolderOpen, "session.db");
-            _manifestPath = Path.Combine(_sessionFolderOpen, "session-manifest.json");
-            _summaryPath = Path.Combine(_sessionFolderOpen, "session-summary.md");
-            _transcriptsPath = Path.Combine(_sessionFolderOpen, "audio-note-transcripts.jsonl");
+            var filePrefix = SessionFilePrefix(CurrentRunNumber, _sessionId);
+
+            _eventsPath = Path.Combine(_sessionFolderOpen, filePrefix + "__events.jsonl");
+            _rawLogsPath = Path.Combine(_sessionFolderOpen, filePrefix + "__unity-raw.jsonl");
+            _eventsCsvPath = Path.Combine(_sessionFolderOpen, filePrefix + "__events.csv");
+            _rawCsvPath = Path.Combine(_sessionFolderOpen, filePrefix + "__unity-raw.csv");
+            _sqlitePath = Path.Combine(_sessionFolderOpen, filePrefix + "__session.db");
+            _manifestPath = Path.Combine(_sessionFolderOpen, filePrefix + "__session-manifest.json");
+            _summaryPath = Path.Combine(_sessionFolderOpen, filePrefix + "__session-summary.md");
+            _transcriptsPath = Path.Combine(_sessionFolderOpen, filePrefix + "__audio-note-transcripts.jsonl");
+            _uxTimelineCsvPath = Path.Combine(_sessionFolderOpen, filePrefix + "__ux-timeline.csv");
+            _uxTimelineJsonlPath = Path.Combine(_sessionFolderOpen, filePrefix + "__ux-timeline.jsonl");
 
             _eventsWriter = new StreamWriter(new FileStream(_eventsPath, FileMode.Append, FileAccess.Write, FileShare.Read))
             {
@@ -379,6 +478,7 @@ namespace AaltoSystemV3
                 payload_json = string.IsNullOrWhiteSpace(payloadJson) ? "{}" : payloadJson
             };
 
+            _structuredEvents.Add(e);
             _eventsWriter.WriteLine(ToJsonLine(e));
             _eventsCsvWriter?.WriteLine(ToCsvRow(
                 e.event_id.ToString(),
@@ -822,6 +922,8 @@ namespace AaltoSystemV3
             _eventsCsvWriter = null;
             _rawCsvWriter = null;
 
+            WriteUxTimelineExport();
+
             try
             {
                 if (_sqliteConnection != null)
@@ -874,7 +976,10 @@ namespace AaltoSystemV3
                     structured_event_count = _eventSeq,
                     raw_log_count = _rawSeq,
                     audio_note_count = _audioNoteSeq,
+                    ux_timeline_row_count = _uxTimelineRowCount,
                     audio_notes_folder = _audioNotesFolder,
+                    ux_timeline_csv = _uxTimelineCsvPath,
+                    ux_timeline_jsonl = _uxTimelineJsonlPath,
                     closed_cleanly = closedCleanly
                 };
 
@@ -908,23 +1013,32 @@ namespace AaltoSystemV3
                 sb.AppendLine();
 
                 sb.AppendLine("## Files");
-                sb.AppendLine("- events.jsonl");
-                sb.AppendLine("- events.csv");
-                sb.AppendLine("- unity-raw.jsonl");
-                sb.AppendLine("- unity-raw.csv");
+                sb.AppendLine("- " + Path.GetFileName(_eventsPath));
+                sb.AppendLine("- " + Path.GetFileName(_eventsCsvPath));
+                sb.AppendLine("- " + Path.GetFileName(_rawLogsPath));
+                sb.AppendLine("- " + Path.GetFileName(_rawCsvPath));
+                sb.AppendLine("- " + Path.GetFileName(_uxTimelineCsvPath) + " (curated UX timeline)");
+                sb.AppendLine("- " + Path.GetFileName(_uxTimelineJsonlPath) + " (curated UX timeline)");
                 sb.AppendLine("- audio-notes/ (WAV audio notes)");
-                sb.AppendLine("- audio-note-transcripts.jsonl (from Vosk sidecar)");
+                sb.AppendLine("- " + Path.GetFileName(_transcriptsPath) + " (from Vosk sidecar)");
                 sb.AppendLine("- audio-note-transcripts.csv (from Vosk sidecar)");
                 sb.AppendLine("- audio-notes/transcripts/*.txt (from Vosk sidecar)");
-                sb.AppendLine("- session.db (SQLite, when provider available)");
-                sb.AppendLine("- session-manifest.json");
-                sb.AppendLine("- session-summary.md");
+                sb.AppendLine("- " + Path.GetFileName(_sqlitePath) + " (SQLite, when provider available)");
+                sb.AppendLine("- " + Path.GetFileName(_manifestPath));
+                sb.AppendLine("- " + Path.GetFileName(_summaryPath));
                 sb.AppendLine();
 
                 sb.AppendLine("## Storage Formats");
                 sb.AppendLine("- JSONL: Full fidelity append logs");
                 sb.AppendLine("- CSV: Spreadsheet-friendly flat export");
                 sb.AppendLine("- SQLite: Queryable database (provider: " + (string.IsNullOrWhiteSpace(_sqliteProviderName) ? "unavailable" : _sqliteProviderName) + ")");
+                sb.AppendLine("- UX Timeline: one curated row per performer decision or researcher note");
+                sb.AppendLine();
+
+                sb.AppendLine("## UX Timeline");
+                sb.AppendLine("- Rows: " + _uxTimelineRowCount);
+                sb.AppendLine("- Built from structured events at run shutdown.");
+                sb.AppendLine("- Full prompts, raw model responses, and Unity logs remain in the appendix files rather than the main UX table.");
                 sb.AppendLine();
 
                 sb.AppendLine("## Events By Source");
@@ -974,6 +1088,699 @@ namespace AaltoSystemV3
                 return cmp != 0 ? cmp : string.Compare(a.Key, b.Key, StringComparison.OrdinalIgnoreCase);
             });
             return items;
+        }
+
+        private void WriteUxTimelineExport()
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(_uxTimelineCsvPath) || string.IsNullOrWhiteSpace(_uxTimelineJsonlPath))
+                    return;
+
+                var directory = Path.GetDirectoryName(_uxTimelineCsvPath);
+                if (!string.IsNullOrWhiteSpace(directory))
+                    Directory.CreateDirectory(directory);
+
+                var rows = BuildUxTimelineRows();
+                _uxTimelineRowCount = rows.Count;
+
+                var csv = new StringBuilder();
+                csv.AppendLine("row_id,session_id,run_id,ts_utc,ts_local,source,event_type,system_mode,take_number,turn_index,turn_id,input_source,actor_source,actor_input,pending_dialogue_batch,prior_dialogue_context,react_now,selected_action,selected_memory_trigger,decision_note,execution_succeeded,execution_result,registry_send,neutral_return_send,model,raw_model_action,fallback_used,parse_error,prompt_memory_scope,prompt_memory_line_count,pending_dialogue_line_count,available_action_count,director_guidance,input_received_utc,decision_started_utc,model_response_utc,action_dispatch_utc,action_dispatch_completed_utc,latency_input_to_model_ms,latency_input_to_action_ms,trace_request_id,source_event_id,action_labels_all,action_labels_added,action_labels_removed,action_memory_pairs");
+
+                var jsonl = new StringBuilder();
+                for (int i = 0; i < rows.Count; i++)
+                {
+                    var row = rows[i];
+                    csv.AppendLine(ToCsvRow(
+                        row.row_id.ToString(),
+                        row.session_id,
+                        row.run_id,
+                        row.ts_utc,
+                        row.ts_local,
+                        row.source,
+                        row.event_type,
+                        row.system_mode,
+                        row.take_number,
+                        row.turn_index,
+                        row.turn_id,
+                        row.input_source,
+                        row.actor_source,
+                        row.actor_input,
+                        row.pending_dialogue_batch,
+                        row.prior_dialogue_context,
+                        row.react_now,
+                        row.selected_action,
+                        row.selected_memory_trigger,
+                        row.decision_note,
+                        row.execution_succeeded,
+                        row.execution_result,
+                        row.registry_send,
+                        row.neutral_return_send,
+                        row.model,
+                        row.raw_model_action,
+                        row.fallback_used,
+                        row.parse_error,
+                        row.prompt_memory_scope,
+                        row.prompt_memory_line_count,
+                        row.pending_dialogue_line_count,
+                        row.available_action_count,
+                        row.director_guidance,
+                        row.input_received_utc,
+                        row.decision_started_utc,
+                        row.model_response_utc,
+                        row.action_dispatch_utc,
+                        row.action_dispatch_completed_utc,
+                        row.latency_input_to_model_ms,
+                        row.latency_input_to_action_ms,
+                        row.trace_request_id,
+                        row.source_event_id.ToString(),
+                        row.action_labels_all,
+                        row.action_labels_added,
+                        row.action_labels_removed,
+                        row.action_memory_pairs));
+                    jsonl.AppendLine(JsonUtility.ToJson(row));
+                }
+
+                File.WriteAllText(_uxTimelineCsvPath, csv.ToString());
+                File.WriteAllText(_uxTimelineJsonlPath, jsonl.ToString());
+            }
+            catch
+            {
+                // UX export is derived data; never let it interrupt run shutdown.
+            }
+        }
+
+        private List<UxTimelineRow> BuildUxTimelineRows()
+        {
+            var rows = new List<UxTimelineRow>();
+            long rowId = 0;
+            var lastActionLabelsBySource = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            var lastStatusByKey = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            for (int i = 0; i < _structuredEvents.Count; i++)
+            {
+                var e = _structuredEvents[i];
+                if (e == null)
+                    continue;
+
+                UxTimelineRow row = null;
+                if (string.Equals(e.event_type, "performer.turn_record", StringComparison.OrdinalIgnoreCase))
+                    row = BuildPerformerTimelineRow(e);
+                else if (string.Equals(e.event_type, "session_started", StringComparison.OrdinalIgnoreCase))
+                    row = BuildSessionStartedTimelineRow(e);
+                else if (string.Equals(e.event_type, "performer.action_labels_pulled", StringComparison.OrdinalIgnoreCase))
+                    row = BuildActionLabelsPulledTimelineRow(e, lastActionLabelsBySource);
+                else if (string.Equals(e.event_type, "bootstrap.generated", StringComparison.OrdinalIgnoreCase))
+                    row = BuildBootstrapGeneratedTimelineRow(e);
+                else if (string.Equals(e.event_type, "interview.summary_changed", StringComparison.OrdinalIgnoreCase))
+                    row = BuildInterviewSummaryChangedTimelineRow(e);
+                else if (string.Equals(e.event_type, "interview.followup_questions_changed", StringComparison.OrdinalIgnoreCase))
+                    row = BuildInterviewFollowupQuestionsChangedTimelineRow(e);
+                else if (IsInterviewUserInputEvent(e))
+                    row = BuildInterviewUserInputTimelineRow(e);
+                else if (IsActionMemoryMappingsEvent(e))
+                    row = BuildActionMemoryMappingsTimelineRow(e);
+                else if (IsSpeechReceiverEvent(e))
+                    row = BuildSpeechReceiverTimelineRow(e);
+                else if (IsDirectorGuidanceEvent(e))
+                    row = BuildDirectorGuidanceTimelineRow(e);
+                else if (IsStatusEvent(e))
+                    row = BuildStatusTimelineRow(e, lastStatusByKey);
+                else if (string.Equals(e.source, "annotation", StringComparison.OrdinalIgnoreCase))
+                    row = BuildAnnotationTimelineRow(e);
+                else if (string.Equals(e.source, "audio_note", StringComparison.OrdinalIgnoreCase) &&
+                         (string.Equals(e.event_type, "audio_note_saved", StringComparison.OrdinalIgnoreCase) ||
+                          string.Equals(e.event_type, "audio_note_failed", StringComparison.OrdinalIgnoreCase)))
+                    row = BuildAudioNoteTimelineRow(e);
+                else if (string.Equals(e.source, "audio_note_sidecar", StringComparison.OrdinalIgnoreCase) &&
+                         string.Equals(e.event_type, "audio_note.transcript_ready", StringComparison.OrdinalIgnoreCase))
+                    row = BuildAudioTranscriptTimelineRow(e);
+
+                if (row == null)
+                    continue;
+
+                row.row_id = ++rowId;
+                rows.Add(row);
+            }
+
+            return rows;
+        }
+
+        private static bool IsInterviewUserInputEvent(EventEnvelope e)
+        {
+            if (e == null)
+                return false;
+
+            var et = e.event_type ?? string.Empty;
+            return string.Equals(et, "interview.user_input_changed", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(et, "interview.user_input_submitted", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsActionMemoryMappingsEvent(EventEnvelope e)
+        {
+            if (e == null)
+                return false;
+
+            var et = e.event_type ?? string.Empty;
+            return string.Equals(et, "action_memory.mappings_changed", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(et, "action_memory.mappings_submitted", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(et, "action_memory.mapping_slot_added", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(et, "action_memory.mapping_submitted", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(et, "action_memory.mapping_removed", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsSpeechReceiverEvent(EventEnvelope e)
+        {
+            if (e == null)
+                return false;
+
+            var et = (e.event_type ?? string.Empty).Trim();
+            return et.StartsWith("receiver.", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsStatusEvent(EventEnvelope e)
+        {
+            if (e == null)
+                return false;
+
+            var et = e.event_type ?? string.Empty;
+            if (!et.EndsWith(".status", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            var payload = e.payload_json ?? string.Empty;
+            return payload.IndexOf("\"status\"", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsDirectorGuidanceEvent(EventEnvelope e)
+        {
+            if (e == null)
+                return false;
+
+            var et = e.event_type ?? string.Empty;
+            return string.Equals(et, "performer.director_guidance_added", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(et, "performer.director_guidance_removed", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(et, "performer.director_guidance_cleared", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(et, "performer.director_guidance_changed", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private UxTimelineRow BuildStatusTimelineRow(EventEnvelope e, Dictionary<string, string> lastStatusByKey)
+        {
+            var payload = e.payload_json ?? "{}";
+            var status = ExtractJsonString(payload, "status") ?? string.Empty;
+            status = status.Trim();
+            if (string.IsNullOrWhiteSpace(status))
+                return null;
+
+            var key = (e.source ?? string.Empty) + "|" + (e.event_type ?? string.Empty);
+            if (lastStatusByKey != null && lastStatusByKey.TryGetValue(key, out var previous) &&
+                string.Equals(previous ?? string.Empty, status, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            if (lastStatusByKey != null)
+                lastStatusByKey[key] = status;
+
+            var row = BuildBaseTimelineRow(e, "status");
+            row.input_source = "system_status";
+            row.actor_source = e.source ?? string.Empty;
+            row.actor_input = status;
+            row.execution_succeeded = "true";
+            row.execution_result = "Status update.";
+            return row;
+        }
+
+        private UxTimelineRow BuildDirectorGuidanceTimelineRow(EventEnvelope e)
+        {
+            var payload = e.payload_json ?? "{}";
+            var row = BuildBaseTimelineRow(e, "director_guidance");
+            row.take_number = ExtractJsonNumber(payload, "take_number");
+            row.input_source = "director_guidance";
+
+            var et = e.event_type ?? string.Empty;
+            if (string.Equals(et, "performer.director_guidance_added", StringComparison.OrdinalIgnoreCase))
+            {
+                row.actor_input = ExtractJsonString(payload, "added");
+                row.director_guidance = ExtractJsonString(payload, "current");
+                row.decision_note = ExtractJsonString(payload, "previous");
+                row.execution_result = "Director guidance added.";
+            }
+            else if (string.Equals(et, "performer.director_guidance_removed", StringComparison.OrdinalIgnoreCase))
+            {
+                row.actor_input = ExtractJsonString(payload, "removed");
+                row.director_guidance = ExtractJsonString(payload, "current");
+                row.decision_note = ExtractJsonString(payload, "previous");
+                row.execution_result = "Director guidance removed.";
+            }
+            else if (string.Equals(et, "performer.director_guidance_cleared", StringComparison.OrdinalIgnoreCase))
+            {
+                row.actor_input = "(cleared)";
+                row.director_guidance = ExtractJsonString(payload, "current");
+                row.decision_note = ExtractJsonString(payload, "previous");
+                row.execution_result = "Director guidance cleared.";
+            }
+            else
+            {
+                row.actor_input = ExtractJsonString(payload, "current");
+                row.director_guidance = ExtractJsonString(payload, "current");
+                row.decision_note = ExtractJsonString(payload, "previous");
+                row.execution_result = "Director guidance changed.";
+            }
+
+            row.execution_succeeded = "true";
+            return row;
+        }
+
+        private UxTimelineRow BuildBaseTimelineRow(EventEnvelope e, string systemMode)
+        {
+            var payload = e != null ? (e.payload_json ?? "{}") : "{}";
+            var runId = ExtractJsonString(payload, "run_id");
+            if (string.IsNullOrWhiteSpace(runId))
+                runId = CurrentRunId;
+
+            return new UxTimelineRow
+            {
+                session_id = e.session_id ?? string.Empty,
+                run_id = runId ?? string.Empty,
+                ts_utc = e.ts_utc ?? string.Empty,
+                ts_local = e.ts_local ?? string.Empty,
+                source = e.source ?? string.Empty,
+                event_type = e.event_type ?? string.Empty,
+                system_mode = systemMode ?? string.Empty,
+                source_event_id = e.event_id
+            };
+        }
+
+        private UxTimelineRow BuildSessionStartedTimelineRow(EventEnvelope e)
+        {
+            var payload = e.payload_json ?? "{}";
+            var row = BuildBaseTimelineRow(e, "session");
+            row.input_source = "system";
+            row.actor_input = ExtractJsonString(payload, "session_folder");
+            row.decision_note = ExtractJsonString(payload, "persistent_data_path");
+            row.execution_succeeded = "true";
+            row.execution_result = "Session started.";
+            return row;
+        }
+
+        private UxTimelineRow BuildBootstrapGeneratedTimelineRow(EventEnvelope e)
+        {
+            var payload = e.payload_json ?? "{}";
+            var row = BuildBaseTimelineRow(e, "bootstrapper");
+            row.input_source = "bootstrapper";
+            row.actor_input = ExtractJsonString(payload, "objective");
+            row.decision_note = ExtractJsonString(payload, "stance");
+            row.execution_succeeded = "true";
+            row.execution_result = "Objective/stance generated.";
+            return row;
+        }
+
+        private UxTimelineRow BuildInterviewSummaryChangedTimelineRow(EventEnvelope e)
+        {
+            var payload = e.payload_json ?? "{}";
+            var row = BuildBaseTimelineRow(e, "interview");
+            row.input_source = "interview_summary";
+            row.actor_input = ExtractJsonString(payload, "new_summary");
+            row.decision_note = ExtractJsonString(payload, "previous_summary");
+            row.execution_succeeded = "true";
+            row.execution_result = "Interview summary changed.";
+            return row;
+        }
+
+        private UxTimelineRow BuildInterviewFollowupQuestionsChangedTimelineRow(EventEnvelope e)
+        {
+            var payload = e.payload_json ?? "{}";
+            var row = BuildBaseTimelineRow(e, "interview");
+            row.input_source = "interview_followup_questions";
+            row.actor_input = ExtractJsonString(payload, "new_questions");
+            row.decision_note = ExtractJsonString(payload, "previous_questions");
+            row.execution_succeeded = "true";
+            row.execution_result = "Follow-up questions changed.";
+            return row;
+        }
+
+        private UxTimelineRow BuildInterviewUserInputTimelineRow(EventEnvelope e)
+        {
+            var payload = e.payload_json ?? "{}";
+            var row = BuildBaseTimelineRow(e, "interview");
+            row.input_source = "interview_user_input";
+
+            var field = ExtractJsonString(payload, "field");
+            var previous = ExtractJsonString(payload, "previous");
+            var current = ExtractJsonString(payload, "current");
+
+            row.actor_source = field;
+            row.actor_input = current;
+            row.prior_dialogue_context = previous;
+            row.execution_succeeded = "true";
+            row.execution_result =
+                string.Equals(e.event_type, "interview.user_input_submitted", StringComparison.OrdinalIgnoreCase)
+                    ? "Interview input submitted."
+                    : "Interview input edited.";
+            return row;
+        }
+
+        private UxTimelineRow BuildActionMemoryMappingsTimelineRow(EventEnvelope e)
+        {
+            var payload = e.payload_json ?? "{}";
+            var row = BuildBaseTimelineRow(e, "action_memory");
+            row.input_source = "config_action_memory";
+
+            if (string.Equals(e.event_type, "action_memory.mapping_slot_added", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(e.event_type, "action_memory.mapping_submitted", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(e.event_type, "action_memory.mapping_removed", StringComparison.OrdinalIgnoreCase))
+            {
+                row.actor_source = ExtractJsonString(payload, "action_label");
+                row.actor_input = ExtractJsonString(payload, "memory_trigger");
+                row.decision_note = ExtractJsonNumber(payload, "index");
+                row.execution_succeeded = "true";
+                if (string.Equals(e.event_type, "action_memory.mapping_slot_added", StringComparison.OrdinalIgnoreCase))
+                    row.execution_result = "Action-memory slot added.";
+                else if (string.Equals(e.event_type, "action_memory.mapping_submitted", StringComparison.OrdinalIgnoreCase))
+                    row.execution_result = "Action-memory mapping submitted.";
+                else
+                    row.execution_result = "Action-memory mapping removed.";
+                return row;
+            }
+
+            var newPairs = ExtractJsonString(payload, "new_pairs");
+            if (string.IsNullOrWhiteSpace(newPairs))
+                newPairs = ExtractJsonString(payload, "pairs");
+
+            row.action_memory_pairs = newPairs;
+            row.action_labels_added = ExtractJsonString(payload, "added_labels");
+            row.action_labels_removed = ExtractJsonString(payload, "removed_labels");
+
+            row.actor_source = "action_memory";
+            row.actor_input = newPairs;
+            row.prior_dialogue_context = ExtractJsonString(payload, "previous_pairs");
+            row.execution_succeeded = "true";
+            row.execution_result =
+                string.Equals(e.event_type, "action_memory.mappings_submitted", StringComparison.OrdinalIgnoreCase)
+                    ? "Action-memory mappings submitted."
+                    : "Action-memory mappings changed.";
+            return row;
+        }
+
+        private UxTimelineRow BuildSpeechReceiverTimelineRow(EventEnvelope e)
+        {
+            var payload = e.payload_json ?? "{}";
+            var row = BuildBaseTimelineRow(e, "speech");
+            row.input_source = "speech_osc";
+
+            var speakerId = ExtractJsonString(payload, "speaker_id");
+            var text = ExtractJsonString(payload, "text");
+            var reason = ExtractJsonString(payload, "reason");
+            var channel = ExtractJsonNumber(payload, "channel");
+
+            row.actor_source = !string.IsNullOrWhiteSpace(speakerId) ? speakerId : reason;
+            row.actor_input = text;
+            row.decision_note = channel;
+            row.execution_succeeded = "true";
+            row.execution_result = e.event_type ?? "receiver.event";
+
+            // If it was an explicit drop, mark it as unsuccessful so it is easy to filter.
+            if (!string.IsNullOrWhiteSpace(reason) &&
+                (e.event_type ?? string.Empty).IndexOf("dropped", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                row.execution_succeeded = "false";
+                row.execution_result = (e.event_type ?? "receiver.dropped") + ": " + reason;
+            }
+
+            return row;
+        }
+
+        private UxTimelineRow BuildActionLabelsPulledTimelineRow(
+            EventEnvelope e,
+            Dictionary<string, HashSet<string>> lastActionLabelsBySource)
+        {
+            var payload = e.payload_json ?? "{}";
+            var row = BuildBaseTimelineRow(e, "action_labels");
+            row.input_source = "config_action_labels";
+
+            // Different controllers used slightly different key names historically.
+            var labelsCsv =
+                ExtractJsonString(payload, "available_action_labels") ??
+                ExtractJsonString(payload, "labels") ??
+                string.Empty;
+            var pairs = ExtractJsonString(payload, "action_memory_pairs") ?? string.Empty;
+
+            var labelsNow = ParseCsvLabels(labelsCsv);
+            var sourceKey = string.IsNullOrWhiteSpace(e.source) ? "unknown" : e.source;
+            var hadPrevious = lastActionLabelsBySource.TryGetValue(sourceKey, out var previous) && previous != null;
+            if (!hadPrevious)
+                previous = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var added = DiffAdded(previous, labelsNow);
+            var removed = DiffRemoved(previous, labelsNow);
+
+            // High-signal filter: keep the first snapshot; afterwards keep only real changes.
+            if (hadPrevious && added.Count == 0 && removed.Count == 0)
+            {
+                lastActionLabelsBySource[sourceKey] = labelsNow;
+                return null;
+            }
+
+            row.action_labels_all = string.Join(",", ToSortedList(labelsNow).ToArray());
+            row.action_labels_added = string.Join(",", added.ToArray());
+            row.action_labels_removed = string.Join(",", removed.ToArray());
+            row.action_memory_pairs = pairs;
+            row.available_action_count = labelsNow.Count.ToString();
+
+            row.actor_input = row.action_labels_added;
+            row.pending_dialogue_batch = row.action_labels_all;
+            row.execution_succeeded = "true";
+            row.execution_result =
+                hadPrevious
+                    ? "Action labels changed (added=" + added.Count + ", removed=" + removed.Count + ")."
+                    : "Action labels snapshot recorded (" + labelsNow.Count + " labels).";
+
+            lastActionLabelsBySource[sourceKey] = labelsNow;
+            return row;
+        }
+
+        private static HashSet<string> ParseCsvLabels(string csv)
+        {
+            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var raw = (csv ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(raw))
+                return set;
+
+            var parts = raw.Split(',');
+            for (int i = 0; i < parts.Length; i++)
+            {
+                var s = (parts[i] ?? string.Empty).Trim();
+                if (!string.IsNullOrWhiteSpace(s))
+                    set.Add(s);
+            }
+
+            return set;
+        }
+
+        private static List<string> DiffAdded(HashSet<string> before, HashSet<string> after)
+        {
+            var added = new List<string>();
+            if (after == null || after.Count == 0)
+                return added;
+
+            foreach (var s in after)
+            {
+                if (before == null || !before.Contains(s))
+                    added.Add(s);
+            }
+
+            added.Sort(StringComparer.OrdinalIgnoreCase);
+            return added;
+        }
+
+        private static List<string> DiffRemoved(HashSet<string> before, HashSet<string> after)
+        {
+            var removed = new List<string>();
+            if (before == null || before.Count == 0)
+                return removed;
+
+            foreach (var s in before)
+            {
+                if (after == null || !after.Contains(s))
+                    removed.Add(s);
+            }
+
+            removed.Sort(StringComparer.OrdinalIgnoreCase);
+            return removed;
+        }
+
+        private static List<string> ToSortedList(HashSet<string> set)
+        {
+            var list = new List<string>();
+            if (set == null || set.Count == 0)
+                return list;
+
+            foreach (var s in set)
+            {
+                if (!string.IsNullOrWhiteSpace(s))
+                    list.Add(s);
+            }
+
+            list.Sort(StringComparer.OrdinalIgnoreCase);
+            return list;
+        }
+
+        private UxTimelineRow BuildPerformerTimelineRow(EventEnvelope e)
+        {
+            var payload = e.payload_json ?? "{}";
+            var row = BuildBaseTimelineRow(e, ExtractJsonString(payload, "turn_type"));
+            row.take_number = ExtractJsonNumber(payload, "take_number");
+            row.turn_index = ExtractJsonNumber(payload, "turn_index");
+            row.turn_id = ExtractJsonString(payload, "turn_id");
+            row.input_source = ExtractJsonString(payload, "input_source");
+            row.actor_source = ExtractJsonString(payload, "actor_source");
+            row.actor_input = ExtractJsonString(payload, "actor_input");
+            row.pending_dialogue_batch = ExtractJsonString(payload, "pending_dialogue_batch");
+            row.prior_dialogue_context = ExtractJsonString(payload, "prior_dialogue_context");
+            row.react_now = ExtractJsonBool(payload, "react_now");
+            row.selected_action = ExtractJsonString(payload, "selected_action");
+            row.selected_memory_trigger = ExtractJsonString(payload, "selected_memory_trigger");
+            row.decision_note = ExtractJsonString(payload, "decision_note");
+            row.execution_succeeded = ExtractJsonBool(payload, "execution_succeeded");
+            row.execution_result = ExtractJsonString(payload, "execution_result");
+            row.registry_send = ExtractJsonString(payload, "registry_send");
+            row.neutral_return_send = ExtractJsonString(payload, "neutral_return_send");
+            row.model = ExtractJsonString(payload, "model");
+            row.raw_model_action = ExtractJsonString(payload, "raw_model_action");
+            row.fallback_used = ExtractJsonBool(payload, "fallback_used");
+            row.parse_error = ExtractJsonString(payload, "parse_error");
+            row.prompt_memory_scope = ExtractJsonString(payload, "prompt_memory_scope");
+            row.prompt_memory_line_count = ExtractJsonNumber(payload, "prompt_memory_line_count");
+            row.pending_dialogue_line_count = ExtractJsonNumber(payload, "pending_dialogue_line_count");
+            row.available_action_count = ExtractJsonNumber(payload, "available_action_count");
+            row.director_guidance = ExtractJsonString(payload, "director_guidance_snapshot");
+            row.input_received_utc = ExtractJsonString(payload, "input_received_utc");
+            row.decision_started_utc = ExtractJsonString(payload, "decision_started_utc");
+            row.model_response_utc = ExtractJsonString(payload, "model_response_utc");
+            row.action_dispatch_utc = ExtractJsonString(payload, "action_dispatch_utc");
+            row.action_dispatch_completed_utc = ExtractJsonString(payload, "action_dispatch_completed_utc");
+            row.latency_input_to_model_ms = ExtractJsonNumber(payload, "latency_input_to_model_ms");
+            row.latency_input_to_action_ms = ExtractJsonNumber(payload, "latency_input_to_action_ms");
+            row.trace_request_id = ExtractJsonString(payload, "trace_request_id");
+            return row;
+        }
+
+        private UxTimelineRow BuildAnnotationTimelineRow(EventEnvelope e)
+        {
+            var payload = e.payload_json ?? "{}";
+            var row = BuildBaseTimelineRow(e, "annotation");
+            row.input_source = "researcher_note";
+            row.actor_source = ExtractJsonString(payload, "label");
+            row.actor_input = ExtractJsonString(payload, "body");
+            if (string.IsNullOrWhiteSpace(row.actor_input))
+                row.actor_input = ExtractJsonString(payload, "label");
+            row.execution_succeeded = "true";
+            row.execution_result = "Researcher annotation logged.";
+            return row;
+        }
+
+        private UxTimelineRow BuildAudioNoteTimelineRow(EventEnvelope e)
+        {
+            var payload = e.payload_json ?? "{}";
+            var row = BuildBaseTimelineRow(e, "audio_note");
+            row.input_source = "researcher_audio_note";
+            row.actor_source = ExtractJsonString(payload, "label");
+            row.actor_input = ExtractJsonString(payload, "body");
+            row.selected_action = ExtractJsonString(payload, "file_name");
+            row.execution_succeeded = string.Equals(e.event_type, "audio_note_saved", StringComparison.OrdinalIgnoreCase) ? "true" : "false";
+            row.execution_result = ExtractJsonString(payload, "message");
+            if (string.IsNullOrWhiteSpace(row.execution_result))
+                row.execution_result = ExtractJsonString(payload, "reason");
+            return row;
+        }
+
+        private UxTimelineRow BuildAudioTranscriptTimelineRow(EventEnvelope e)
+        {
+            var payload = e.payload_json ?? "{}";
+            var row = BuildBaseTimelineRow(e, "audio_note_transcript");
+            row.input_source = "audio_note_transcript";
+            row.actor_input = ExtractJsonString(payload, "transcript_text");
+            if (string.IsNullOrWhiteSpace(row.actor_input))
+                row.actor_input = ExtractJsonString(payload, "raw");
+            row.execution_succeeded = "true";
+            row.execution_result = "Audio note transcript received.";
+            return row;
+        }
+
+        private static string ExtractJsonString(string json, string key)
+        {
+            if (string.IsNullOrWhiteSpace(json) || string.IsNullOrWhiteSpace(key))
+                return string.Empty;
+
+            var pattern = "\"" + Regex.Escape(key) + "\"\\s*:\\s*\"((?:\\\\.|[^\"])*)\"";
+            var match = Regex.Match(json, pattern, RegexOptions.CultureInvariant);
+            return match.Success ? UnescapeJsonString(match.Groups[1].Value) : string.Empty;
+        }
+
+        private static string ExtractJsonNumber(string json, string key)
+        {
+            if (string.IsNullOrWhiteSpace(json) || string.IsNullOrWhiteSpace(key))
+                return string.Empty;
+
+            var pattern = "\"" + Regex.Escape(key) + "\"\\s*:\\s*(-?\\d+(?:\\.\\d+)?)";
+            var match = Regex.Match(json, pattern, RegexOptions.CultureInvariant);
+            return match.Success ? match.Groups[1].Value : string.Empty;
+        }
+
+        private static string ExtractJsonBool(string json, string key)
+        {
+            if (string.IsNullOrWhiteSpace(json) || string.IsNullOrWhiteSpace(key))
+                return string.Empty;
+
+            var pattern = "\"" + Regex.Escape(key) + "\"\\s*:\\s*(true|false)";
+            var match = Regex.Match(json, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            return match.Success ? match.Groups[1].Value.ToLowerInvariant() : string.Empty;
+        }
+
+        private static string UnescapeJsonString(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return string.Empty;
+
+            var sb = new StringBuilder(value.Length);
+            for (int i = 0; i < value.Length; i++)
+            {
+                var c = value[i];
+                if (c != '\\' || i + 1 >= value.Length)
+                {
+                    sb.Append(c);
+                    continue;
+                }
+
+                var next = value[++i];
+                switch (next)
+                {
+                    case '"': sb.Append('"'); break;
+                    case '\\': sb.Append('\\'); break;
+                    case '/': sb.Append('/'); break;
+                    case 'b': sb.Append('\b'); break;
+                    case 'f': sb.Append('\f'); break;
+                    case 'n': sb.Append('\n'); break;
+                    case 'r': sb.Append('\r'); break;
+                    case 't': sb.Append('\t'); break;
+                    case 'u':
+                        if (i + 4 < value.Length)
+                        {
+                            var hex = value.Substring(i + 1, 4);
+                            if (int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out var code))
+                            {
+                                sb.Append((char)code);
+                                i += 4;
+                            }
+                        }
+                        break;
+                    default:
+                        sb.Append(next);
+                        break;
+                }
+            }
+
+            return sb.ToString();
         }
 
         private static string ToCsvRow(params string[] values)

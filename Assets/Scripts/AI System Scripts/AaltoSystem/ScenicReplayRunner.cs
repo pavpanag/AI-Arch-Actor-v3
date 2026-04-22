@@ -16,7 +16,7 @@ namespace AaltoSystemV3
     public sealed class ScenicReplayRunner : MonoBehaviour
     {
         [Header("Replay Source")]
-        [Tooltip("If empty, runner loads latest scenic_*.jsonl from persistentDataPath/scenic_event_logs.")]
+        [Tooltip("If empty, runner loads latest scenic event .jsonl from full-event-logs/scenic-events.")]
         public string ReplayFilePath;
         [Tooltip("Default delay between replayed turns.")]
         [Range(0f, 3f)] public float DelayBetweenTurnsSeconds = 0.35f;
@@ -118,7 +118,7 @@ namespace AaltoSystemV3
         [ContextMenu("Scenic Replay/Reveal Replay Folder")]
         public void RevealReplayFolder()
         {
-            var folder = Path.Combine(Application.persistentDataPath, "scenic_event_logs");
+            var folder = Path.Combine(AaltoLaunchSessionLogger.ResolveFullEventLogsDirectory(), "scenic-events");
             Debug.Log("[scenic-replay] folder: " + folder);
 #if UNITY_EDITOR
             UnityEditor.EditorUtility.RevealInFinder(folder);
@@ -162,10 +162,16 @@ namespace AaltoSystemV3
             if (!string.IsNullOrWhiteSpace(ReplayFilePath) && File.Exists(ReplayFilePath))
                 return ReplayFilePath;
 
-            var folder = Path.Combine(Application.persistentDataPath, "scenic_event_logs");
+            var folder = Path.Combine(AaltoLaunchSessionLogger.ResolveFullEventLogsDirectory(), "scenic-events");
             if (!Directory.Exists(folder)) return null;
 
-            var files = Directory.GetFiles(folder, "scenic_*.jsonl")
+            var files = Directory.GetFiles(folder, "*.jsonl")
+                .Where(path =>
+                {
+                    var file = Path.GetFileName(path) ?? string.Empty;
+                    return file.StartsWith("scenic-events__", StringComparison.OrdinalIgnoreCase)
+                           || file.StartsWith("scenic_", StringComparison.OrdinalIgnoreCase);
+                })
                 .OrderByDescending(File.GetLastWriteTimeUtc)
                 .ToArray();
 

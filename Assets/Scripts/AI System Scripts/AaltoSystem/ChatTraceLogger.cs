@@ -13,9 +13,9 @@ namespace AaltoSystemV3
 /// <summary>
 /// Chat trace logger: captures every OpenAI API request/response for offline analysis.
 /// 
-/// Logs are written to: Application.persistentDataPath/chat_traces/
+/// Logs are written to: Recordings/AaltoExports/full-event-logs/chat-traces/
 /// File format: JSON lines (JSONL) - one ChatTraceEntry per line
-/// File name: trace_<sessionId>_<yyyyMMdd_HHmms>.jsonl
+/// File name: chat-trace__RUN_###__sid_<session8>__<yyyy-MM-dd_HH-mm-ss>.jsonl
 /// 
 /// Each entry contains:
 /// - sessionId: GUID per app session
@@ -35,7 +35,7 @@ namespace AaltoSystemV3
 /// 
 /// To find logs:
 ///   Debug.Log will print the path on every session start and save.
-///   Manually: Application.persistentDataPath/chat_traces/trace_*.jsonl
+///   Manually: Recordings/AaltoExports/full-event-logs/chat-traces/
 /// </summary>
 public sealed class ChatTraceLogger : MonoBehaviour
 {
@@ -78,7 +78,7 @@ public sealed class ChatTraceLogger : MonoBehaviour
 		_instance = this;
 		DontDestroyOnLoad(gameObject);
 
-		_traceFolderPath = Path.Combine(Application.persistentDataPath, "chat_traces");
+		_traceFolderPath = Path.Combine(AaltoLaunchSessionLogger.ResolveFullEventLogsDirectory(), "chat-traces");
 		_latestRequestPath = Path.Combine(_traceFolderPath, "latest_request.json");
 		_latestResponsePath = Path.Combine(_traceFolderPath, "latest_response.json");
 		try { Directory.CreateDirectory(_traceFolderPath); }
@@ -272,7 +272,17 @@ public sealed class ChatTraceLogger : MonoBehaviour
 				return;
 			}
 
-			var fileName = $"trace_{_sessionId}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.jsonl";
+			var sessionShort = _sessionId ?? string.Empty;
+			if (sessionShort.Length > 8)
+				sessionShort = sessionShort.Substring(0, 8);
+			if (string.IsNullOrWhiteSpace(sessionShort))
+				sessionShort = "session";
+
+			var runId = string.IsNullOrWhiteSpace(AaltoLaunchSessionLogger.CurrentRunId)
+				? "RUN_000"
+				: AaltoLaunchSessionLogger.CurrentRunId;
+
+			var fileName = $"chat-trace__{runId}__sid_{sessionShort}__{DateTime.UtcNow:yyyy-MM-dd_HH-mm-ss}.jsonl";
 			var filePath = Path.Combine(_traceFolderPath, fileName);
 			try
 			{
@@ -306,7 +316,7 @@ public sealed class ChatTraceLogger : MonoBehaviour
 		try
 		{
 			if (string.IsNullOrWhiteSpace(_traceFolderPath))
-				_traceFolderPath = Path.Combine(Application.persistentDataPath, "chat_traces");
+				_traceFolderPath = Path.Combine(AaltoLaunchSessionLogger.ResolveFullEventLogsDirectory(), "chat-traces");
 			Directory.CreateDirectory(_traceFolderPath);
 			File.WriteAllText(path, contents ?? "");
 		}

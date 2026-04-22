@@ -65,8 +65,16 @@ namespace AaltoSystemV3
                 GUILayout.Label(memoryLabel, GUILayout.Width(70f));
                 EditorGUILayout.PropertyField(actionLabelProperty, GUIContent.none);
 
+                if (GUILayout.Button("Submit", GUILayout.Width(70f)))
+                {
+                    serializedObject.ApplyModifiedProperties();
+                    EmitMappingSubmitted(i, actionLabelProperty.stringValue, memoryTriggerProperty.stringValue);
+                    return;
+                }
+
                 if (GUILayout.Button("Remove", GUILayout.Width(70f)))
                 {
+                    EmitMappingRemoved(i, actionLabelProperty.stringValue, memoryTriggerProperty.stringValue);
                     mappingsProperty.DeleteArrayElementAtIndex(i);
                     serializedObject.ApplyModifiedProperties();
                     return;
@@ -116,6 +124,8 @@ namespace AaltoSystemV3
             SerializedProperty entryProperty = mappingsProperty.GetArrayElementAtIndex(nextIndex);
             entryProperty.FindPropertyRelative("actionLabel").stringValue = string.Empty;
             entryProperty.FindPropertyRelative("memoryTrigger").stringValue = $"memory {memoryNumber}";
+            serializedObject.ApplyModifiedProperties();
+            EmitMappingSlotAdded(nextIndex, $"memory {memoryNumber}");
         }
 
         int FindNextAvailableMemoryNumber()
@@ -163,6 +173,44 @@ namespace AaltoSystemV3
             SerializedProperty entryProperty = mappingsProperty.GetArrayElementAtIndex(index);
             entryProperty.FindPropertyRelative("actionLabel").stringValue = actionLabel;
             entryProperty.FindPropertyRelative("memoryTrigger").stringValue = memoryTrigger;
+        }
+
+        static void EmitMappingSlotAdded(int index, string memoryTrigger)
+        {
+            if (!Application.isPlaying)
+                return;
+
+            string payload =
+                "{\"index\":" + index + "," +
+                "\"memory_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(memoryTrigger ?? string.Empty) + "\"}";
+
+            AaltoLaunchSessionLogger.EmitEvent("AaltoActionMemoryRegistry", "action_memory.mapping_slot_added", payload);
+        }
+
+        static void EmitMappingSubmitted(int index, string actionLabel, string memoryTrigger)
+        {
+            if (!Application.isPlaying)
+                return;
+
+            string payload =
+                "{\"index\":" + index + "," +
+                "\"action_label\":\"" + AaltoLaunchSessionLogger.EscapeJson(actionLabel ?? string.Empty) + "\"," +
+                "\"memory_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(memoryTrigger ?? string.Empty) + "\"}";
+
+            AaltoLaunchSessionLogger.EmitEvent("AaltoActionMemoryRegistry", "action_memory.mapping_submitted", payload);
+        }
+
+        static void EmitMappingRemoved(int index, string actionLabel, string memoryTrigger)
+        {
+            if (!Application.isPlaying)
+                return;
+
+            string payload =
+                "{\"index\":" + index + "," +
+                "\"action_label\":\"" + AaltoLaunchSessionLogger.EscapeJson(actionLabel ?? string.Empty) + "\"," +
+                "\"memory_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(memoryTrigger ?? string.Empty) + "\"}";
+
+            AaltoLaunchSessionLogger.EmitEvent("AaltoActionMemoryRegistry", "action_memory.mapping_removed", payload);
         }
     }
 }

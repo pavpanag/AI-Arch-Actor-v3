@@ -1,0 +1,27 @@
+{
+    "exportedAtUtc": "2026-04-21T19:15:45.1760596Z",
+    "currentTakeNumber": 1,
+    "archivedTakeCount": 0,
+    "archivedTakes": [],
+    "currentTake": {
+        "takeNumber": 1,
+        "capturedAtUtc": "2026-04-21T19:15:45.1760596Z",
+        "turnCount": 2,
+        "turns": [
+            {
+                "actorLine": "hi",
+                "selectedResponse": "I say I want you to stay",
+                "justification": "The waiting room, filled with discomfort, aims to keep the patients engaged and distracted from their pain. By inviting them to stay, it creates a sense of camaraderie and shared experience, subtly reveling in their collective unease while providing a misleading sense of comfort.",
+                "showDetails": false,
+                "showJustification": false
+            },
+            {
+                "actorLine": "test",
+                "selectedResponse": "I say I want you to stay",
+                "justification": "The waiting room continues to embrace the discomfort of its patients while offering a false sense of comfort and camaraderie. By inviting them to stay, it reinforces the shared experience of waiting and suffering, subtly savoring the collective anxiety in the air. This action aligns with the room's mischievous intent to distract from their pain while enjoying the atmosphere of unease.",
+                "showDetails": false,
+                "showJustification": false
+            }
+        ]
+    }
+}

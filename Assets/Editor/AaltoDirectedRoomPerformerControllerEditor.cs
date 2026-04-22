@@ -145,10 +145,11 @@ public sealed class AaltoDirectedRoomPerformerControllerEditor : Editor
         {
             serializedObject.ApplyModifiedProperties();
 
+            var defaultDirectory = ResolveDefaultExportDirectory(controller.DialogExportFolderRelativePath);
             var defaultFileName = "AaltoDialogArchive_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".json";
             var savePath = EditorUtility.SaveFilePanel(
                 "Export Dialog Archive (JSON + CSV)",
-                Application.dataPath,
+                defaultDirectory,
                 defaultFileName,
                 "json");
 
@@ -158,8 +159,9 @@ public sealed class AaltoDirectedRoomPerformerControllerEditor : Editor
                 {
                     var folder = Path.GetDirectoryName(savePath);
                     var baseName = Path.GetFileNameWithoutExtension(savePath);
-                    var jsonPath = Path.Combine(folder ?? Application.dataPath, baseName + ".json");
-                    var csvPath = Path.Combine(folder ?? Application.dataPath, baseName + ".csv");
+                    var resolvedFolder = string.IsNullOrWhiteSpace(folder) ? defaultDirectory : folder;
+                    var jsonPath = Path.Combine(resolvedFolder, baseName + ".json");
+                    var csvPath = Path.Combine(resolvedFolder, baseName + ".csv");
 
                     var json = controller.BuildDialogArchiveExportJson();
                     var csv = controller.BuildDialogArchiveExportCsv();
@@ -185,6 +187,27 @@ public sealed class AaltoDirectedRoomPerformerControllerEditor : Editor
         EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.Space(6f);
+    }
+
+    static string ResolveDefaultExportDirectory(string relativeOrAbsolute)
+    {
+        var raw = (relativeOrAbsolute ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(raw))
+            return Application.dataPath;
+
+        var candidate = raw;
+        if (!Path.IsPathRooted(candidate))
+        {
+            var projectRoot = Directory.GetParent(Application.dataPath)?.FullName;
+            if (string.IsNullOrWhiteSpace(projectRoot))
+                return Application.dataPath;
+
+            candidate = Path.Combine(projectRoot, raw.Replace('\\', '/').TrimStart('/'));
+        }
+
+        var fullPath = Path.GetFullPath(candidate);
+        Directory.CreateDirectory(fullPath);
+        return fullPath;
     }
 
     void DrawSceneRefsSection()

@@ -23,9 +23,18 @@ import queue
 import threading
 import socket
 import struct
+import ctypes
+import shutil
+import tempfile
+import zipfile
 import tkinter as tk
+from tkinter import filedialog
+from tkinter import messagebox
 from tkinter.scrolledtext import ScrolledText
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from pathlib import Path
+from urllib.error import URLError
+from urllib.request import urlretrieve
 
 
 def require(module_name: str, pip_name: str | None = None) -> None:
@@ -47,6 +56,172 @@ require("vosk")
 
 import sounddevice as sd
 import vosk
+
+
+# -------------------- Model helpers --------------------
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = SCRIPT_DIR.parent  # keep models shared with the single-source script
+MODEL_BASE_URL = "https://alphacephei.com/vosk/models"
+MODEL_INSTALL_DIR = PROJECT_DIR
+DEFAULT_MODEL_NAME = "vosk-model-en-us-0.22-lgraph"
+DEFAULT_MODEL_PRESET = "English US 0.22 lgraph (better, 128 MB)"
+
+# Curated from the official Vosk model list. Big models are more accurate but
+# can require many GB of RAM and take a while to load/download.
+VOSK_MODELS: dict[str, dict[str, str]] = {
+    "Small English US 0.15 (installed/default, 40 MB)": {
+        "name": "vosk-model-small-en-us-0.15",
+        "url": f"{MODEL_BASE_URL}/vosk-model-small-en-us-0.15.zip",
+        "notes": "Fast, light, good for real-time desktop work.",
+        "min_free_gb": "1",
+        "rec_free_gb": "2",
+    },
+    "English US 0.22 lgraph (better, 128 MB)": {
+        "name": "vosk-model-en-us-0.22-lgraph",
+        "url": f"{MODEL_BASE_URL}/vosk-model-en-us-0.22-lgraph.zip",
+        "notes": "Better accuracy than small while still fairly practical.",
+        "min_free_gb": "2",
+        "rec_free_gb": "4",
+    },
+    "English US 0.22 accurate (1.8 GB)": {
+        "name": "vosk-model-en-us-0.22",
+        "url": f"{MODEL_BASE_URL}/vosk-model-en-us-0.22.zip",
+        "notes": "Accurate generic English model; needs much more RAM.",
+        "min_free_gb": "6",
+        "rec_free_gb": "10",
+    },
+    "English US 0.42 GigaSpeech (2.3 GB)": {
+        "name": "vosk-model-en-us-0.42-gigaspeech",
+        "url": f"{MODEL_BASE_URL}/vosk-model-en-us-0.42-gigaspeech.zip",
+        "notes": "Very accurate for podcasts/general speech; huge download.",
+        "min_free_gb": "10",
+        "rec_free_gb": "14",
+    },
+    "Custom path below": {
+        "name": "",
+        "url": "",
+        "notes": "Use the model path field directly.",
+    },
+}
+
+
+def model_dir_for(model_name: str) -> Path:
+    return MODEL_INSTALL_DIR / model_name
+
+
+def is_vosk_model_dir(path: Path) -> bool:
+    return path.is_dir() and any((path / child).exists() for child in ("am", "conf"))
+
+
+def find_local_model_dir(model_name: str) -> Path | None:
+    direct = model_dir_for(model_name)
+    if is_vosk_model_dir(direct):
+        return direct
+
+    nested = direct / model_name
+    if is_vosk_model_dir(nested):
+        return nested
+
+    for match in MODEL_INSTALL_DIR.glob(f"**/{model_name}"):
+        if is_vosk_model_dir(match):
+            return match
+    return None
+
+
+def best_initial_model_path() -> str:
+    found = find_local_model_dir(DEFAULT_MODEL_NAME)
+    if found:
+        return str(found)
+    return str(model_dir_for(DEFAULT_MODEL_NAME))
+
+
+def download_and_extract_model(model_name: str, url: str, log: Callable[[str], None]) -> Path:
+    existing = find_local_model_dir(model_name)
+    if existing:
+        log(f"[model] Already installed: {existing}")
+        return existing
+
+    MODEL_INSTALL_DIR.mkdir(parents=True, exist_ok=True)
+    tmp_dir = Path(tempfile.mkdtemp(prefix="vosk-model-download-", dir=str(MODEL_INSTALL_DIR)))
+    zip_path = tmp_dir / f"{model_name}.zip"
+
+    def report(blocks: int, block_size: int, total: int) -> None:
+        if total <= 0:
+            return
+        downloaded = min(blocks * block_size, total)
+        pct = int(downloaded * 100 / total)
+        if pct % 10 == 0 and report.last_pct != pct:
+            report.last_pct = pct
+            log(f"[download] {model_name}: {pct}%")
+
+    report.last_pct = -1  # type: ignore[attr-defined]
+
+    try:
+        log(f"[download] Fetching {url}")
+        urlretrieve(url, zip_path, reporthook=report)
+        log("[download] Extracting model zip...")
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            zf.extractall(MODEL_INSTALL_DIR)
+    except (URLError, OSError, zipfile.BadZipFile) as e:
+        raise RuntimeError(f"Download/extract failed: {e}") from e
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    installed = find_local_model_dir(model_name)
+    if not installed:
+        raise RuntimeError(f"Downloaded {model_name}, but no valid Vosk model folder was found after extraction.")
+
+    log(f"[model] Installed: {installed}")
+    return installed
+
+
+# -------------------- Memory helpers --------------------
+
+def _fmt_bytes(n: int) -> str:
+    units = ["B", "KB", "MB", "GB", "TB"]
+    x = float(max(0, int(n)))
+    for u in units:
+        if x < 1024.0 or u == units[-1]:
+            return f"{x:.1f} {u}" if u != "B" else f"{int(x)} B"
+        x /= 1024.0
+    return f"{x:.1f} TB"
+
+
+def _get_mem_status_windows() -> tuple[int, int, int, int] | None:
+    class MEMORYSTATUSEX(ctypes.Structure):
+        _fields_ = [
+            ("dwLength", ctypes.c_ulong),
+            ("dwMemoryLoad", ctypes.c_ulong),
+            ("ullTotalPhys", ctypes.c_ulonglong),
+            ("ullAvailPhys", ctypes.c_ulonglong),
+            ("ullTotalPageFile", ctypes.c_ulonglong),
+            ("ullAvailPageFile", ctypes.c_ulonglong),
+            ("ullTotalVirtual", ctypes.c_ulonglong),
+            ("ullAvailVirtual", ctypes.c_ulonglong),
+            ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+        ]
+
+    stat = MEMORYSTATUSEX()
+    stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+    ok = ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))  # type: ignore[attr-defined]
+    if not ok:
+        return None
+    return (int(stat.ullAvailPhys), int(stat.ullTotalPhys), int(stat.ullAvailPageFile), int(stat.ullTotalPageFile))
+
+
+def _dir_size_bytes(path: Path) -> int:
+    total = 0
+    try:
+        for root, dirs, files in os.walk(path):
+            for f in files:
+                try:
+                    total += (Path(root) / f).stat().st_size
+                except OSError:
+                    pass
+    except Exception:
+        return 0
+    return total
 
 
 def _osc_pad4(n: int) -> int:
@@ -117,6 +292,8 @@ class VoskMultiSourceApp:
         self.root.geometry("980x760")
 
         self.running = False
+        self.downloading = False
+        self.cuda_initialized = False
         self.model: vosk.Model | None = None
         self.sources: list[SourceState] = [SourceState() for _ in range(SOURCE_COUNT)]
 
@@ -130,38 +307,56 @@ class VoskMultiSourceApp:
         self.osc_address = tk.StringVar(value="/speech")
         self.payload_mode = tk.StringVar(value="speaker_text")
         self.show_partials = tk.BooleanVar(value=False)
-        self.model_path = tk.StringVar(
-            value=r"C:\Users\pavpa\AI Arch Actor v3\Assets\Scripts\AI System Scripts\System v2\vosk-model-small-en-us-0.15\vosk-model-small-en-us-0.15"
-        )
+        self.model_choice = tk.StringVar(value=DEFAULT_MODEL_PRESET)
+        self.try_cuda = tk.BooleanVar(value=False)
+        self.force_big_model = tk.BooleanVar(value=False)
+        self.model_path = tk.StringVar(value=best_initial_model_path())
+        self.model_status = tk.StringVar(value="")
 
         self._build_ui()
         self.refresh_mics()
+        self.on_model_choice(self.model_choice.get())
 
     def _build_ui(self) -> None:
         cfg = tk.Frame(self.root)
         cfg.pack(fill=tk.X, padx=10, pady=8)
 
-        tk.Label(cfg, text="Vosk model path:").grid(row=0, column=0, sticky="w")
-        tk.Entry(cfg, textvariable=self.model_path, width=108).grid(row=0, column=1, columnspan=8, sticky="we", padx=6)
+        tk.Label(cfg, text="Model preset:").grid(row=0, column=0, sticky="w")
+        tk.OptionMenu(cfg, self.model_choice, *VOSK_MODELS.keys(), command=self.on_model_choice).grid(
+            row=0, column=1, columnspan=4, sticky="we", padx=6
+        )
+        self.btn_download = tk.Button(cfg, text="Download selected", command=self.download_selected_model)
+        self.btn_download.grid(row=0, column=5, sticky="w", padx=6)
+        tk.Checkbutton(cfg, text="Try CUDA/GPU", variable=self.try_cuda).grid(row=0, column=6, sticky="w")
+        tk.Checkbutton(cfg, text="Force huge model", variable=self.force_big_model).grid(row=0, column=7, sticky="w")
 
-        tk.Label(cfg, text="OSC IP:").grid(row=1, column=0, sticky="w")
-        tk.Entry(cfg, textvariable=self.osc_ip, width=20).grid(row=1, column=1, sticky="w", padx=6)
+        tk.Label(cfg, text="Vosk model path:").grid(row=1, column=0, sticky="w")
+        tk.Entry(cfg, textvariable=self.model_path, width=92).grid(row=1, column=1, columnspan=5, sticky="we", padx=6)
+        tk.Button(cfg, text="Browse", command=self.browse_model_path).grid(row=1, column=6, sticky="w")
 
-        tk.Label(cfg, text="Port:").grid(row=1, column=2, sticky="w")
-        tk.Entry(cfg, textvariable=self.osc_port, width=8).grid(row=1, column=3, sticky="w", padx=6)
+        tk.Label(cfg, textvariable=self.model_status, anchor="w", fg="#555").grid(row=2, column=1, columnspan=6, sticky="we", padx=6)
 
-        tk.Label(cfg, text="Address:").grid(row=1, column=4, sticky="w")
-        tk.Entry(cfg, textvariable=self.osc_address, width=14).grid(row=1, column=5, sticky="w", padx=6)
+        tk.Label(cfg, text="OSC IP:").grid(row=3, column=0, sticky="w")
+        tk.Entry(cfg, textvariable=self.osc_ip, width=20).grid(row=3, column=1, sticky="w", padx=6)
 
-        tk.Label(cfg, text="Payload:").grid(row=1, column=6, sticky="w")
-        tk.OptionMenu(cfg, self.payload_mode, "speaker_text", "channel_text").grid(row=1, column=7, sticky="we", padx=6)
+        tk.Label(cfg, text="Port:").grid(row=3, column=2, sticky="w")
+        tk.Entry(cfg, textvariable=self.osc_port, width=8).grid(row=3, column=3, sticky="w", padx=6)
 
-        tk.Button(cfg, text="Refresh mics", command=self.refresh_mics).grid(row=1, column=8, sticky="e")
+        tk.Label(cfg, text="Address:").grid(row=3, column=4, sticky="w")
+        tk.Entry(cfg, textvariable=self.osc_address, width=14).grid(row=3, column=5, sticky="w", padx=6)
+
+        tk.Label(cfg, text="Payload:").grid(row=3, column=6, sticky="w")
+        tk.OptionMenu(cfg, self.payload_mode, "speaker_text", "channel_text").grid(row=3, column=7, sticky="we", padx=6)
+
+        tk.Button(cfg, text="Refresh mics", command=self.refresh_mics).grid(row=3, column=8, sticky="e")
 
         tk.Checkbutton(
             cfg,
             text="Show partial preview",
-            variable=self.show_partials).grid(row=2, column=0, columnspan=3, sticky="w")
+            variable=self.show_partials).grid(row=4, column=0, columnspan=3, sticky="w")
+
+        cfg.columnconfigure(1, weight=1)
+        cfg.columnconfigure(7, weight=1)
 
         sources_frame = tk.LabelFrame(self.root, text="Sources (up to 4)")
         sources_frame.pack(fill=tk.X, padx=10, pady=6)
@@ -188,6 +383,9 @@ class VoskMultiSourceApp:
         self.btn_stop = tk.Button(controls, text="Stop", command=self.stop, state=tk.DISABLED)
         self.btn_stop.pack(side=tk.LEFT, padx=8)
 
+        self.btn_test_imports = tk.Button(controls, text="Test imports", command=self.test_imports)
+        self.btn_test_imports.pack(side=tk.LEFT, padx=8)
+
         self.btn_test_osc = tk.Button(controls, text="Test OSC", command=self.test_osc)
         self.btn_test_osc.pack(side=tk.LEFT, padx=8)
 
@@ -198,12 +396,145 @@ class VoskMultiSourceApp:
         self._log(f"[Executable] {sys.executable}")
         self._log(f"[CWD] {os.getcwd()}")
         self._log("Ready. Enable sources, assign mics, click Start.")
+        self._log("If the app dies when loading a huge model: you likely ran out of RAM/pagefile. Use lgraph or enable pagefile.")
+        self._log("CUDA note: standard pip Vosk builds are usually CPU-only. If GPU init fails, the script falls back to CPU.")
+        self._log("Official models: https://alphacephei.com/vosk/models")
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
     def _log(self, s: str) -> None:
         self.log.insert(tk.END, s + "\n")
         self.log.see(tk.END)
+
+    def _threadsafe_log(self, s: str) -> None:
+        self.root.after(0, self._log, s)
+
+    # ---------- Model UI ----------
+    def on_model_choice(self, choice: str | None = None) -> None:
+        choice = choice or self.model_choice.get()
+        info = VOSK_MODELS.get(choice, {})
+        model_name = info.get("name", "")
+        notes = info.get("notes", "")
+
+        if model_name:
+            found = find_local_model_dir(model_name)
+            path = found or model_dir_for(model_name)
+            self.model_path.set(str(path))
+            installed = "installed" if found else "not installed"
+            self.model_status.set(f"{model_name}: {installed}. {notes}")
+        else:
+            self.model_status.set(notes)
+
+    def browse_model_path(self) -> None:
+        selected = filedialog.askdirectory(title="Choose Vosk model folder", initialdir=str(MODEL_INSTALL_DIR))
+        if selected:
+            self.model_choice.set("Custom path below")
+            self.model_path.set(selected)
+            self.model_status.set("Using custom model path.")
+
+    def download_selected_model(self) -> None:
+        if self.running:
+            self._log("[warn] Stop listening before downloading/changing models.")
+            return
+        if self.downloading:
+            self._log("[warn] A model download is already running.")
+            return
+
+        choice = self.model_choice.get()
+        info = VOSK_MODELS.get(choice, {})
+        model_name = info.get("name", "")
+        url = info.get("url", "")
+        if not model_name or not url:
+            self._log("[warn] Select a downloadable preset, or use Browse for a custom model folder.")
+            return
+
+        self.downloading = True
+        self.btn_download.config(state=tk.DISABLED)
+        self._log(f"[model] Preparing {model_name}...")
+
+        def work() -> None:
+            try:
+                installed = download_and_extract_model(model_name, url, self._threadsafe_log)
+                self.root.after(0, self.model_path.set, str(installed))
+                self.root.after(0, self.model_status.set, f"Installed and selected: {installed.name}")
+            except Exception as e:
+                self.root.after(0, self._log, f"[error] {e}")
+            finally:
+                self.root.after(0, self._download_finished)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _download_finished(self) -> None:
+        self.downloading = False
+        self.btn_download.config(state=tk.NORMAL)
+
+    # ---------- CUDA ----------
+    def _try_init_cuda(self) -> bool:
+        if not self.try_cuda.get():
+            return False
+        if self.cuda_initialized:
+            return True
+        if not hasattr(vosk, "GpuInit"):
+            self._log("[cuda] This vosk package does not expose GpuInit(); using CPU.")
+            return False
+        try:
+            self._log("[cuda] Attempting vosk.GpuInit()...")
+            vosk.GpuInit()
+            self.cuda_initialized = True
+            self._log("[cuda] GPU initialized. If libvosk was built with CUDA, recognition can use it.")
+            return True
+        except Exception as e:
+            self._log(f"[cuda] GPU init failed; using CPU. Details: {e}")
+            return False
+
+    def _try_init_cuda_thread(self, index: int) -> None:
+        if not self.cuda_initialized or not hasattr(vosk, "GpuThreadInit"):
+            return
+        try:
+            vosk.GpuThreadInit()
+            self.root.after(0, self._log, f"[cuda] Worker thread GPU context initialized (source {index}).")
+        except Exception as e:
+            self.root.after(0, self._log, f"[cuda] Worker thread GPU init failed (source {index}); continuing. Details: {e}")
+
+    def _selected_preset_info(self) -> dict[str, str]:
+        return VOSK_MODELS.get(self.model_choice.get(), {})
+
+    def _preflight_memory_for_model(self, model_path: Path) -> bool:
+        info = self._selected_preset_info()
+        min_free_gb = float(info.get("min_free_gb", "0") or "0")
+        rec_free_gb = float(info.get("rec_free_gb", "0") or "0")
+
+        if sys.platform == "win32":
+            ms = _get_mem_status_windows()
+            if ms:
+                avail_phys, total_phys, avail_pf, total_pf = ms
+                avail_gb = avail_phys / (1024**3)
+                self._log(f"[mem] Free RAM { _fmt_bytes(avail_phys) } / Total { _fmt_bytes(total_phys) }")
+                self._log(f"[mem] Free pagefile { _fmt_bytes(avail_pf) } / Total { _fmt_bytes(total_pf) }")
+
+                if min_free_gb > 0 and avail_gb < min_free_gb and not self.force_big_model.get():
+                    self._log(f"[mem] Not enough free RAM for this model (needs ~{min_free_gb:.0f} GB free).")
+                    self._log("[mem] Use a smaller model (lgraph), close apps, or increase Windows pagefile; then retry.")
+                    return False
+                if rec_free_gb > 0 and avail_gb < rec_free_gb:
+                    self._log(f"[mem] Warning: recommended free RAM for this model is ~{rec_free_gb:.0f} GB; you have ~{avail_gb:.1f} GB.")
+
+        size = _dir_size_bytes(model_path)
+        if size >= 2 * 1024**3:
+            self._log(f"[mem] Model folder size is { _fmt_bytes(size) } (large). Loading may spike RAM.")
+        return True
+
+    # ---------- Tests ----------
+    def test_imports(self) -> None:
+        try:
+            import importlib.util  # just to prove it's fine
+            self._log("[OK] importlib.util imports")
+            self._log("[OK] urllib/zipfile imports")
+            self._log("[OK] vosk imports")
+            self._log(f"[OK] vosk GPU hooks present: GpuInit={hasattr(vosk, 'GpuInit')} GpuThreadInit={hasattr(vosk, 'GpuThreadInit')}")
+            self._log("[OK] sounddevice imports")
+        except Exception as e:
+            self._log(f"[FAIL] Import test failed: {e}")
 
     def _list_mics(self) -> list[str]:
         items: list[str] = []
@@ -251,14 +582,32 @@ class VoskMultiSourceApp:
     def start(self) -> None:
         if self.running:
             return
-
-        model_path = self.model_path.get().strip()
-        if not model_path or not os.path.isdir(model_path):
-            self._log(f"[error] Invalid model path: {model_path}")
+        if self.downloading:
+            self._log("[warn] Wait for the model download to finish before starting.")
             return
 
+        model_path = self.model_path.get().strip().strip('"')
+        if not model_path or not is_vosk_model_dir(Path(model_path)):
+            self._log(f"[error] Model path does not look like a Vosk model directory: {model_path}")
+            self._log("Tip: choose a preset and click 'Download selected', or Browse to the folder containing 'am' and 'conf'.")
+            return
+
+        if not self._preflight_memory_for_model(Path(model_path)):
+            try:
+                messagebox.showwarning(
+                    "Not enough free memory",
+                    "This model is likely to crash your system due to RAM/pagefile pressure.\n\n"
+                    "Try the lgraph model, close other apps, or increase Windows pagefile.\n"
+                    "You can override with 'Force huge model' at your own risk.",
+                )
+            except Exception:
+                pass
+            return
+
+        self._try_init_cuda()
+
         try:
-            self._log("Loading Vosk model...")
+            self._log(f"Loading Vosk model: {model_path}")
             self.model = vosk.Model(model_path)
         except Exception as e:
             self._log(f"[error] Failed to load Vosk model: {e}")
@@ -312,6 +661,7 @@ class VoskMultiSourceApp:
         return cb
 
     def _worker(self, src: SourceState, index: int) -> None:
+        self._try_init_cuda_thread(index)
         while True:
             if not self.running:
                 return

@@ -101,7 +101,7 @@ public sealed class MultiSpeakerOscSpeechReceiver : MonoBehaviour
                     continue;
                 }
 
-                MultiSpeakerPerformer.ReceiveExternalSpeech(item.speakerId, item.text);
+                MultiSpeakerPerformer.ReceiveExternalSpeech(item.speakerId, item.text, "osc");
                 TotalDispatched++;
                 EmitReceiverEvent(
                     "receiver.dispatched",
