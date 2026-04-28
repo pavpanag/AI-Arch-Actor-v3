@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 
 namespace AaltoSystemV3
@@ -70,6 +71,55 @@ namespace AaltoSystemV3
             }
 
             return false;
+        }
+
+        public List<AaltoActionMemoryPair> BuildExecutableMappingSnapshot()
+        {
+            var snapshot = new List<AaltoActionMemoryPair>();
+            if (mappings == null || mappings.Count == 0)
+                return snapshot;
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < mappings.Count; i++)
+            {
+                var mapping = mappings[i];
+                if (mapping == null)
+                    continue;
+
+                var label = (mapping.actionLabel ?? string.Empty).Trim();
+                var trigger = (mapping.memoryTrigger ?? string.Empty).Trim();
+                if (string.IsNullOrWhiteSpace(label) || string.IsNullOrWhiteSpace(trigger))
+                    continue;
+
+                if (!seen.Add(label))
+                    continue;
+
+                snapshot.Add(new AaltoActionMemoryPair
+                {
+                    actionLabel = label,
+                    memoryTrigger = trigger
+                });
+            }
+
+            return snapshot;
+        }
+
+        public string BuildExecutableMappingSignature()
+        {
+            var snapshot = BuildExecutableMappingSnapshot();
+            if (snapshot.Count == 0)
+                return string.Empty;
+
+            var sb = new StringBuilder();
+            for (int i = 0; i < snapshot.Count; i++)
+            {
+                if (i > 0)
+                    sb.Append("|");
+
+                sb.Append(snapshot[i].actionLabel).Append("=>").Append(snapshot[i].memoryTrigger);
+            }
+
+            return sb.ToString();
         }
 
         public bool TrySendMemoryTriggerForActionLabel(string actionLabel, out string error)

@@ -4,6 +4,7 @@ Vosk Multi-Source -> OSC Transcriber (Tkinter GUI)
 What it does:
 - Captures up to 4 microphone sources simultaneously
 - Runs one Vosk recognizer per enabled source
+- Can split different physical input channels from the same multichannel device
 - Sends finalized transcripts via OSC with speaker identity
 
 Default OSC payload:
@@ -27,6 +28,7 @@ import ctypes
 import shutil
 import tempfile
 import zipfile
+import time
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import messagebox
@@ -53,9 +55,11 @@ def require(module_name: str, pip_name: str | None = None) -> None:
 
 require("sounddevice")
 require("vosk")
+require("numpy")
 
 import sounddevice as sd
 import vosk
+import numpy as np
 
 
 # -------------------- Model helpers --------------------
@@ -271,6 +275,7 @@ def send_osc(ip: str, port: int, address: str, args: Sequence[object]) -> None:
 
 SAMPLE_RATE = 16000
 SOURCE_COUNT = 4
+SAMPLE_RATE_CANDIDATES = [16000, 48000, 44100, 32000]
 
 
 class SourceState:
@@ -278,11 +283,16 @@ class SourceState:
         self.enabled = tk.BooleanVar(value=False)
         self.speaker_id = tk.StringVar(value="")
         self.channel = tk.IntVar(value=1)
+        self.input_channel = tk.IntVar(value=1)
         self.mic = tk.StringVar(value="")
         self.audio_q: "queue.Queue[bytes]" = queue.Queue()
         self.stream: sd.InputStream | None = None
         self.recognizer: vosk.KaldiRecognizer | None = None
         self.last_partial: str = ""
+        self.sample_rate: int = SAMPLE_RATE
+        self.last_rms: float = 0.0
+        self.last_peak: int = 0
+        self.last_debug_log_ts: float = 0.0
 
 
 class VoskMultiSourceApp:
@@ -300,6 +310,7 @@ class VoskMultiSourceApp:
         for i, src in enumerate(self.sources, start=1):
             src.speaker_id.set(f"actor_{i}")
             src.channel.set(i)
+            src.input_channel.set(i)
             src.enabled.set(i <= 2)
 
         self.osc_ip = tk.StringVar(value="127.0.0.1")
@@ -307,6 +318,8 @@ class VoskMultiSourceApp:
         self.osc_address = tk.StringVar(value="/speech")
         self.payload_mode = tk.StringVar(value="speaker_text")
         self.show_partials = tk.BooleanVar(value=False)
+        self.audio_debug = tk.BooleanVar(value=False)
+        self.only_active_mics = tk.BooleanVar(value=False)
         self.model_choice = tk.StringVar(value=DEFAULT_MODEL_PRESET)
         self.try_cuda = tk.BooleanVar(value=False)
         self.force_big_model = tk.BooleanVar(value=False)
@@ -354,6 +367,14 @@ class VoskMultiSourceApp:
             cfg,
             text="Show partial preview",
             variable=self.show_partials).grid(row=4, column=0, columnspan=3, sticky="w")
+        tk.Checkbutton(
+            cfg,
+            text="Audio debug logs",
+            variable=self.audio_debug).grid(row=4, column=3, columnspan=2, sticky="w")
+        tk.Checkbutton(
+            cfg,
+            text="Only show active mics",
+            variable=self.only_active_mics).grid(row=4, column=5, columnspan=2, sticky="w")
 
         cfg.columnconfigure(1, weight=1)
         cfg.columnconfigure(7, weight=1)
@@ -361,7 +382,7 @@ class VoskMultiSourceApp:
         sources_frame = tk.LabelFrame(self.root, text="Sources (up to 4)")
         sources_frame.pack(fill=tk.X, padx=10, pady=6)
 
-        headers = ["Use", "Speaker ID", "Channel", "Mic device"]
+        headers = ["Use", "Speaker ID", "OSC Chan", "Input Ch", "Mic device"]
         for c, h in enumerate(headers):
             tk.Label(sources_frame, text=h).grid(row=0, column=c, sticky="w", padx=4)
 
@@ -370,8 +391,9 @@ class VoskMultiSourceApp:
             tk.Checkbutton(sources_frame, text=f"Source {i}", variable=src.enabled).grid(row=i, column=0, sticky="w", padx=4)
             tk.Entry(sources_frame, textvariable=src.speaker_id, width=18).grid(row=i, column=1, sticky="w", padx=4)
             tk.Spinbox(sources_frame, from_=1, to=64, textvariable=src.channel, width=6).grid(row=i, column=2, sticky="w", padx=4)
+            tk.Spinbox(sources_frame, from_=1, to=64, textvariable=src.input_channel, width=6).grid(row=i, column=3, sticky="w", padx=4)
             m = tk.OptionMenu(sources_frame, src.mic, "(loading...)")
-            m.grid(row=i, column=3, sticky="we", padx=4)
+            m.grid(row=i, column=4, sticky="we", padx=4)
             self.mic_menus.append(m)
 
         controls = tk.Frame(self.root)
@@ -388,6 +410,16 @@ class VoskMultiSourceApp:
 
         self.btn_test_osc = tk.Button(controls, text="Test OSC", command=self.test_osc)
         self.btn_test_osc.pack(side=tk.LEFT, padx=8)
+
+        self.btn_auto_assign = tk.Button(controls, text="Auto assign inputs", command=self.auto_assign_inputs)
+        self.btn_auto_assign.pack(side=tk.LEFT, padx=8)
+
+        self.btn_probe_audio = tk.Button(controls, text="Probe channels", command=self.probe_selected_channels)
+        self.btn_probe_audio.pack(side=tk.LEFT, padx=8)
+        self.btn_auto_assign_available = tk.Button(
+            controls, text="Auto assign available", command=self.auto_assign_available_inputs
+        )
+        self.btn_auto_assign_available.pack(side=tk.LEFT, padx=8)
 
         self.log = ScrolledText(self.root, wrap=tk.WORD, height=26)
         self.log.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
@@ -541,8 +573,53 @@ class VoskMultiSourceApp:
         devices = sd.query_devices()
         for i, d in enumerate(devices):
             if d.get("max_input_channels", 0) > 0:
-                items.append(f"{i}: {d.get('name', '(unknown)')}")
+                ch = int(d.get("max_input_channels", 0) or 0)
+                label = f"{i}: {d.get('name', '(unknown)')} [in:{ch}]"
+
+                if self.only_active_mics.get():
+                    try:
+                        active = self._probe_device_activity(i, max_channels=min(ch, 8), duration=0.4)
+                    except Exception:
+                        active = []
+
+                    if not active:
+                        continue
+                    # show active channels in label
+                    act_str = ",".join(str(x) for x in active)
+                    label = f"{i}: {d.get('name', '(unknown)')} [in:{ch} active:{len(active)} ch:{act_str}]"
+
+                items.append(label)
         return items or ["(no input devices)"]
+
+    def _probe_device_activity(self, mic_index: int, max_channels: int = 2, duration: float = 0.4, threshold: float = 500.0) -> list[int]:
+        # Returns 1-based channel indices that have RMS above threshold
+        info = sd.query_devices(mic_index)
+        max_in = int(info.get("max_input_channels", 0) or 0)
+        if max_in <= 0:
+            return []
+
+        channels = min(max_in, int(max_channels))
+        sr = self._pick_working_samplerate(mic_index, channels)
+        if sr is None:
+            return []
+
+        frames = int(sr * max(0.1, min(duration, 1.0)))
+
+        try:
+            with sd.InputStream(device=mic_index, channels=channels, samplerate=sr, dtype="int16") as stream:
+                data, _ = stream.read(frames)
+        except Exception:
+            return []
+
+        try:
+            arr = np.asarray(data, dtype=np.int16).astype(np.float32)
+            if arr.ndim == 1:
+                arr = arr.reshape(-1, 1)
+            rms = np.sqrt(np.mean(arr * arr, axis=0))
+            active = [i + 1 for i, v in enumerate(rms) if float(v) >= float(threshold)]
+            return active
+        except Exception:
+            return []
 
     def refresh_mics(self) -> None:
         items = self._list_mics()
@@ -555,12 +632,243 @@ class VoskMultiSourceApp:
                 src.mic.set(items[0])
         self._log("Mic list refreshed.")
 
+    def auto_assign_inputs(self) -> None:
+        for i, src in enumerate(self.sources, start=1):
+            src.input_channel.set(i)
+        self._log("Auto assign: Input Ch mapped to Source index (1->1, 2->2, ...).")
+
+    def auto_assign_available_inputs(self) -> None:
+        # Build available candidates: (mic_index, ch, device_name, max_in, active_flag)
+        devices = sd.query_devices()
+        candidates: list[tuple[int, int, str, int, bool]] = []
+
+        for i, d in enumerate(devices):
+            max_in = int(d.get("max_input_channels", 0) or 0)
+            if max_in <= 0:
+                continue
+            name = str(d.get("name", "(unknown)"))
+
+            # Prefer active channels if requested
+            active_channels: list[int] = []
+            if self.only_active_mics.get():
+                try:
+                    active_channels = self._probe_device_activity(i, max_channels=min(max_in, 8), duration=0.3)
+                except Exception:
+                    active_channels = []
+
+            if active_channels:
+                for ch in active_channels:
+                    candidates.append((i, ch, name, max_in, True))
+            else:
+                # Add all channels up to a sensible limit
+                for ch in range(1, min(max_in, 8) + 1):
+                    candidates.append((i, ch, name, max_in, False))
+
+        if not candidates:
+            self._log("[autoassign] No available input channels found.")
+            return
+
+        # Remove duplicates and prefer active ones first
+        candidates_sorted = sorted(candidates, key=lambda x: (not x[4], x[0], x[1]))
+
+        # Refresh current mic menu items to find labels
+        menu_items = self._list_mics()
+
+        used: set[tuple[int, int]] = set()
+        assign_count = 0
+        for src in self.sources:
+            if not src.enabled.get():
+                continue
+            # find first unused candidate
+            picked = None
+            for cand in candidates_sorted:
+                mic_idx, ch, name, max_in, active = cand
+                if (mic_idx, ch) in used:
+                    continue
+                picked = cand
+                break
+
+            if picked is None:
+                break
+
+            mic_idx, ch, name, max_in, active = picked
+            # find a menu item that starts with "{mic_idx}:"
+            match_label = next((it for it in menu_items if it.startswith(f"{mic_idx}:")), None)
+            if match_label is None:
+                match_label = f"{mic_idx}: {name} [in:{max_in}]"
+
+            src.mic.set(match_label)
+            src.input_channel.set(ch)
+            used.add((mic_idx, ch))
+            assign_count += 1
+            self._log(f"[autoassign] Assigned source -> mic={mic_idx} ({name}) input_ch={ch} active={active}")
+
+        if assign_count == 0:
+            self._log("[autoassign] No enabled sources were assigned.")
+        elif assign_count < sum(1 for s in self.sources if s.enabled.get()):
+            self._log("[autoassign] Partial assignment: not enough distinct input channels for all enabled sources.")
+        else:
+            self._log(f"[autoassign] Assigned {assign_count} sources.")
+
     def _selected_mic_index(self, src: SourceState) -> int | None:
         sel = src.mic.get()
         try:
             return int(sel.split(":")[0]) if ":" in sel else None
         except Exception:
             return None
+
+    def _device_info(self, mic_index: int) -> dict[str, object]:
+        info = sd.query_devices(mic_index)
+        hostapis = sd.query_hostapis()
+        host_idx = int(info.get("hostapi", -1) or -1)
+        host_name = "unknown"
+        if 0 <= host_idx < len(hostapis):
+            host_name = str(hostapis[host_idx].get("name", "unknown"))
+        return {
+            "name": str(info.get("name", "(unknown)")),
+            "hostapi": host_name,
+            "max_input_channels": int(info.get("max_input_channels", 0) or 0),
+            "default_samplerate": int(float(info.get("default_samplerate", 0) or 0)),
+        }
+
+    def _mic_input_channel_count(self, mic_index: int) -> int:
+        try:
+            info = sd.query_devices(mic_index)
+            return int(info.get("max_input_channels", 0) or 0)
+        except Exception:
+            return 0
+
+    def _resample_int16(self, arr: "np.ndarray", src_sr: int, tgt_sr: int) -> "np.ndarray":
+        # arr: 1-D int16 numpy array
+        if src_sr == tgt_sr:
+            return arr
+        if arr.size == 0:
+            return arr
+        try:
+            src_len = arr.shape[0]
+            duration = src_len / float(src_sr)
+            tgt_len = int(round(duration * float(tgt_sr)))
+            if tgt_len <= 0:
+                return np.array([], dtype=np.int16)
+            # Linear interpolation resampling
+            old_pos = np.linspace(0.0, 1.0, num=src_len, endpoint=False)
+            new_pos = np.linspace(0.0, 1.0, num=tgt_len, endpoint=False)
+            res = np.interp(new_pos, old_pos, arr.astype(np.float32)).astype(np.int16)
+            return res
+        except Exception:
+            return arr
+
+    def _samplerate_candidates_for(self, mic_index: int) -> list[int]:
+        info = self._device_info(mic_index)
+        default_sr = int(info.get("default_samplerate", 0) or 0)
+        candidates: list[int] = []
+        if default_sr > 0:
+            candidates.append(default_sr)
+        candidates.extend(SAMPLE_RATE_CANDIDATES)
+
+        uniq: list[int] = []
+        for sr in candidates:
+            if sr > 0 and sr not in uniq:
+                uniq.append(sr)
+        return uniq
+
+    def _pick_working_samplerate(self, mic_index: int, channels: int) -> int | None:
+        for sr in self._samplerate_candidates_for(mic_index):
+            try:
+                sd.check_input_settings(device=mic_index, channels=channels, samplerate=sr, dtype="int16")
+                if self.audio_debug.get():
+                    self._log(f"[audio dbg] mic={mic_index} accepts sr={sr} ch={channels}")
+                return sr
+            except Exception as e:
+                if self.audio_debug.get():
+                    self._log(f"[audio dbg] mic={mic_index} rejects sr={sr} ch={channels}: {e}")
+        return None
+
+    def _log_duplicate_input_channel_warnings(self) -> None:
+        used: dict[tuple[int, int], list[int]] = {}
+        for i, src in enumerate(self.sources, start=1):
+            if not src.enabled.get():
+                continue
+            mic_index = self._selected_mic_index(src)
+            if mic_index is None:
+                continue
+            input_channel = int(src.input_channel.get())
+            key = (mic_index, input_channel)
+            used.setdefault(key, []).append(i)
+
+        for (mic_index, input_channel), source_ids in used.items():
+            if len(source_ids) > 1:
+                self._log(
+                    f"[warn] Sources {source_ids} use same mic index={mic_index} input_ch={input_channel}. "
+                    "They will transcribe the same physical input."
+                )
+
+    def probe_selected_channels(self) -> None:
+        if self.running:
+            self._log("[warn] Stop listening before probing channels.")
+            return
+
+        selected_src = next((s for s in self.sources if s.enabled.get()), self.sources[0])
+        mic_index = self._selected_mic_index(selected_src)
+        if mic_index is None:
+            self._log("[probe] No valid mic selected.")
+            return
+
+        def work() -> None:
+            try:
+                info = self._device_info(mic_index)
+                max_in = int(info["max_input_channels"])
+                self._threadsafe_log(
+                    f"[probe] mic={mic_index} name={info['name']} host={info['hostapi']} "
+                    f"max_in={max_in} default_sr={info['default_samplerate']}"
+                )
+
+                if max_in < 2:
+                    self._threadsafe_log("[probe] Device exposes fewer than 2 input channels. No split test possible.")
+                    return
+
+                sr = self._pick_working_samplerate(mic_index, min(max_in, 2))
+                if sr is None:
+                    self._threadsafe_log("[probe] No working samplerate found for 2-channel probe.")
+                    return
+
+                self._threadsafe_log(
+                    "[probe] Capturing 2-channel audio for 3 seconds. Speak into input 1, then input 2."
+                )
+
+                frames = int(sr * 3)
+                with sd.InputStream(device=mic_index, channels=2, samplerate=sr, dtype="int16") as stream:
+                    data, _ = stream.read(frames)
+
+                ch1 = data[:, 0].astype(np.float32)
+                ch2 = data[:, 1].astype(np.float32)
+                rms1 = float(np.sqrt(np.mean(ch1 * ch1)))
+                rms2 = float(np.sqrt(np.mean(ch2 * ch2)))
+                peak1 = int(np.max(np.abs(ch1))) if ch1.size else 0
+                peak2 = int(np.max(np.abs(ch2))) if ch2.size else 0
+
+                corr = 0.0
+                if rms1 > 5.0 and rms2 > 5.0:
+                    corr = float(np.corrcoef(ch1, ch2)[0, 1])
+
+                self._threadsafe_log(
+                    f"[probe] sr={sr} rms1={rms1:.1f} peak1={peak1} rms2={rms2:.1f} peak2={peak2} corr={corr:.3f}"
+                )
+
+                if rms1 < 5.0 and rms2 < 5.0:
+                    self._threadsafe_log("[probe] Both channels are nearly silent. Repeat probe while speaking louder.")
+                elif corr > 0.98 and rms1 > 20.0 and rms2 > 20.0:
+                    self._threadsafe_log(
+                        "[probe] Channels look strongly mirrored. Driver routing is likely duplicating the same signal on ch1/ch2."
+                    )
+                else:
+                    self._threadsafe_log(
+                        "[probe] Channels are not strongly mirrored. Independent channel capture appears possible."
+                    )
+            except Exception as e:
+                self._threadsafe_log(f"[probe] Failed: {e}")
+
+        threading.Thread(target=work, daemon=True).start()
 
     def _payload_for(self, src: SourceState, transcript: str) -> list[object]:
         mode = self.payload_mode.get().strip()
@@ -605,6 +913,7 @@ class VoskMultiSourceApp:
             return
 
         self._try_init_cuda()
+        self._log_duplicate_input_channel_warnings()
 
         try:
             self._log(f"Loading Vosk model: {model_path}")
@@ -627,19 +936,55 @@ class VoskMultiSourceApp:
                 continue
 
             try:
-                src.recognizer = vosk.KaldiRecognizer(self.model, SAMPLE_RATE)
+                input_channel = int(src.input_channel.get())
+                if input_channel < 1:
+                    self._log(f"[warn] Source {i} has invalid Input Ch={input_channel}, skipping.")
+                    continue
+
+                device_inputs = self._mic_input_channel_count(mic_index)
+                if device_inputs <= 0:
+                    self._log(f"[warn] Source {i} device reports no input channels, skipping.")
+                    continue
+
+                if input_channel > device_inputs:
+                    self._log(
+                        f"[warn] Source {i} Input Ch={input_channel} exceeds device max in={device_inputs}. "
+                        f"Pick 1..{device_inputs}. Skipping."
+                    )
+                    continue
+
+                mic_info = self._device_info(mic_index)
+                if self.audio_debug.get():
+                    self._log(
+                        f"[audio dbg] Source {i} mic={mic_index} name={mic_info['name']} host={mic_info['hostapi']} "
+                        f"max_in={mic_info['max_input_channels']} default_sr={mic_info['default_samplerate']}"
+                    )
+
+                stream_sr = self._pick_working_samplerate(mic_index, device_inputs)
+                if stream_sr is None:
+                    self._log(
+                        f"[error] Source {i} no working samplerate found for mic={mic_index} channels={device_inputs}."
+                    )
+                    continue
+
+                src.sample_rate = int(stream_sr)
+                # Use model sample rate for recognizer (resample audio to this rate in worker)
+                src.recognizer = vosk.KaldiRecognizer(self.model, float(SAMPLE_RATE))
                 src.audio_q = queue.Queue()
                 src.stream = sd.InputStream(
-                    samplerate=SAMPLE_RATE,
-                    channels=1,
+                    samplerate=src.sample_rate,
+                    channels=device_inputs,
                     dtype="int16",
-                    callback=self._make_audio_callback(src, i),
+                    callback=self._make_audio_callback(src, i, input_channel),
                     device=mic_index,
                 )
                 src.stream.start()
                 threading.Thread(target=self._worker, args=(src, i), daemon=True).start()
                 enabled_count += 1
-                self._log(f"[OK] Source {i} started on mic={src.mic.get()} speaker_id={src.speaker_id.get().strip()} channel={src.channel.get()}")
+                self._log(
+                    f"[OK] Source {i} started on mic={src.mic.get()} input_ch={input_channel} "
+                    f"speaker_id={src.speaker_id.get().strip()} osc_channel={src.channel.get()} sr={src.sample_rate}"
+                )
             except Exception as e:
                 self._log(f"[error] Failed to start source {i}: {e}")
 
@@ -652,11 +997,27 @@ class VoskMultiSourceApp:
         self.btn_stop.config(state=tk.NORMAL)
         self._log(f"Listening on {enabled_count} source(s)...")
 
-    def _make_audio_callback(self, src: SourceState, index: int):
+    def _make_audio_callback(self, src: SourceState, index: int, input_channel: int):
         def cb(indata, frames, time_info, status) -> None:
             if status:
                 self.root.after(0, self._log, f"[audio status] source {index}: {status}")
-            src.audio_q.put(bytes(indata))
+            try:
+                # Pick one physical input channel from a multichannel capture block.
+                if getattr(indata, "ndim", 1) <= 1:
+                    mono = indata
+                else:
+                    ch_idx = max(0, min(int(input_channel) - 1, int(indata.shape[1]) - 1))
+                    mono = indata[:, ch_idx]
+
+                if self.audio_debug.get():
+                    m = mono.astype(np.float32)
+                    src.last_peak = int(np.max(np.abs(m))) if m.size else 0
+                    src.last_rms = float(np.sqrt(np.mean(m * m))) if m.size else 0.0
+
+                # Enqueue tuple (bytes, source_samplerate) so worker can resample to model rate
+                src.audio_q.put((mono.tobytes(), int(src.sample_rate)))
+            except Exception as e:
+                self.root.after(0, self._log, f"[audio status] source {index} channel split error: {e}")
 
         return cb
 
@@ -675,7 +1036,40 @@ class VoskMultiSourceApp:
             if rec is None:
                 continue
 
-            if rec.AcceptWaveform(data):
+            if self.audio_debug.get():
+                now = time.time()
+                if now - src.last_debug_log_ts >= 1.0:
+                    src.last_debug_log_ts = now
+                    self.root.after(
+                        0,
+                        self._log,
+                        f"[audio dbg] source {index} q={src.audio_q.qsize()} rms={src.last_rms:.1f} peak={src.last_peak} sr={src.sample_rate}",
+                    )
+
+            # data can be raw bytes or (bytes, src_samplerate)
+            raw = None
+            src_sr = int(src.sample_rate)
+            if isinstance(data, tuple) or isinstance(data, list):
+                try:
+                    raw_bytes, src_sr = data
+                    raw = raw_bytes
+                except Exception:
+                    raw = None
+            else:
+                raw = data
+
+            if raw is None:
+                continue
+
+            try:
+                arr = np.frombuffer(raw, dtype=np.int16)
+                if int(src_sr) != int(SAMPLE_RATE):
+                    arr = self._resample_int16(arr, int(src_sr), int(SAMPLE_RATE))
+                data_to_feed = arr.tobytes()
+            except Exception:
+                data_to_feed = raw
+
+            if rec.AcceptWaveform(data_to_feed):
                 result_raw = rec.Result()
                 text = ""
                 try:

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -78,6 +79,9 @@ namespace AaltoSystemV3
 
         private bool _isGenerating;
         private string _lastGeneratedSummary;
+        private int _summaryRevision;
+        private int _generatedRevision = -1;
+        private readonly SemaphoreSlim _generationGate = new SemaphoreSlim(1, 1);
 
         private string SelectedModelId => Model switch
         {
@@ -123,7 +127,7 @@ namespace AaltoSystemV3
                 return false;
             }
 
-            CurrentCharacterSummary = summary;
+            UpdateSummaryAndInvalidateContext(summary, "interview_pull");
             return await GenerateFromCurrentSummaryAsync();
         }
 
@@ -139,7 +143,7 @@ namespace AaltoSystemV3
             if (string.IsNullOrWhiteSpace(normalized))
                 return;
 
-            CurrentCharacterSummary = normalized;
+            UpdateSummaryAndInvalidateContext(normalized, "interview_apply");
 
             if (autoGenerate && AutoGenerateOnSummaryUpdate)
                 _ = GenerateFromCurrentSummaryAsync();
@@ -158,14 +162,12 @@ namespace AaltoSystemV3
 
         public async Task<bool> GenerateFromCurrentSummaryAsync()
         {
+            if (_isGenerating)
+                SetStatus("Generation already running. Queuing latest summary.");
+
+            await _generationGate.WaitAsync();
             try
             {
-                if (_isGenerating)
-                {
-                    SetStatus("Generation already running. Skipping duplicate request.");
-                    return false;
-                }
-
                 if (OpenAI == null)
                 {
                     SetStatus("OpenAIClient is not assigned.");
@@ -173,6 +175,7 @@ namespace AaltoSystemV3
                 }
 
                 var summary = (CurrentCharacterSummary ?? string.Empty).Trim();
+                var revisionAtStart = _summaryRevision;
                 if (string.IsNullOrWhiteSpace(summary))
                 {
                     SetStatus("Current character summary is empty.");
@@ -180,6 +183,7 @@ namespace AaltoSystemV3
                 }
 
                 var alreadyGenerated =
+                    _generatedRevision == revisionAtStart &&
                     string.Equals(_lastGeneratedSummary, summary, StringComparison.Ordinal) &&
                     !string.IsNullOrWhiteSpace(GeneratedObjective) &&
                     !string.IsNullOrWhiteSpace(GeneratedStance);
@@ -223,9 +227,23 @@ namespace AaltoSystemV3
                     return false;
                 }
 
+                var latestSummary = (CurrentCharacterSummary ?? string.Empty).Trim();
+                if (revisionAtStart != _summaryRevision || !string.Equals(summary, latestSummary, StringComparison.Ordinal))
+                {
+                    EmitBootstrapperEvent("bootstrap.stale_generation_discarded",
+                        "{\"requested_revision\":" + revisionAtStart + "," +
+                        "\"current_revision\":" + _summaryRevision + "," +
+                        "\"requested_summary\":\"" + AaltoLaunchSessionLogger.EscapeJson(summary) + "\"," +
+                        "\"current_summary\":\"" + AaltoLaunchSessionLogger.EscapeJson(latestSummary) + "\"}");
+                    GenerationStatus = "Pending";
+                    SetStatus("Generated objective/stance discarded because summary changed during request.");
+                    return false;
+                }
+
                 GeneratedObjective = objective;
                 GeneratedStance = stance;
                 _lastGeneratedSummary = summary;
+                _generatedRevision = revisionAtStart;
                 EmitBootstrapperEvent("bootstrap.generated",
                     "{\"objective\":\"" + AaltoLaunchSessionLogger.EscapeJson(GeneratedObjective ?? string.Empty) + "\"," +
                     "\"stance\":\"" + AaltoLaunchSessionLogger.EscapeJson(GeneratedStance ?? string.Empty) + "\"}");
@@ -246,7 +264,35 @@ namespace AaltoSystemV3
             finally
             {
                 _isGenerating = false;
+                _generationGate.Release();
             }
+        }
+
+        private void UpdateSummaryAndInvalidateContext(string summary, string source)
+        {
+            var normalized = (summary ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(normalized))
+                return;
+
+            var previous = (CurrentCharacterSummary ?? string.Empty).Trim();
+            var changed = !string.Equals(previous, normalized, StringComparison.Ordinal);
+
+            CurrentCharacterSummary = normalized;
+            if (!changed)
+                return;
+
+            _summaryRevision++;
+            _generatedRevision = -1;
+            _lastGeneratedSummary = string.Empty;
+            GeneratedObjective = string.Empty;
+            GeneratedStance = string.Empty;
+            GenerationStatus = "Pending";
+
+            EmitBootstrapperEvent("bootstrap.summary_changed",
+                "{\"source\":\"" + AaltoLaunchSessionLogger.EscapeJson(source ?? string.Empty) + "\"," +
+                "\"revision\":" + _summaryRevision + "," +
+                "\"previous_summary\":\"" + AaltoLaunchSessionLogger.EscapeJson(previous) + "\"," +
+                "\"current_summary\":\"" + AaltoLaunchSessionLogger.EscapeJson(normalized) + "\"}");
         }
 
         private static bool TryParse(string raw, out string objective, out string stance, out string error)

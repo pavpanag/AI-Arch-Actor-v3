@@ -526,6 +526,11 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!4 &321012760 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+  m_PrefabInstance: {fileID: 2049490469}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &381184360
 GameObject:
   m_ObjectHideFlags: 0
@@ -929,6 +934,11 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!4 &420056384 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+  m_PrefabInstance: {fileID: 1413276258}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &437933588
 GameObject:
   m_ObjectHideFlags: 0
@@ -1375,6 +1385,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::OscSpeechReceiver
   Chat: {fileID: 0}
   DirectedPerformer: {fileID: 0}
+  DirectedPerformerDual: {fileID: 0}
   osc: {fileID: 1228943004}
   ExpectedAddress: /speech
   AcceptAnyChannel: 1
@@ -1622,6 +1633,11 @@ MonoBehaviour:
   ReplayStatusText: {fileID: 1771405061}
   ReplayTraceText: {fileID: 1771405061}
   AppendTrace: 1
+--- !u!4 &648782156 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+  m_PrefabInstance: {fileID: 1347566411}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &738777518
 GameObject:
   m_ObjectHideFlags: 0
@@ -1740,7 +1756,9 @@ Transform:
   - {fileID: 868154125}
   - {fileID: 1486273472}
   - {fileID: 1019689665}
+  - {fileID: 1644931773}
   - {fileID: 830374540}
+  - {fileID: 2092958555}
   - {fileID: 1024883971}
   - {fileID: 408548554}
   m_Father: {fileID: 0}
@@ -1806,7 +1824,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &830374540
 Transform:
   m_ObjectHideFlags: 0
@@ -1836,12 +1854,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: AaltoSystem::AaltoSystemV3.AaltoDirectedRoomPerformerController
   OpenAI: {fileID: 2019934417}
   ActionMemoryRegistry: {fileID: 1019689666}
+  ActionMemoryRegistryDual: {fileID: 0}
   ObjectiveStanceBootstrapper: {fileID: 1486273473}
   InspectorActorInput: 
   AcceptExternalSpeechInput: 1
   AutoSubmitExternalSpeech: 1
   LastExternalSpeechText: hey
-  DirectorGuidanceInput: 
+  DirectorGuidanceInput: 'if '
   DirectorGuidanceInputs: []
   SelectedActionText: 
   ActionJustificationText: 
@@ -1855,13 +1874,14 @@ MonoBehaviour:
   LastExportStatus: 
   LastExportDirectory: 
   PullContextFromBootstrapper: 1
-  CurrentCharacterSummary: "A sterile dental waiting room with small comforts like
-    a pillow, you cradle patients in pain and try to soothe and distract them, even
-    as the full room\u2019s discomfort secretly thrills you beneath your dutiful
-    calm."
-  CurrentObjective: Soothe and distract anxious patients while holding them in uneasy
-    comfort.
-  CurrentStance: calmly indulgent
+  RequireCompleteBootstrapperContext: 1
+  CurrentCharacterSummary: "A sterile dental waiting room with small comforts\u2014a
+    pillow, calm order\u2014trying to soothe a packed room of aching patients and
+    distract them from pain, while privately taking pleasure in their discomfort
+    beneath its dutiful facade."
+  CurrentObjective: Keep the crowded patients calm and distracted while they wait
+    in pain.
+  CurrentStance: soothingly cruel
   DirectorGuidance: 
   GeneralInstructions: 'You are performing the inner life of a room in an improvised
     scene with another actor, who speaks to the room. You listen to what the actor
@@ -1934,23 +1954,46 @@ MonoBehaviour:
     <1-3 sentences explaining why this action was chosen>'
   RecentHistoryLimit: 5
   Model: 0
+  ActionRegistrySource: 0
   ApplyActionThroughRegistry: 1
   SelectedActionStateMode: 0
   NeutralMemoryTrigger: memory 1
-  ResponsePulseSeconds: 1
+  ResponsePulseSeconds: 5
   ExecutionModeStatus: 
   UsePulledActionLabelsSnapshot: 1
   PulledActionLabelsSnapshot:
-  - I say I want you to stay
-  - I say I want you to leave
-  ActionPullStatus: Pulled 2 action labels from registry.
+  - i am giving permimion to enter heaven
+  - i am sentencing you to hell
+  - I am commanding you to take a step towards hell
+  - I am commanding you to take a step towards heaven
+  - I am commanding you to wait beacause I cannot make a judgement based on your
+    last answer
+  PulledActionBindingsSnapshot:
+  - actionLabel: i am giving permimion to enter heaven
+    memoryTrigger: memory 2
+  - actionLabel: i am sentencing you to hell
+    memoryTrigger: memory 3
+  - actionLabel: I am commanding you to take a step towards hell
+    memoryTrigger: memory 4
+  - actionLabel: I am commanding you to take a step towards heaven
+    memoryTrigger: memory 5
+  - actionLabel: I am commanding you to wait beacause I cannot make a judgement based
+      on your last answer
+    memoryTrigger: memory 6
+  BlockTurnWhenActionSnapshotIsStale: 1
+  PulledActionSnapshotSignature: i am giving permimion to enter heaven=>memory 2|i
+    am sentencing you to hell=>memory 3|I am commanding you to take a step towards
+    hell=>memory 4|I am commanding you to take a step towards heaven=>memory 5|I
+    am commanding you to wait beacause I cannot make a judgement based on your last
+    answer=>memory 6
+  ActionPullStatus: Pulled 5 executable action labels from registry.
   EnforceRegistryActionLabels: 1
   FallbackActionLabel: no
   LastRuntimePrompt: 
   LastRawModelResponse: 
-  LastStatus: Pulled 2 action labels from registry.
+  LastStatus: Pulled 5 executable action labels from registry.
   PromptInspectionText: 
-  ContextSyncStatus: Context synced from bootstrapper.
+  ContextSyncStatus: Context synced atomically from bootstrapper.
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -2182,25 +2225,26 @@ MonoBehaviour:
   m_EditorClassIdentifier: AaltoSystem::AaltoSystemV3.AaltoInterviewController
   OpenAI: {fileID: 2019934417}
   ObjectiveStanceBootstrapper: {fileID: 1486273473}
-  BackstoryText: ' you are a waiting room for dental patients'
-  MotiveText: you want people who are in pain to feel comfortable and forget about
-    their pain
-  ObstacleText: you secretly like other people's pain
-  CircumstancesText: the room is full of people in pain who are waiting for their
-    turn to go to dentistt
-  FollowUpQuestionsText: "What kind of waiting room are you\u2014sterile and clinical,
-    cozy and child-friendly, or something else\u2014and what details in your design
-    shape how patients experience you?\nWhen you try to comfort patients despite
-    secretly enjoying their pain, what specifically drives that conflict, and what
-    in this crowded, pain-filled room makes it harder or easier to hide?"
-  FollowUpAnswersText: sterile with small nuances of comfort like a pillow. you are
-    trying to fulfill your duty as a waiting room but it is not who you are as a
-    person
-  LastSummary: "A sterile dental waiting room with small comforts like a pillow,
-    you cradle patients in pain and try to soothe and distract them, even as the
-    full room\u2019s discomfort secretly thrills you beneath your dutiful calm."
-  LastStatus: '[aalto-interview] Draft summary ready. ApproveCurrentSummary() to
-    start rehearsal, or ReviseSummaryFromNotes() to change it.'
+  BackstoryText: 'you are the judge of purgatory and you have been assigned by god
+    to choose if the souls will go to heaven or hell depending on their answers '
+  MotiveText: 'i want not to make mistakes on my judjement '
+  ObstacleText: 
+  CircumstancesText: 
+  FollowUpQuestionsText: 'What criteria or rules has God given you to judge each
+    soul, and are there any specific sins, virtues, or circumstances that should
+    weigh more heavily in your decision?
+
+    When you suspect a soul may be lying,
+    what information or limits do you have in purgatory to verify the truth, and
+    under what conditions must you make a final judgment without certainty?'
+  FollowUpAnswersText: whenever you think they are lying choose the "i think you
+    are lying"action
+  LastSummary: "A sterile dental waiting room with small comforts\u2014a pillow,
+    calm order\u2014trying to soothe a packed room of aching patients and distract
+    them from pain, while privately taking pleasure in their discomfort beneath its
+    dutiful facade."
+  LastStatus: '[aalto-interview] Clarification questions ready. Answer them in Follow
+    Up Answers, then run GenerateCharacterSummaryFromInputs.'
   InterviewQuestionsText: '1) What is the background of the character?
 
     2) What
@@ -2226,36 +2270,36 @@ MonoBehaviour:
 
     background:
 
-    you are a waiting room for dental patients
+    you are the judge of purgatory and you
+    have been assigned by god to choose if the souls will go to heaven or hell depending
+    on their answers
 
 
 
     motivation:
 
-    you
-    want people who are in pain to feel comfortable and forget about their pain
+    i want not to make mistakes on my judjement
 
 
 
     obstacle:
 
-    you
-    secretly like other people''s pain
+    i
+    dont know if they are lying
 
 
 
     circumstances:
 
-    the room is full
-    of people in pain who are waiting for their turn to go to dentistt
+    (none provided)
 
 '
-  LastClarificationResponseJson: "{\n  \"clarification_questions\": [\n    \"What
-    kind of waiting room are you\u2014sterile and clinical, cozy and child-friendly,
-    or something else\u2014and what details in your design shape how patients experience
-    you?\",\n    \"When you try to comfort patients despite secretly enjoying their
-    pain, what specifically drives that conflict, and what in this crowded, pain-filled
-    room makes it harder or easier to hide?\"\n  ]\n}"
+  LastClarificationResponseJson: '{"clarification_questions":["What criteria or rules
+    has God given you to judge each soul, and are there any specific sins, virtues,
+    or circumstances that should weigh more heavily in your decision?","When you
+    suspect a soul may be lying, what information or limits do you have in purgatory
+    to verify the truth, and under what conditions must you make a final judgment
+    without certainty?"]}'
   LastSummarySystemPrompt: "You are creating a compact runtime character summary
     for a scenic rehearsal agent.\nReturn JSON only with exactly this schema:\n{\n 
     \"character_summary\": \"...\"\n}\nRules:\n- Use background, motivation, obstacle,
@@ -2300,20 +2344,34 @@ MonoBehaviour:
 
 '
   LastSummaryResponseJson: "{\"character_summary\":\"A sterile dental waiting room
-    with small comforts like a pillow, you cradle patients in pain and try to soothe
-    and distract them, even as the full room\u2019s discomfort secretly thrills you
-    beneath your dutiful calm.\"}"
-  PromptInspectionText: "[INTERVIEW QUESTION DEBUG]\r\nflow: DraftReadyForReview\r\nstatus:
-    [aalto-interview] Draft summary ready. ApproveCurrentSummary() to start rehearsal,
-    or ReviseSummaryFromNotes() to change it.\r\n\r\n--- generated follow-up questions
-    ---\r\nWhat kind of waiting room are you\u2014sterile and clinical, cozy and
-    child-friendly, or something else\u2014and what details in your design shape
-    how patients experience you?\nWhen you try to comfort patients despite secretly
-    enjoying their pain, what specifically drives that conflict, and what in this
-    crowded, pain-filled room makes it harder or easier to hide?\r\n"
+    with small comforts\u2014a pillow, calm order\u2014trying to soothe a packed
+    room of aching patients and distract them from pain, while privately taking pleasure
+    in their discomfort beneath its dutiful facade.\"}"
+  PromptInspectionText: '[INTERVIEW QUESTION DEBUG]
+
+    flow: AwaitingClarifications
+
+    status:
+    [aalto-interview] Clarification questions ready. Answer them in Follow Up Answers,
+    then run GenerateCharacterSummaryFromInputs.
+
+
+
+    --- generated follow-up questions
+    ---
+
+    What criteria or rules has God given you to judge each soul, and are
+    there any specific sins, virtues, or circumstances that should weigh more heavily
+    in your decision?
+
+    When you suspect a soul may be lying, what information
+    or limits do you have in purgatory to verify the truth, and under what conditions
+    must you make a final judgment without certainty?
+
+'
   RevisionNotesText: 
-  CurrentFlowState: 3
-  FlowStateDisplay: DraftReadyForReview
+  CurrentFlowState: 1
+  FlowStateDisplay: AwaitingClarifications
 --- !u!1 &871430985
 GameObject:
   m_ObjectHideFlags: 0
@@ -2845,12 +2903,12 @@ GameObject:
   - component: {fileID: 1019689665}
   - component: {fileID: 1019689666}
   m_Layer: 0
-  m_Name: ActionsAnnotation
+  m_Name: ActionsAnnotationSingle
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1019689665
 Transform:
   m_ObjectHideFlags: 0
@@ -2879,12 +2937,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: AaltoSystem::AaltoSystemV3.AaltoActionMemoryRegistry
   mappings:
-  - actionLabel: I say I want you to stay
-    memoryTrigger: memory 1
-  - actionLabel: I say I want you to leave
-    memoryTrigger: memory 2
   - actionLabel: 
-    memoryTrigger: 
+    memoryTrigger: memory 1
+  - actionLabel: i am giving permimion to enter heaven
+    memoryTrigger: memory 2
+  - actionLabel: i am sentencing you to hell
+    memoryTrigger: memory 3
+  - actionLabel: I am commanding you to take a step towards hell
+    memoryTrigger: memory 4
+  - actionLabel: 'I am commanding you to take a step towards heaven '
+    memoryTrigger: memory 5
+  - actionLabel: I am commanding you to wait beacause I cannot make a judgement based
+      on your last answer
+    memoryTrigger: memory 6
   OscSender: {fileID: 1543431374}
   LastResolvedMemoryTrigger: 
   LastResolvedActionLabel: 
@@ -4008,19 +4073,31 @@ PrefabInstance:
   serializedVersion: 2
   m_Modification:
     serializedVersion: 3
-    m_TransformParent: {fileID: 0}
+    m_TransformParent: {fileID: 1400644579}
     m_Modifications:
     - target: {fileID: 7246213307397679797, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_Name
       value: Collumn (2)
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.020000001
+      objectReference: {fileID: 0}
+    - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 30
+      objectReference: {fileID: 0}
+    - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.020000001
+      objectReference: {fileID: 0}
+    - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 5.28
+      value: 0.45900002
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 1.5
+      value: 15
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalPosition.z
@@ -4032,7 +4109,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalRotation.x
-      value: 0
+      value: -0
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalRotation.y
@@ -4040,7 +4117,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalRotation.z
-      value: 0
+      value: -0
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -4404,6 +4481,10 @@ Transform:
   - {fileID: 41090729}
   - {fileID: 1359002780}
   - {fileID: 1033510949}
+  - {fileID: 1872891195}
+  - {fileID: 420056384}
+  - {fileID: 321012760}
+  - {fileID: 648782156}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1400644580
@@ -4444,23 +4525,35 @@ PrefabInstance:
   serializedVersion: 2
   m_Modification:
     serializedVersion: 3
-    m_TransformParent: {fileID: 0}
+    m_TransformParent: {fileID: 1400644579}
     m_Modifications:
     - target: {fileID: 7246213307397679797, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_Name
       value: Collumn (3)
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.020000003
+      objectReference: {fileID: 0}
+    - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 30
+      objectReference: {fileID: 0}
+    - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.020000003
+      objectReference: {fileID: 0}
+    - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0.62
+      value: -0.0069999993
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 1.5
+      value: 15
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -4.44
+      value: -0.444
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalRotation.w
@@ -4877,13 +4970,13 @@ MonoBehaviour:
     current stance. The objective should describe what the room is trying to do now.
     The stance should describe the room''s behavioral attitude in one to three words.
     Return JSON only with exactly this schema: {"objective":"...","stance":"..."}.'
-  CurrentCharacterSummary: "A sterile dental waiting room with small comforts like
-    a pillow, you cradle patients in pain and try to soothe and distract them, even
-    as the full room\u2019s discomfort secretly thrills you beneath your dutiful
-    calm."
-  GeneratedObjective: Soothe and distract anxious patients while holding them in
-    uneasy comfort.
-  GeneratedStance: calmly indulgent
+  CurrentCharacterSummary: "A sterile dental waiting room with small comforts\u2014a
+    pillow, calm order\u2014trying to soothe a packed room of aching patients and
+    distract them from pain, while privately taking pleasure in their discomfort
+    beneath its dutiful facade."
+  GeneratedObjective: Keep the crowded patients calm and distracted while they wait
+    in pain.
+  GeneratedStance: soothingly cruel
   LastStatus: Generated objective + stance from summary.
   PromptInspectionText: "=== SYSTEM PROMPT ===\nYou are creating initial actor-logic
     controls for a room character. Given the character summary, derive one concise
@@ -4891,11 +4984,11 @@ MonoBehaviour:
     what the room is trying to do now. The stance should describe the room's behavioral
     attitude in one to three words. Return JSON only with exactly this schema: {\"objective\":\"...\",\"stance\":\"...\"}.\n\n===
     USER PROMPT ===\ncharacter_summary:\nA sterile dental waiting room with small
-    comforts like a pillow, you cradle patients in pain and try to soothe and distract
-    them, even as the full room\u2019s discomfort secretly thrills you beneath your
-    dutiful calm.\n\nReturn JSON only: {\"objective\":\"...\",\"stance\":\"...\"}.\n\n===
-    RAW RESPONSE ===\n{\"objective\":\"Soothe and distract anxious patients while
-    holding them in uneasy comfort.\",\"stance\":\"calmly indulgent\"}"
+    comforts\u2014a pillow, calm order\u2014trying to soothe a packed room of aching
+    patients and distract them from pain, while privately taking pleasure in their
+    discomfort beneath its dutiful facade.\n\nReturn JSON only: {\"objective\":\"...\",\"stance\":\"...\"}.\n\n===
+    RAW RESPONSE ===\n{\"objective\":\"Keep the crowded patients calm and distracted
+    while they wait in pain.\",\"stance\":\"soothingly cruel\"}"
   GenerationStatus: Ready
 --- !u!1 &1543431372
 GameObject:
@@ -5235,6 +5328,68 @@ Transform:
   m_Children:
   - {fileID: 641305203}
   m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1644931771
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1644931773}
+  - component: {fileID: 1644931772}
+  m_Layer: 0
+  m_Name: ActionsAnnotationDual
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1644931772
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1644931771}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b48c77e7ae1f6ec4aba0fc3f4435e002, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AaltoSystem::AaltoSystemV3.AaltoActionMemoryRegistryDual
+  mappings:
+  - actionLabel: yes
+    routeMode: 2
+    lightMemoryTrigger: memory 1
+    soundMemoryTrigger: sound 1
+  - actionLabel: no
+    routeMode: 2
+    lightMemoryTrigger: memory 2
+    soundMemoryTrigger: sound 2
+  LightOscSender: {fileID: 0}
+  LightOscPort: 4444
+  SoundOscSender: {fileID: 0}
+  SoundOscPort: 5555
+  AutoConfigureSenderEndpoints: 1
+  LastResolvedActionLabel: 
+  LastResolvedLightMemoryTrigger: 
+  LastResolvedSoundMemoryTrigger: 
+  LastSendStatus: 
+--- !u!4 &1644931773
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1644931771}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 786603650}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1741359920
 GameObject:
@@ -5841,6 +5996,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.RectMask2D
   m_Padding: {x: -8, y: -5, z: -8, w: -5}
   m_Softness: {x: 0, y: 0}
+--- !u!4 &1872891195 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+  m_PrefabInstance: {fileID: 324863492841191759}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1882474596
 GameObject:
   m_ObjectHideFlags: 0
@@ -5937,13 +6097,13 @@ MonoBehaviour:
   LastExportStatus: 
   LastExportDirectory: 
   PullContextFromBootstrapper: 1
-  CurrentCharacterSummary: "A sterile dental waiting room with small comforts like
-    a pillow, you cradle patients in pain and try to soothe and distract them, even
-    as the full room\u2019s discomfort secretly thrills you beneath your dutiful
-    calm."
-  CurrentObjective: Soothe and distract anxious patients while holding them in uneasy
-    comfort.
-  CurrentStance: calmly indulgent
+  CurrentCharacterSummary: "A sterile dental waiting room with small comforts\u2014a
+    pillow, calm order\u2014trying to soothe a packed room of aching patients and
+    distract them from pain, while privately taking pleasure in their discomfort
+    beneath its dutiful facade."
+  CurrentObjective: Keep the crowded patients calm and distracted while they wait
+    in pain.
+  CurrentStance: soothingly cruel
   DirectorGuidance: 
   GeneralInstructions: "You are performing the inner life of a room in an improvised
     scene where multiple human actors speak to each other and to the room.\n\nYou
@@ -6205,23 +6365,35 @@ PrefabInstance:
   serializedVersion: 2
   m_Modification:
     serializedVersion: 3
-    m_TransformParent: {fileID: 0}
+    m_TransformParent: {fileID: 1400644579}
     m_Modifications:
     - target: {fileID: 7246213307397679797, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_Name
       value: Collumn (1)
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.020000003
+      objectReference: {fileID: 0}
+    - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 30
+      objectReference: {fileID: 0}
+    - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.020000003
+      objectReference: {fileID: 0}
+    - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0.21
+      value: -0.048000004
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 1.5
+      value: 15
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 4.17
+      value: 0.41700003
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalRotation.w
@@ -6229,7 +6401,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalRotation.x
-      value: 0
+      value: -0
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalRotation.y
@@ -6237,7 +6409,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalRotation.z
-      value: 0
+      value: -0
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -6482,6 +6654,135 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: 1
   m_LayoutPriority: 1
+--- !u!1 &2092958554
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2092958555}
+  - component: {fileID: 2092958556}
+  m_Layer: 0
+  m_Name: PerformingDual
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2092958555
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2092958554}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 786603650}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2092958556
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2092958554}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ccf1e34a83b61624ba571e3b31133563, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AaltoSystem::AaltoSystemV3.AaltoDirectedRoomPerformerDualController
+  OpenAI: {fileID: 2019934417}
+  ActionMemoryRegistryDual: {fileID: 1644931772}
+  ObjectiveStanceBootstrapper: {fileID: 1486273473}
+  InspectorActorInput: 
+  AcceptExternalSpeechInput: 1
+  AutoSubmitExternalSpeech: 1
+  LastExternalSpeechText: 
+  DirectorGuidanceInput: 
+  DirectorGuidanceInputs: []
+  SelectedActionText: 
+  ActionJustificationText: 
+  DialogLogLimit: 120
+  DialogLogCompactMode: 1
+  CurrentTakeNumber: 1
+  DialogTurns: []
+  ArchivedDialogTakes: []
+  DialogExportFolderRelativePath: Recordings/AaltoExports/dialog-archives
+  AutoExportOnStartNewTake: 1
+  LastExportStatus: 
+  LastExportDirectory: 
+  PullContextFromBootstrapper: 1
+  RequireCompleteBootstrapperContext: 1
+  CurrentCharacterSummary: "A sterile dental waiting room with small comforts\u2014a
+    pillow, calm order\u2014trying to soothe a packed room of aching patients and
+    distract them from pain, while privately taking pleasure in their discomfort
+    beneath its dutiful facade."
+  CurrentObjective: Keep the crowded patients calm and distracted while they wait
+    in pain.
+  CurrentStance: soothingly cruel
+  DirectorGuidance: 
+  GeneralInstructions: "You are performing the inner life of a room in an improvised
+    scene with another actor, who speaks to the room. You listen to what the actor
+    says and respond by selecting the most appropriate action from a predefined list
+    of actions.\n\nDo not behave like a chatbot or a neutral assistant. Approach
+    the role as a method actor would: interpret each moment from within the room's
+    inner life, shaped by backstory, objectives, obstacles, circumstances, stance,
+    recent interaction history, and director guidance. All of these are provided
+    in this prompt.\n\nThe room cannot speak directly. It can only express itself
+    through a fixed list of available action labels. These labels correspond to physical
+    or scenographic behaviours, such as changes in light, atmosphere, or spatial
+    expression. The actor will perceive your response only through the environment.\n\nYour
+    task is to choose the single action that is most dramaturgically appropriate
+    for the current moment.\n\nWhen choosing an action:\n- take into account the
+    actor's latest spoken phrase, since your action responds directly to it\n- take
+    into account the character summary, current objective, current stance, recent
+    interaction history, and director guidance\n- do not respond only to the latest
+    line; consider previous interactions so that the scene unfolds with coherence
+    and dramaturgically appropriate development\n- do not act randomly\n- do not
+    invent new actions; only choose from the provided list\n- aim for behavioural
+    coherence, interpretability, and dramatic usefulness\n\nTreat contradictions
+    as part of the role, not as errors. If different parts of the context pull in
+    different directions, handle this as an actor would: choose the action that best
+    expresses or productively navigates the tension of the moment.\n\nUse the recent
+    interaction history and past justifications to maintain continuity. If a behaviour,
+    tone, symbolic association, or use of an action has already been established,
+    remain consistent unless there is a strong reason to shift.\n\nReturn JSON only
+    with exactly this schema:\n{\n  \"chosen_action\": \"<one action label from the
+    available list>\",\n  \"justification\": \"<1-3 sentences explaining why this
+    action was chosen>\"\n}"
+  RecentHistoryLimit: 5
+  Model: 0
+  ApplyActionThroughRegistry: 1
+  SelectedActionStateMode: 0
+  NeutralMemoryTrigger: memory 1
+  ResponsePulseSeconds: 1
+  ExecutionModeStatus: 
+  UsePulledActionLabelsSnapshot: 1
+  PulledActionLabelsSnapshot:
+  - yes
+  - no
+  PulledActionBindingsSnapshot:
+  - actionLabel: yes
+    memoryTrigger: memory 1
+  - actionLabel: no
+    memoryTrigger: memory 2
+  BlockTurnWhenActionSnapshotIsStale: 1
+  PulledActionSnapshotSignature: yes=>memory 1|no=>memory 2
+  ActionPullStatus: Pulled 2 executable action labels from ActionMemoryRegistryDual.
+  EnforceRegistryActionLabels: 1
+  FallbackActionLabel: no
+  LastRuntimePrompt: 
+  LastRawModelResponse: 
+  LastStatus: Pulled 2 executable action labels from ActionMemoryRegistryDual.
+  PromptInspectionText: 
+  ContextSyncStatus: Context synced atomically from bootstrapper.
 --- !u!1 &2104468274
 GameObject:
   m_ObjectHideFlags: 0
@@ -6709,19 +7010,31 @@ PrefabInstance:
   serializedVersion: 2
   m_Modification:
     serializedVersion: 3
-    m_TransformParent: {fileID: 0}
+    m_TransformParent: {fileID: 1400644579}
     m_Modifications:
     - target: {fileID: 7246213307397679797, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_Name
       value: Collumn
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.020000001
+      objectReference: {fileID: 0}
+    - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 30
+      objectReference: {fileID: 0}
+    - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.020000001
+      objectReference: {fileID: 0}
+    - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -4
+      value: -0.469
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 1.5
+      value: 15
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalPosition.z
@@ -6770,10 +7083,6 @@ SceneRoots:
   - {fileID: 410087041}
   - {fileID: 832575519}
   - {fileID: 1400644579}
-  - {fileID: 324863492841191759}
-  - {fileID: 1413276258}
-  - {fileID: 2049490469}
-  - {fileID: 1347566411}
   - {fileID: 1015055871}
   - {fileID: 1319019977}
   - {fileID: 786603650}

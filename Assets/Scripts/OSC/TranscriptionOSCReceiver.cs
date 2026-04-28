@@ -16,6 +16,7 @@ public sealed class OscSpeechReceiver : MonoBehaviour
     [Header("Wiring")]
     public BlueprintChatController Chat;
     public AaltoDirectedRoomPerformerController DirectedPerformer;
+    public AaltoDirectedRoomPerformerDualController DirectedPerformerDual;
 
     [Header("OSC (via OSC.cs)")]
     [Tooltip("Reference to the OSC MonoBehaviour that owns the UDP receiver thread.")]
@@ -71,6 +72,7 @@ public sealed class OscSpeechReceiver : MonoBehaviour
 
                 var sentToChat = false;
                 var sentToPerformer = false;
+                var sentToDualPerformer = false;
 
                 if (Chat != null)
                 {
@@ -84,7 +86,13 @@ public sealed class OscSpeechReceiver : MonoBehaviour
                     sentToPerformer = true;
                 }
 
-                if (!sentToChat && !sentToPerformer)
+                if (DirectedPerformerDual != null)
+                {
+                    DirectedPerformerDual.ReceiveExternalSpeech(t);
+                    sentToDualPerformer = true;
+                }
+
+                if (!sentToChat && !sentToPerformer && !sentToDualPerformer)
                 {
                     Debug.LogWarning($"[{nameof(OscSpeechReceiver)}] No target assigned, dropped transcript: \"{t}\"");
                     EmitReceiverEvent(
@@ -102,7 +110,8 @@ public sealed class OscSpeechReceiver : MonoBehaviour
                         "\"text\":\"" + AaltoLaunchSessionLogger.EscapeJson(t ?? string.Empty) + "\"," +
                         "\"channel\":" + (item != null ? item.channel : 0) + "," +
                         "\"sent_to_chat\":" + (sentToChat ? "true" : "false") + "," +
-                        "\"sent_to_performer\":" + (sentToPerformer ? "true" : "false") + "}");
+                        "\"sent_to_performer\":" + (sentToPerformer ? "true" : "false") + "," +
+                        "\"sent_to_dual_performer\":" + (sentToDualPerformer ? "true" : "false") + "}");
                 }
             }
         }
@@ -115,6 +124,13 @@ public sealed class OscSpeechReceiver : MonoBehaviour
             DirectedPerformer = FindObjectOfType<AaltoDirectedRoomPerformerController>();
             if (DirectedPerformer != null)
                 Debug.Log($"[{nameof(OscSpeechReceiver)}] Auto-linked DirectedPerformer: {DirectedPerformer.name}");
+        }
+
+        if (DirectedPerformerDual == null)
+        {
+            DirectedPerformerDual = FindObjectOfType<AaltoDirectedRoomPerformerDualController>();
+            if (DirectedPerformerDual != null)
+                Debug.Log($"[{nameof(OscSpeechReceiver)}] Auto-linked DirectedPerformerDual: {DirectedPerformerDual.name}");
         }
 
         if (Chat == null)

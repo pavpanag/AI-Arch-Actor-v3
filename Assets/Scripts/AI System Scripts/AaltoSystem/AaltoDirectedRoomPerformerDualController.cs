@@ -9,22 +9,11 @@ using UnityEngine;
 namespace AaltoSystemV3
 {
     /// <summary>
-    /// A standalone room-performance controller that uses a fixed dramaturgical instruction set
-    /// plus runtime context (summary/objective/stance/history/director guidance/actions)
-    /// to select exactly one action label from the action registry.
+    /// A standalone room-performance controller that mirrors the original single performer flow
+    /// while sourcing actions and dispatch from the dual light/sound action registry.
     /// </summary>
-    public sealed class AaltoDirectedRoomPerformerController : MonoBehaviour
+    public sealed class AaltoDirectedRoomPerformerDualController : MonoBehaviour
     {
-        public enum ActionRegistrySourceMode
-        {
-            [InspectorName("Auto (Prefer Dual)")]
-            AutoPreferDual = 0,
-            [InspectorName("Legacy Registry Only")]
-            LegacyOnly = 1,
-            [InspectorName("Dual Registry Only")]
-            DualOnly = 2
-        }
-
         public enum ActionStateMode
         {
             [InspectorName("Hold Response State")]
@@ -50,8 +39,6 @@ namespace AaltoSystemV3
         [Header("Scene Refs")]
         [InspectorName("OpenAI Client (Agent Produced)")]
         public OpenAIClient OpenAI;
-        [InspectorName("Action Memory Registry (Agent Produced)")]
-        public AaltoActionMemoryRegistry ActionMemoryRegistry;
         [InspectorName("Action Memory Registry Dual (Agent Produced)")]
         public AaltoActionMemoryRegistryDual ActionMemoryRegistryDual;
         [InspectorName("Objective/Stance Bootstrapper (Primary Source)")]
@@ -174,17 +161,14 @@ namespace AaltoSystemV3
         public OpenAIModelPreset Model = OpenAIModelPreset.Gpt4oMini;
 
         [Header("Execution")]
-        [Tooltip("Choose which action registry this performer should draw from and dispatch through.")]
-        public ActionRegistrySourceMode ActionRegistrySource = ActionRegistrySourceMode.AutoPreferDual;
-
-        [Tooltip("If true, selected action is sent via its resolved memory trigger through ActionMemoryRegistry.")]
+        [Tooltip("If true, selected action is dispatched through ActionMemoryRegistryDual.")]
         public bool ApplyActionThroughRegistry = true;
 
         [Tooltip("Choose whether the selected response remains active, or briefly pulses then returns to a neutral memory trigger.")]
         [InspectorName("Action State Mode")]
         public ActionStateMode SelectedActionStateMode = ActionStateMode.HoldResponseState;
 
-        [Tooltip("Neutral memory trigger used when mode is Pulse Then Return To Neutral (example: 'memory 1').")]
+        [Tooltip("Neutral light memory trigger used when mode is Pulse Then Return To Neutral (example: 'memory 1').")]
         [InspectorName("Neutral Memory Trigger")]
         public string NeutralMemoryTrigger = "memory 1";
 
@@ -359,7 +343,7 @@ namespace AaltoSystemV3
             }
 
             LastExternalSpeechText = transcript;
-            Debug.Log("[AaltoDirectedRoomPerformer] Received external speech: " + transcript);
+            Debug.Log("[AaltoDirectedRoomPerformerDual] Received external speech: " + transcript);
             var turnIndex = ReserveTurnIndex();
             var turnId = BuildTurnId(turnIndex);
             var inputReceivedUtc = DateTime.UtcNow;
@@ -529,7 +513,7 @@ namespace AaltoSystemV3
                     var response = await OpenAI.ChatCompletionsJsonAsync(
                         messages,
                         model: SelectedModelId,
-                        contextTag: "Aalto:DirectedRoomPerformer");
+                        contextTag: "Aalto:DirectedRoomPerformerDual");
 
                     if (IsTurnStale(takeEpochAtSubmit))
                     {
@@ -757,7 +741,7 @@ namespace AaltoSystemV3
             return !RequireCompleteBootstrapperContext;
         }
 
-        [ContextMenu("Directed Performer/Pull Context From Bootstrapper Now")]
+        [ContextMenu("Directed Performer Dual/Pull Context From Bootstrapper Now")]
         public void PullContextFromBootstrapperNow()
         {
             var beforeSummary = CurrentCharacterSummary;
@@ -794,10 +778,10 @@ namespace AaltoSystemV3
                 : "Context pull completed; values were already current.");
         }
 
-        [ContextMenu("Directed Performer/Pull Action Labels From Registry Now")]
+        [ContextMenu("Directed Performer Dual/Pull Action Labels From Registry Now")]
         public void PullActionsFromRegistryNow()
         {
-            var pulledBindings = BuildExecutableActionBindingsFromRegistry();
+            var pulledBindings = BuildExecutableActionBindingsFromDualRegistry();
             PulledActionBindingsSnapshot = CloneActionBindings(pulledBindings);
             PulledActionLabelsSnapshot = BuildActionLabelListFromBindings(PulledActionBindingsSnapshot);
             PulledActionSnapshotSignature = BuildActionBindingSignature(PulledActionBindingsSnapshot);
@@ -809,16 +793,16 @@ namespace AaltoSystemV3
 
             if (PulledActionLabelsSnapshot.Count == 0)
             {
-                ActionPullStatus = "No executable action labels found in configured action registry.";
+                ActionPullStatus = "No executable action labels found in ActionMemoryRegistryDual.";
                 SetStatus(ActionPullStatus);
                 return;
             }
 
-            ActionPullStatus = $"Pulled {PulledActionLabelsSnapshot.Count} executable action labels from registry.";
+            ActionPullStatus = $"Pulled {PulledActionLabelsSnapshot.Count} executable action labels from ActionMemoryRegistryDual.";
             SetStatus(ActionPullStatus);
         }
 
-        [ContextMenu("Directed Performer/Submit Inspector Input")]
+        [ContextMenu("Directed Performer Dual/Submit Inspector Input")]
         public void SubmitInspectorInputContextMenu()
         {
             SubmitTurnFromInspectorInput();
@@ -842,7 +826,7 @@ namespace AaltoSystemV3
                     return false;
                 }
 
-                if (BlockTurnWhenActionSnapshotIsStale && (IsDualRegistryActive() || IsLegacyRegistryActive()))
+                if (BlockTurnWhenActionSnapshotIsStale && IsDualRegistryActive())
                 {
                     var liveSignature = BuildLiveActionBindingSignature();
                     var pulledSignature = BuildActionBindingSignature(bindings);
@@ -861,39 +845,14 @@ namespace AaltoSystemV3
             }
 
             source = "live_registry";
-            bindings = BuildExecutableActionBindingsFromRegistry();
+            bindings = BuildExecutableActionBindingsFromDualRegistry();
             if (bindings.Count == 0)
             {
-                error = "No executable action labels configured in the selected action registry source.";
+                error = "No executable action labels configured in ActionMemoryRegistryDual.";
                 return false;
             }
 
             return true;
-        }
-
-        private List<AaltoActionMemoryPair> BuildExecutableActionBindingsFromRegistry()
-        {
-            if (ActionRegistrySource == ActionRegistrySourceMode.DualOnly)
-            {
-                return BuildExecutableActionBindingsFromDualRegistry();
-            }
-
-            if (ActionRegistrySource == ActionRegistrySourceMode.LegacyOnly)
-            {
-                if (!IsLegacyRegistryActive())
-                    return new List<AaltoActionMemoryPair>();
-
-                return ActionMemoryRegistry.BuildExecutableMappingSnapshot();
-            }
-
-            var dualBindings = BuildExecutableActionBindingsFromDualRegistry();
-            if (dualBindings.Count > 0)
-                return dualBindings;
-
-            if (!IsLegacyRegistryActive())
-                return new List<AaltoActionMemoryPair>();
-
-            return ActionMemoryRegistry.BuildExecutableMappingSnapshot();
         }
 
         private List<AaltoActionMemoryPair> BuildExecutableActionBindingsFromDualRegistry()
@@ -926,45 +885,16 @@ namespace AaltoSystemV3
 
         private string BuildLiveActionBindingSignature()
         {
-            if (ActionRegistrySource == ActionRegistrySourceMode.DualOnly)
-                return IsDualRegistryActive() ? ActionMemoryRegistryDual.BuildExecutableMappingSignature() : string.Empty;
+            if (!IsDualRegistryActive())
+                return string.Empty;
 
-            if (ActionRegistrySource == ActionRegistrySourceMode.LegacyOnly)
-                return IsLegacyRegistryActive() ? ActionMemoryRegistry.BuildExecutableMappingSignature() : string.Empty;
-
-            if (IsDualRegistryActive())
-            {
-                var dualSignature = ActionMemoryRegistryDual.BuildExecutableMappingSignature();
-                if (!string.IsNullOrWhiteSpace(dualSignature))
-                    return dualSignature;
-            }
-
-            if (IsLegacyRegistryActive())
-                return ActionMemoryRegistry.BuildExecutableMappingSignature();
-
-            return string.Empty;
+            // Keep signature format aligned with pulled snapshots to avoid false stale warnings.
+            return BuildActionBindingSignature(BuildExecutableActionBindingsFromDualRegistry());
         }
 
         private bool IsDualRegistryActive()
         {
-            if (ActionRegistrySource == ActionRegistrySourceMode.DualOnly)
-                return ActionMemoryRegistryDual != null;
-
-            if (ActionRegistrySource == ActionRegistrySourceMode.LegacyOnly)
-                return false;
-
             return ActionMemoryRegistryDual != null;
-        }
-
-        private bool IsLegacyRegistryActive()
-        {
-            if (ActionRegistrySource == ActionRegistrySourceMode.LegacyOnly)
-                return ActionMemoryRegistry != null;
-
-            if (ActionRegistrySource == ActionRegistrySourceMode.DualOnly)
-                return false;
-
-            return ActionMemoryRegistry != null;
         }
 
         private static string ResolvePrimaryTriggerFromDualRoute(AaltoActionMemoryRoute route)
@@ -1064,7 +994,7 @@ namespace AaltoSystemV3
             if (PulledActionLabelsSnapshot == null || PulledActionLabelsSnapshot.Count == 0)
                 return;
 
-            var liveBindings = BuildExecutableActionBindingsFromRegistry();
+            var liveBindings = BuildExecutableActionBindingsFromDualRegistry();
             if (liveBindings.Count == 0)
                 return;
 
@@ -1098,7 +1028,7 @@ namespace AaltoSystemV3
 
         private string BuildActionMemoryPairsSnapshot(List<AaltoActionMemoryPair> bindings = null)
         {
-            var effective = bindings != null ? CloneActionBindings(bindings) : BuildExecutableActionBindingsFromRegistry();
+            var effective = bindings != null ? CloneActionBindings(bindings) : BuildExecutableActionBindingsFromDualRegistry();
             if (effective.Count == 0)
                 return string.Empty;
 
@@ -1151,7 +1081,7 @@ namespace AaltoSystemV3
                 mode = SelectedActionStateMode.ToString()
             };
 
-            if (!ApplyActionThroughRegistry || (!IsLegacyRegistryActive() && !IsDualRegistryActive()) || string.IsNullOrWhiteSpace(selectedAction))
+            if (!ApplyActionThroughRegistry || !IsDualRegistryActive() || string.IsNullOrWhiteSpace(selectedAction))
             {
                 EmitPerformerEvent("performer.action_dispatch",
                     "{\"turn_id\":\"" + AaltoLaunchSessionLogger.EscapeJson(turnId) + "\"," +
@@ -1165,174 +1095,40 @@ namespace AaltoSystemV3
                 return timeline;
             }
 
-            if (IsDualRegistryActive())
-            {
-                var allowLegacyFallback = ActionRegistrySource == ActionRegistrySourceMode.AutoPreferDual && IsLegacyRegistryActive();
-                if (!ActionMemoryRegistryDual.TryResolveActionMemory(selectedAction, out var route))
-                {
-                    if (allowLegacyFallback)
-                    {
-                        EmitPerformerEvent("performer.action_dispatch_dual_fallback",
-                            "{\"turn_id\":\"" + AaltoLaunchSessionLogger.EscapeJson(turnId) + "\"," +
-                            "\"turn_index\":" + turnIndex + "," +
-                            "\"take_number\":" + Mathf.Max(1, CurrentTakeNumber) + "," +
-                            "\"chosen_action\":\"" + AaltoLaunchSessionLogger.EscapeJson(selectedAction) + "\"," +
-                            "\"reason\":\"dual_mapping_missing\"}");
-                    }
-                    else
-                    {
-                    timeline.registrySend = "failed";
-                    timeline.registryError = "Selected action has no dual route mapping.";
-                    timeline.actionDispatchCompletedUtc = DateTime.UtcNow.ToString("o");
-                    ExecutionModeStatus = "Dispatch failed. Selected action has no dual route mapping.";
-                    SetStatus("Action resolved but had no dual route mapping: " + selectedAction);
-                    return timeline;
-                    }
-                }
-                else
-                {
-                    var sendLight = route.routeMode == AaltoActionMemoryRouteMode.LightOnly || route.routeMode == AaltoActionMemoryRouteMode.Both;
-                    var sendSound = route.routeMode == AaltoActionMemoryRouteMode.SoundOnly || route.routeMode == AaltoActionMemoryRouteMode.Both;
-                    var lightTrigger = (route.lightMemoryTrigger ?? string.Empty).Trim();
-                    var soundTrigger = (route.soundMemoryTrigger ?? string.Empty).Trim();
-                    timeline.resolvedMemoryTrigger = !string.IsNullOrWhiteSpace(selectedMemoryTrigger)
-                        ? selectedMemoryTrigger
-                        : ResolvePrimaryTriggerFromDualRoute(route);
-
-                    if (!ActionMemoryRegistryDual.TrySendForActionLabel(selectedAction, sendLight, sendSound, out var dualSendError))
-                    {
-                        timeline.registrySend = "failed";
-                        timeline.registryError = string.IsNullOrWhiteSpace(dualSendError) ? (ActionMemoryRegistryDual.LastSendStatus ?? string.Empty) : dualSendError;
-                        timeline.actionDispatchCompletedUtc = DateTime.UtcNow.ToString("o");
-                        EmitPerformerEvent("performer.action_dispatch",
-                            "{\"turn_id\":\"" + AaltoLaunchSessionLogger.EscapeJson(turnId) + "\"," +
-                            "\"turn_index\":" + turnIndex + "," +
-                            "\"take_number\":" + Mathf.Max(1, CurrentTakeNumber) + "," +
-                            "\"chosen_action\":\"" + AaltoLaunchSessionLogger.EscapeJson(selectedAction) + "\"," +
-                            "\"route_mode\":\"" + AaltoLaunchSessionLogger.EscapeJson(route.routeMode.ToString()) + "\"," +
-                            "\"light_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(lightTrigger) + "\"," +
-                            "\"sound_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(soundTrigger) + "\"," +
-                            "\"registry_send\":\"failed\",\"error\":\"" + AaltoLaunchSessionLogger.EscapeJson(timeline.registryError) + "\"}");
-                        ExecutionModeStatus = "Dispatch failed. Response state was not applied.";
-                        SetStatus("Action resolved but dual registry send failed: " + timeline.registryError);
-                        return timeline;
-                    }
-
-                    timeline.registrySend = "ok";
-                    timeline.actionDispatchCompletedUtc = DateTime.UtcNow.ToString("o");
-                    EmitPerformerEvent("performer.action_dispatch",
-                        "{\"turn_id\":\"" + AaltoLaunchSessionLogger.EscapeJson(turnId) + "\"," +
-                        "\"turn_index\":" + turnIndex + "," +
-                        "\"take_number\":" + Mathf.Max(1, CurrentTakeNumber) + "," +
-                        "\"chosen_action\":\"" + AaltoLaunchSessionLogger.EscapeJson(selectedAction) + "\"," +
-                        "\"route_mode\":\"" + AaltoLaunchSessionLogger.EscapeJson(route.routeMode.ToString()) + "\"," +
-                        "\"light_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(lightTrigger) + "\"," +
-                        "\"sound_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(soundTrigger) + "\"," +
-                        "\"registry_send\":\"ok\",\"mode\":\"" + AaltoLaunchSessionLogger.EscapeJson(SelectedActionStateMode.ToString()) + "\"}");
-
-                    if (SelectedActionStateMode == ActionStateMode.HoldResponseState)
-                    {
-                        CancelPendingNeutralReturn();
-                        ExecutionModeStatus = "Hold mode active. Response state remains until another action is applied.";
-                        SetStatus("Action applied: " + selectedAction);
-                        return timeline;
-                    }
-
-                    var dualNeutralTrigger = (NeutralMemoryTrigger ?? string.Empty).Trim();
-                    if (string.IsNullOrWhiteSpace(dualNeutralTrigger))
-                    {
-                        ExecutionModeStatus = "Pulse mode active, but neutral memory trigger is empty.";
-                        SetStatus("Action applied, but neutral return is not configured.");
-                        timeline.neutralReturnSend = "not_configured";
-                        return timeline;
-                    }
-
-                    CancelPendingNeutralReturn();
-                    _neutralReturnCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
-                    var dualReturnToken = _neutralReturnCts.Token;
-
-                    var dualPulseSeconds = Mathf.Max(0.1f, ResponsePulseSeconds);
-                    ExecutionModeStatus =
-                        "Pulse mode active. Applied '" + selectedAction + "' then returning to neutral trigger '" + dualNeutralTrigger +
-                        "' after " + dualPulseSeconds.ToString("0.00") + "s.";
-                    SetStatus("Action pulsed: " + selectedAction + " (returning to neutral soon)");
-
-                    try
-                    {
-                        await Task.Delay(TimeSpan.FromSeconds(dualPulseSeconds), dualReturnToken);
-                    }
-                    catch (TaskCanceledException)
-                    {
-                        timeline.neutralReturnSend = "cancelled";
-                        return timeline;
-                    }
-
-                    if (_cts == null || _cts.IsCancellationRequested || dualReturnToken.IsCancellationRequested || IsTurnStale(takeEpochAtSubmit))
-                    {
-                        timeline.neutralReturnSend = "cancelled";
-                        return timeline;
-                    }
-
-                    timeline.neutralReturnTrigger = dualNeutralTrigger;
-                    if (ActionMemoryRegistryDual.TrySendLightMemoryTrigger(dualNeutralTrigger, out var dualNeutralError))
-                    {
-                        timeline.neutralReturnSend = "ok";
-                        EmitPerformerEvent("performer.neutral_return",
-                            "{\"turn_id\":\"" + AaltoLaunchSessionLogger.EscapeJson(turnId) + "\"," +
-                            "\"turn_index\":" + turnIndex + "," +
-                            "\"take_number\":" + Mathf.Max(1, CurrentTakeNumber) + "," +
-                            "\"neutral_memory_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(dualNeutralTrigger) + "\",\"send\":\"ok\"}");
-                        ExecutionModeStatus = "Pulse mode completed. Returned to neutral trigger '" + dualNeutralTrigger + "'.";
-                        SetStatus("Returned to neutral: " + dualNeutralTrigger);
-                    }
-                    else
-                    {
-                        timeline.neutralReturnSend = "failed";
-                        timeline.neutralReturnError = dualNeutralError ?? string.Empty;
-                        EmitPerformerEvent("performer.neutral_return",
-                            "{\"turn_id\":\"" + AaltoLaunchSessionLogger.EscapeJson(turnId) + "\"," +
-                            "\"turn_index\":" + turnIndex + "," +
-                            "\"take_number\":" + Mathf.Max(1, CurrentTakeNumber) + "," +
-                            "\"neutral_memory_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(dualNeutralTrigger) + "\",\"send\":\"failed\",\"error\":\"" + AaltoLaunchSessionLogger.EscapeJson(dualNeutralError ?? string.Empty) + "\"}");
-                        ExecutionModeStatus = "Pulse mode failed to return to neutral. " + dualNeutralError;
-                        SetStatus("Action applied but neutral return failed: " + dualNeutralError);
-                    }
-
-                    return timeline;
-                }
-            }
-
-            if (string.IsNullOrWhiteSpace(selectedMemoryTrigger))
+            if (!ActionMemoryRegistryDual.TryResolveActionMemory(selectedAction, out var route))
             {
                 timeline.registrySend = "failed";
-                timeline.registryError = "Selected action has no resolved memory trigger.";
+                timeline.registryError = "Selected action has no dual route mapping.";
                 timeline.actionDispatchCompletedUtc = DateTime.UtcNow.ToString("o");
-                EmitPerformerEvent("performer.action_dispatch",
-                    "{\"turn_id\":\"" + AaltoLaunchSessionLogger.EscapeJson(turnId) + "\"," +
-                    "\"turn_index\":" + turnIndex + "," +
-                    "\"take_number\":" + Mathf.Max(1, CurrentTakeNumber) + "," +
-                    "\"chosen_action\":\"" + AaltoLaunchSessionLogger.EscapeJson(selectedAction) + "\"," +
-                    "\"registry_send\":\"failed\",\"error\":\"selected_action_has_no_memory_trigger\"}");
-                ExecutionModeStatus = "Dispatch failed. Selected action had no resolved memory trigger.";
-                SetStatus("Action resolved but had no executable mapping: " + selectedAction);
+                ExecutionModeStatus = "Dispatch failed. Selected action has no dual route mapping.";
+                SetStatus("Action resolved but had no dual route mapping: " + selectedAction);
                 return timeline;
             }
 
-            timeline.resolvedMemoryTrigger = selectedMemoryTrigger;
-            if (!ActionMemoryRegistry.TrySendMemoryTrigger(selectedMemoryTrigger, out var sendError))
+            var sendLight = route.routeMode == AaltoActionMemoryRouteMode.LightOnly || route.routeMode == AaltoActionMemoryRouteMode.Both;
+            var sendSound = route.routeMode == AaltoActionMemoryRouteMode.SoundOnly || route.routeMode == AaltoActionMemoryRouteMode.Both;
+            var lightTrigger = (route.lightMemoryTrigger ?? string.Empty).Trim();
+            var soundTrigger = (route.soundMemoryTrigger ?? string.Empty).Trim();
+            timeline.resolvedMemoryTrigger = !string.IsNullOrWhiteSpace(selectedMemoryTrigger)
+                ? selectedMemoryTrigger
+                : ResolvePrimaryTriggerFromDualRoute(route);
+
+            if (!ActionMemoryRegistryDual.TrySendForActionLabel(selectedAction, sendLight, sendSound, out var dualSendError))
             {
                 timeline.registrySend = "failed";
-                timeline.registryError = sendError ?? string.Empty;
+                timeline.registryError = string.IsNullOrWhiteSpace(dualSendError) ? (ActionMemoryRegistryDual.LastSendStatus ?? string.Empty) : dualSendError;
                 timeline.actionDispatchCompletedUtc = DateTime.UtcNow.ToString("o");
                 EmitPerformerEvent("performer.action_dispatch",
                     "{\"turn_id\":\"" + AaltoLaunchSessionLogger.EscapeJson(turnId) + "\"," +
                     "\"turn_index\":" + turnIndex + "," +
                     "\"take_number\":" + Mathf.Max(1, CurrentTakeNumber) + "," +
                     "\"chosen_action\":\"" + AaltoLaunchSessionLogger.EscapeJson(selectedAction) + "\"," +
-                    "\"resolved_memory_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(selectedMemoryTrigger) + "\"," +
-                    "\"registry_send\":\"failed\",\"error\":\"" + AaltoLaunchSessionLogger.EscapeJson(sendError ?? string.Empty) + "\"}");
+                    "\"route_mode\":\"" + AaltoLaunchSessionLogger.EscapeJson(route.routeMode.ToString()) + "\"," +
+                    "\"light_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(lightTrigger) + "\"," +
+                    "\"sound_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(soundTrigger) + "\"," +
+                    "\"registry_send\":\"failed\",\"error\":\"" + AaltoLaunchSessionLogger.EscapeJson(timeline.registryError) + "\"}");
                 ExecutionModeStatus = "Dispatch failed. Response state was not applied.";
-                SetStatus("Action resolved but registry send failed: " + sendError);
+                SetStatus("Action resolved but dual registry send failed: " + timeline.registryError);
                 return timeline;
             }
 
@@ -1343,7 +1139,9 @@ namespace AaltoSystemV3
                 "\"turn_index\":" + turnIndex + "," +
                 "\"take_number\":" + Mathf.Max(1, CurrentTakeNumber) + "," +
                 "\"chosen_action\":\"" + AaltoLaunchSessionLogger.EscapeJson(selectedAction) + "\"," +
-                "\"resolved_memory_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(selectedMemoryTrigger) + "\"," +
+                "\"route_mode\":\"" + AaltoLaunchSessionLogger.EscapeJson(route.routeMode.ToString()) + "\"," +
+                "\"light_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(lightTrigger) + "\"," +
+                "\"sound_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(soundTrigger) + "\"," +
                 "\"registry_send\":\"ok\",\"mode\":\"" + AaltoLaunchSessionLogger.EscapeJson(SelectedActionStateMode.ToString()) + "\"}");
 
             if (SelectedActionStateMode == ActionStateMode.HoldResponseState)
@@ -1354,8 +1152,8 @@ namespace AaltoSystemV3
                 return timeline;
             }
 
-            var neutralTrigger = (NeutralMemoryTrigger ?? string.Empty).Trim();
-            if (string.IsNullOrWhiteSpace(neutralTrigger))
+            var dualNeutralTrigger = (NeutralMemoryTrigger ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(dualNeutralTrigger))
             {
                 ExecutionModeStatus = "Pulse mode active, but neutral memory trigger is empty.";
                 SetStatus("Action applied, but neutral return is not configured.");
@@ -1365,17 +1163,17 @@ namespace AaltoSystemV3
 
             CancelPendingNeutralReturn();
             _neutralReturnCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
-            var returnToken = _neutralReturnCts.Token;
+            var dualReturnToken = _neutralReturnCts.Token;
 
-            var pulseSeconds = Mathf.Max(0.1f, ResponsePulseSeconds);
+            var dualPulseSeconds = Mathf.Max(0.1f, ResponsePulseSeconds);
             ExecutionModeStatus =
-                "Pulse mode active. Applied '" + selectedAction + "' then returning to neutral trigger '" + neutralTrigger +
-                "' after " + pulseSeconds.ToString("0.00") + "s.";
+                "Pulse mode active. Applied '" + selectedAction + "' then returning to neutral trigger '" + dualNeutralTrigger +
+                "' after " + dualPulseSeconds.ToString("0.00") + "s.";
             SetStatus("Action pulsed: " + selectedAction + " (returning to neutral soon)");
 
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(pulseSeconds), returnToken);
+                await Task.Delay(TimeSpan.FromSeconds(dualPulseSeconds), dualReturnToken);
             }
             catch (TaskCanceledException)
             {
@@ -1383,35 +1181,35 @@ namespace AaltoSystemV3
                 return timeline;
             }
 
-            if (_cts == null || _cts.IsCancellationRequested || returnToken.IsCancellationRequested || IsTurnStale(takeEpochAtSubmit))
+            if (_cts == null || _cts.IsCancellationRequested || dualReturnToken.IsCancellationRequested || IsTurnStale(takeEpochAtSubmit))
             {
                 timeline.neutralReturnSend = "cancelled";
                 return timeline;
             }
 
-            timeline.neutralReturnTrigger = neutralTrigger;
-            if (ActionMemoryRegistry.TrySendMemoryTrigger(neutralTrigger, out var neutralError))
+            timeline.neutralReturnTrigger = dualNeutralTrigger;
+            if (ActionMemoryRegistryDual.TrySendLightMemoryTrigger(dualNeutralTrigger, out var dualNeutralError))
             {
                 timeline.neutralReturnSend = "ok";
                 EmitPerformerEvent("performer.neutral_return",
                     "{\"turn_id\":\"" + AaltoLaunchSessionLogger.EscapeJson(turnId) + "\"," +
                     "\"turn_index\":" + turnIndex + "," +
                     "\"take_number\":" + Mathf.Max(1, CurrentTakeNumber) + "," +
-                    "\"neutral_memory_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(neutralTrigger) + "\",\"send\":\"ok\"}");
-                ExecutionModeStatus = "Pulse mode completed. Returned to neutral trigger '" + neutralTrigger + "'.";
-                SetStatus("Returned to neutral: " + neutralTrigger);
+                    "\"neutral_memory_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(dualNeutralTrigger) + "\",\"send\":\"ok\"}");
+                ExecutionModeStatus = "Pulse mode completed. Returned to neutral trigger '" + dualNeutralTrigger + "'.";
+                SetStatus("Returned to neutral: " + dualNeutralTrigger);
             }
             else
             {
                 timeline.neutralReturnSend = "failed";
-                timeline.neutralReturnError = neutralError ?? string.Empty;
+                timeline.neutralReturnError = dualNeutralError ?? string.Empty;
                 EmitPerformerEvent("performer.neutral_return",
                     "{\"turn_id\":\"" + AaltoLaunchSessionLogger.EscapeJson(turnId) + "\"," +
                     "\"turn_index\":" + turnIndex + "," +
                     "\"take_number\":" + Mathf.Max(1, CurrentTakeNumber) + "," +
-                    "\"neutral_memory_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(neutralTrigger) + "\",\"send\":\"failed\",\"error\":\"" + AaltoLaunchSessionLogger.EscapeJson(neutralError ?? string.Empty) + "\"}");
-                ExecutionModeStatus = "Pulse mode failed to return to neutral. " + neutralError;
-                SetStatus("Action applied but neutral return failed: " + neutralError);
+                    "\"neutral_memory_trigger\":\"" + AaltoLaunchSessionLogger.EscapeJson(dualNeutralTrigger) + "\",\"send\":\"failed\",\"error\":\"" + AaltoLaunchSessionLogger.EscapeJson(dualNeutralError ?? string.Empty) + "\"}");
+                ExecutionModeStatus = "Pulse mode failed to return to neutral. " + dualNeutralError;
+                SetStatus("Action applied but neutral return failed: " + dualNeutralError);
             }
 
             return timeline;
@@ -1429,7 +1227,7 @@ namespace AaltoSystemV3
             _neutralReturnCts = null;
         }
 
-        [ContextMenu("Directed Performer/Start New Take")]
+        [ContextMenu("Directed Performer Dual/Start New Take")]
         public void StartNewTake()
         {
             CancelPendingNeutralReturn();
@@ -1454,7 +1252,7 @@ namespace AaltoSystemV3
             SetStatus($"Started new take #{CurrentTakeNumber}. Active dialog memory cleared and pending turns invalidated.");
         }
 
-        [ContextMenu("Directed Performer/Export Dialog Archive Now")]
+        [ContextMenu("Directed Performer Dual/Export Dialog Archive Now")]
         public void ExportDialogArchiveNow()
         {
             TryExportArchiveToProjectFolder("manual");
@@ -1661,7 +1459,7 @@ namespace AaltoSystemV3
                     ? "RUN_000"
                     : AaltoLaunchSessionLogger.CurrentRunId;
                 var baseName =
-                    "single-dialog__" + runId +
+                    "dual-dialog__" + runId +
                     "__take_" + takeNumber.ToString("000") +
                     "__" + timestamp;
 
@@ -1855,11 +1653,11 @@ namespace AaltoSystemV3
         private void SetStatus(string status)
         {
             LastStatus = status ?? string.Empty;
-            Debug.Log("[AaltoDirectedRoomPerformer] " + LastStatus);
+            Debug.Log("[AaltoDirectedRoomPerformerDual] " + LastStatus);
             EmitPerformerEvent("performer.status", "{\"status\":\"" + AaltoLaunchSessionLogger.EscapeJson(LastStatus) + "\"}");
         }
 
-        [ContextMenu("Directed Performer/Clear Runtime History")]
+        [ContextMenu("Directed Performer Dual/Clear Runtime History")]
         public void ClearRuntimeHistory()
         {
             _recentInteractions.Clear();
@@ -1867,7 +1665,7 @@ namespace AaltoSystemV3
             LastStatus = "Runtime history cleared.";
         }
 
-        [ContextMenu("Directed Performer/Refresh Prompt Inspection")]
+        [ContextMenu("Directed Performer Dual/Refresh Prompt Inspection")]
         public void RefreshPromptInspectionContextMenu()
         {
             RefreshPromptInspection();
@@ -1876,7 +1674,7 @@ namespace AaltoSystemV3
 
         private static void EmitPerformerEvent(string eventType, string payloadJson)
         {
-            AaltoLaunchSessionLogger.EmitEvent("AaltoDirectedRoomPerformer", eventType, payloadJson);
+            AaltoLaunchSessionLogger.EmitEvent("AaltoDirectedRoomPerformerDual", eventType, payloadJson);
         }
 
         private void EmitTurnRecord(
@@ -1956,7 +1754,7 @@ namespace AaltoSystemV3
                 ? "RUN_000"
                 : AaltoLaunchSessionLogger.CurrentRunId;
 
-            return runId + "__single__take_" + Mathf.Max(1, CurrentTakeNumber).ToString("000") +
+            return runId + "__dual__take_" + Mathf.Max(1, CurrentTakeNumber).ToString("000") +
                    "__turn_" + Mathf.Max(1, turnIndex).ToString("0000");
         }
 

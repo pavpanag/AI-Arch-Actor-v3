@@ -29,6 +29,7 @@ namespace AaltoSystemV3
         [Header("Scene Refs")]
         public OpenAIClient OpenAI;
         public AaltoActionMemoryRegistry ActionMemoryRegistry;
+        public AaltoActionMemoryRegistryDual ActionMemoryRegistryDual;
         public AaltoOscSender OscSender;
         public TMP_InputField UserInput;
         public TMP_Text ConversationLog;
@@ -1032,6 +1033,63 @@ Rules:
             resolvedMemoryLabel = string.Empty;
             executionSucceeded = true;
             executionResult = "Dry-run only; no external execution.";
+
+            if (ActionMemoryRegistryDual != null)
+            {
+                if (!ActionMemoryRegistryDual.TryResolveActionMemory(selectedActionLabel, out var route))
+                {
+                    executionSucceeded = false;
+                    executionResult = $"No memory mapping for label '{selectedActionLabel}' in dual registry.";
+                    AppendConversation("[aalto-warning] " + executionResult);
+                    return false;
+                }
+
+                var sendLight = route.routeMode == AaltoActionMemoryRouteMode.LightOnly || route.routeMode == AaltoActionMemoryRouteMode.Both;
+                var sendSound = route.routeMode == AaltoActionMemoryRouteMode.SoundOnly || route.routeMode == AaltoActionMemoryRouteMode.Both;
+
+                var lightTrigger = (route.lightMemoryTrigger ?? string.Empty).Trim();
+                var soundTrigger = (route.soundMemoryTrigger ?? string.Empty).Trim();
+
+                var routeSummary = $"mode={route.routeMode}, light='{lightTrigger}', sound='{soundTrigger}'";
+                AppendConversation($"[aalto] label '{selectedActionLabel}' -> dual route ({routeSummary})");
+
+                if (sendLight && !string.IsNullOrWhiteSpace(lightTrigger))
+                {
+                    resolvedMemoryLabel = lightTrigger;
+                    resolvedMemoryId = ExtractMemoryId(lightTrigger);
+                }
+                else if (sendSound && !string.IsNullOrWhiteSpace(soundTrigger))
+                {
+                    resolvedMemoryLabel = soundTrigger;
+                    resolvedMemoryId = string.Empty;
+                }
+
+                if (DryRunOnly)
+                {
+                    executionSucceeded = true;
+                    executionResult = "Dry-run only; dual route resolved but not sent.";
+                    return true;
+                }
+
+                var sent = ActionMemoryRegistryDual.TrySendForActionLabel(selectedActionLabel, sendLight, sendSound, out var sendError);
+                if (sent)
+                {
+                    executionSucceeded = true;
+                    executionResult = string.IsNullOrWhiteSpace(ActionMemoryRegistryDual.LastSendStatus)
+                        ? "Dual-route trigger sent."
+                        : ActionMemoryRegistryDual.LastSendStatus;
+                    return true;
+                }
+
+                executionSucceeded = false;
+                executionResult = string.IsNullOrWhiteSpace(sendError)
+                    ? (string.IsNullOrWhiteSpace(ActionMemoryRegistryDual.LastSendStatus)
+                        ? "Dual-route send failed."
+                        : ActionMemoryRegistryDual.LastSendStatus)
+                    : sendError;
+                AppendConversation("[aalto-error] " + executionResult);
+                return true;
+            }
 
             if (ActionMemoryRegistry == null)
             {

@@ -1,76 +1,307 @@
 {
   "version": 1,
-  "current_memory": 1,
+  "current_memory": 2,
   "persistent_memories": {
     "1": {
-      "00:17:88:01:0d:a7:76:7e-0b": [
-        254,
-        20665,
-        213
-      ],
-      "00:17:88:01:0d:a7:8e:cc-0b": [
-        227,
-        19371,
-        212
-      ],
-      "00:17:88:01:0d:a8:21:ca-0b": [
-        254,
-        19998,
-        213
-      ],
-      "00:17:88:01:0d:a7:50:de-0b": [
-        217,
-        21113,
-        208
-      ]
+      "lights": {
+        "00:17:88:01:0d:a7:76:7e-0b": [
+          0,
+          20665,
+          213
+        ],
+        "00:17:88:01:0d:a7:8e:cc-0b": [
+          0,
+          19371,
+          212
+        ],
+        "00:17:88:01:0d:a8:21:ca-0b": [
+          0,
+          19998,
+          213
+        ],
+        "00:17:88:01:0d:a7:50:de-0b": [
+          0,
+          21113,
+          208
+        ]
+      },
+      "effects": {
+        "00:17:88:01:0d:a7:76:7e-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        },
+        "00:17:88:01:0d:a7:8e:cc-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        },
+        "00:17:88:01:0d:a8:21:ca-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        },
+        "00:17:88:01:0d:a7:50:de-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        }
+      }
     },
     "2": {
-      "00:17:88:01:0d:a7:76:7e-0b": [
-        254,
-        49261,
-        247
-      ],
-      "00:17:88:01:0d:a7:8e:cc-0b": [
-        254,
-        49991,
-        234
-      ],
-      "00:17:88:01:0d:a8:21:ca-0b": [
-        254,
-        48384,
-        235
-      ],
-      "00:17:88:01:0d:a7:50:de-0b": [
-        254,
-        49378,
-        240
-      ]
+      "lights": {
+        "00:17:88:01:0d:a7:76:7e-0b": [
+          0,
+          49261,
+          247
+        ],
+        "00:17:88:01:0d:a7:8e:cc-0b": [
+          254,
+          23857,
+          227
+        ],
+        "00:17:88:01:0d:a8:21:ca-0b": [
+          254,
+          20821,
+          223
+        ],
+        "00:17:88:01:0d:a7:50:de-0b": [
+          0,
+          49378,
+          240
+        ]
+      },
+      "effects": {
+        "00:17:88:01:0d:a7:76:7e-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        },
+        "00:17:88:01:0d:a7:8e:cc-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        },
+        "00:17:88:01:0d:a8:21:ca-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        },
+        "00:17:88:01:0d:a7:50:de-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        }
+      }
     },
     "3": {
-      "00:17:88:01:0d:a7:76:7e-0b": [
-        254,
-        37082,
-        243
-      ],
-      "00:17:88:01:0d:a7:8e:cc-0b": [
-        254,
-        36408,
-        248
-      ],
-      "00:17:88:01:0d:a8:21:ca-0b": [
-        254,
-        36480,
-        253
-      ],
-      "00:17:88:01:0d:a7:50:de-0b": [
-        254,
-        36422,
-        250
-      ]
+      "lights": {
+        "00:17:88:01:0d:a7:76:7e-0b": [
+          254,
+          22315,
+          209
+        ],
+        "00:17:88:01:0d:a7:8e:cc-0b": [
+          0,
+          36408,
+          248
+        ],
+        "00:17:88:01:0d:a8:21:ca-0b": [
+          0,
+          36480,
+          253
+        ],
+        "00:17:88:01:0d:a7:50:de-0b": [
+          254,
+          22200,
+          215
+        ]
+      },
+      "effects": {
+        "00:17:88:01:0d:a7:76:7e-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        },
+        "00:17:88:01:0d:a7:8e:cc-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        },
+        "00:17:88:01:0d:a8:21:ca-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        },
+        "00:17:88:01:0d:a7:50:de-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        }
+      }
     },
-    "4": {},
-    "5": {},
-    "6": {},
+    "4": {
+      "lights": {
+        "00:17:88:01:0d:a7:76:7e-0b": [
+          0,
+          0,
+          0
+        ],
+        "00:17:88:01:0d:a7:8e:cc-0b": [
+          254,
+          1139,
+          229
+        ],
+        "00:17:88:01:0d:a8:21:ca-0b": [
+          254,
+          2212,
+          232
+        ],
+        "00:17:88:01:0d:a7:50:de-0b": [
+          0,
+          0,
+          0
+        ]
+      },
+      "effects": {
+        "00:17:88:01:0d:a7:76:7e-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        },
+        "00:17:88:01:0d:a7:8e:cc-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        },
+        "00:17:88:01:0d:a8:21:ca-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        },
+        "00:17:88:01:0d:a7:50:de-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        }
+      }
+    },
+    "5": {
+      "lights": {
+        "00:17:88:01:0d:a7:76:7e-0b": [
+          254,
+          0,
+          219
+        ],
+        "00:17:88:01:0d:a7:8e:cc-0b": [
+          0,
+          0,
+          0
+        ],
+        "00:17:88:01:0d:a8:21:ca-0b": [
+          0,
+          0,
+          0
+        ],
+        "00:17:88:01:0d:a7:50:de-0b": [
+          254,
+          2708,
+          249
+        ]
+      },
+      "effects": {
+        "00:17:88:01:0d:a7:76:7e-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        },
+        "00:17:88:01:0d:a7:8e:cc-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        },
+        "00:17:88:01:0d:a8:21:ca-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        },
+        "00:17:88:01:0d:a7:50:de-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        }
+      }
+    },
+    "6": {
+      "lights": {
+        "00:17:88:01:0d:a7:76:7e-0b": [
+          108,
+          37398,
+          250
+        ],
+        "00:17:88:01:0d:a7:8e:cc-0b": [
+          118,
+          37172,
+          243
+        ],
+        "00:17:88:01:0d:a8:21:ca-0b": [
+          101,
+          36711,
+          252
+        ],
+        "00:17:88:01:0d:a7:50:de-0b": [
+          104,
+          36763,
+          246
+        ]
+      },
+      "effects": {
+        "00:17:88:01:0d:a7:76:7e-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        },
+        "00:17:88:01:0d:a7:8e:cc-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        },
+        "00:17:88:01:0d:a8:21:ca-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        },
+        "00:17:88:01:0d:a7:50:de-0b": {
+          "mode": "constant",
+          "duration_seconds": null,
+          "cycles": null,
+          "final_mode": "constant"
+        }
+      }
+    },
     "7": {},
     "8": {},
     "9": {},
