@@ -14,7 +14,9 @@ namespace CNCDemo
     /// phrased in the character's own first-person voice. The character can also be revised after
     /// the fact from a plain-language change request.
     ///
-    /// Every prompt is an editable field, so nothing the model is told is hidden. New file only.
+    /// Prompts are split in two: the editable "coaching" fields below (how the model should read,
+    /// question, and summarize) and a FIXED return-format that the code appends automatically. So
+    /// you can rewrite the behaviour freely without ever breaking the JSON the code parses.
     /// </summary>
     public sealed class CNCFrameCompiler : MonoBehaviour
     {
@@ -25,60 +27,64 @@ namespace CNCDemo
         [Tooltip("Model id for authoring steps. Cheaper is fine here (e.g. gpt-4o-mini); the performance model can differ.")]
         public string Model = "gpt-4o-mini";
 
-        [Header("Prompts — Character Frame")]
-        [Tooltip("Decides whether to ask one clarifying question about the character. MUST keep the first-person instruction and end by asking for JSON {\"follow_up\":\"...\"}.")]
+        [Header("Coaching — Character Frame (return format is added automatically)")]
+        [Tooltip("How the model should read the answers and phrase ONE clarifying question about the character. The JSON return shape is fixed by the system; you cannot break it here.")]
         [TextArea(3, 8)]
         public string CharacterFollowUpPrompt =
             "You are helping an author define the inner life of a character for an improvised scene. " +
             "You are given their answers to a few questions, written in the first person, as the character. " +
-            "If something important is unclear, thin, or contradictory, ask exactly ONE short, specific clarifying question. " +
+            "Treat the author's answers as the authority on what the character is; never treat a question's wording as a fact about the character. " +
+            "If something important is unclear, thin, or genuinely contradictory within the answers, ask exactly ONE short, specific clarifying question. " +
             "Phrase the question in the FIRST PERSON, as the character speaking to itself " +
             "(for example 'Why do I want to keep people close?', never 'Why do you want...'). " +
-            "If the answers are already clear enough to work with, return an empty string. " +
-            "Return JSON only: {\"follow_up\":\"<one first-person question, or empty>\"}.";
+            "If the answers are already clear enough to work with, ask nothing.";
 
-        [Tooltip("Compiles the character answers into summary + objective + obstacle + stance. MUST end by asking for JSON with those four keys.")]
+        [Tooltip("How the model should compile the answers into the character. The JSON return shape (summary/objective/obstacle/stance) is fixed by the system; you cannot break it here.")]
         [TextArea(3, 12)]
         public string CharacterCompilePrompt =
             "Compile the author's answers (written in the first person, as the character) into runtime controls for a scenic performer. " +
-            "Produce four things: a compact character summary; one current objective (what the character wants now); " +
-            "one obstacle (what stands in the way of that objective); and one stance (its attitude in a few words). " +
+            "Produce a compact character summary; a current objective (what the character wants now); an obstacle (what stands in the way of that objective); and a stance (its attitude in a few words). " +
             "The character is whatever the author says it is — do not assume it is a lamp or a room unless they say so. " +
-            "Keep everything concrete and playable. Avoid abstraction and generic assistant language. Stay faithful to what the author wrote. " +
-            "Return JSON only: {\"summary\":\"...\",\"objective\":\"...\",\"obstacle\":\"...\",\"stance\":\"...\"}.";
+            "Keep everything concrete and playable. Avoid abstraction and generic assistant language. Stay faithful to what the author wrote.";
 
-        [Tooltip("Rewrites an existing character from a plain-language change request. MUST end by asking for JSON with the same four keys.")]
+        [Tooltip("How the model should rewrite an existing character from a plain-language change request. The JSON return shape is fixed by the system; you cannot break it here.")]
         [TextArea(3, 10)]
         public string CharacterRevisePrompt =
             "You are revising a character for a scenic performer. You are given the current summary, objective, obstacle, and stance, " +
             "and a change the author wants. Rewrite all four so the requested change is fully incorporated, while keeping everything " +
-            "else faithful to what was there. The character is whatever the author says it is. Keep everything concrete and playable. " +
-            "Return JSON only: {\"summary\":\"...\",\"objective\":\"...\",\"obstacle\":\"...\",\"stance\":\"...\"}.";
+            "else faithful to what was there. The character is whatever the author says it is. Keep everything concrete and playable.";
 
-        [Header("Prompts — Scene Frame")]
-        [Tooltip("Decides whether to ask one clarifying question about the scene. MUST keep the first-person instruction and end by asking for JSON {\"follow_up\":\"...\"}.")]
+        [Header("Coaching — Scene Frame (return format is added automatically)")]
+        [Tooltip("How the model should read the answers and phrase ONE clarifying question about the scene. The JSON return shape is fixed by the system; you cannot break it here.")]
         [TextArea(3, 8)]
         public string SceneFollowUpPrompt =
             "You are helping an author define the given circumstances of a scene for an improvised performance. " +
             "You are given their answers to a few questions, written in the first person, as the character in the scene. " +
-            "If something important is unclear, thin, or contradictory, ask exactly ONE short, specific clarifying question. " +
+            "Treat the author's answers as the authority; never treat a question's wording as a fact. " +
+            "If something important is unclear, thin, or genuinely contradictory, ask exactly ONE short, specific clarifying question. " +
             "Phrase the question in the FIRST PERSON, as the character speaking to itself " +
             "(for example 'Who else is in the room with me?', never 'Who else is with you?'). " +
-            "If the answers are already clear enough to work with, return an empty string. " +
-            "Return JSON only: {\"follow_up\":\"<one first-person question, or empty>\"}.";
+            "If the answers are already clear enough to work with, ask nothing.";
 
-        [Tooltip("Compiles the scene answers into a scene brief. MUST end by asking for JSON {\"scene_frame\":\"...\"}.")]
+        [Tooltip("How the model should compile the answers into a scene brief. The JSON return shape is fixed by the system; you cannot break it here.")]
         [TextArea(3, 10)]
         public string SceneCompilePrompt =
             "Compile the author's answers into a short scene brief for a scenic performer. " +
             "State the given circumstances, who is present, and the character's role and how present it should be. " +
-            "Keep it concrete and directive; a few sentences. Stay faithful to what the author wrote. " +
-            "Return JSON only: {\"scene_frame\":\"...\"}.";
+            "Keep it concrete and directive; a few sentences. Stay faithful to what the author wrote.";
 
         [Header("Debug (read-only)")]
         [TextArea(2, 6)] public string LastFollowUp;
         [TextArea(2, 8)] public string LastCompiled;
         [TextArea(1, 3)] public string LastStatus;
+
+        // Fixed return formats — appended to the coaching prompts so the parser contract can't be broken.
+        private const string FollowUpReturnFormat =
+            "Return JSON only, with exactly this shape and no other keys: {\"follow_up\":\"<one first-person question, or an empty string if none is needed>\"}.";
+        private const string CharacterReturnFormat =
+            "Return JSON only, with exactly these keys and no others: {\"summary\":\"...\",\"objective\":\"...\",\"obstacle\":\"...\",\"stance\":\"...\"}.";
+        private const string SceneReturnFormat =
+            "Return JSON only, with exactly this shape and no other keys: {\"scene_frame\":\"...\"}.";
 
         public sealed class DramaturgyBrief { public string summary; public string objective; public string obstacle; public string stance; }
         public sealed class SceneBrief { public string sceneFrame; }
@@ -92,9 +98,8 @@ namespace CNCDemo
         /// <summary>Returns one short first-person follow-up question, or empty if the answers are clear enough.</summary>
         public async Task<string> GenerateFollowUpAsync(string frameKind, List<FrameQuestion> qa)
         {
-            var system = IsScene(frameKind) ? SceneFollowUpPrompt : CharacterFollowUpPrompt;
-
-            var response = await Ask(system, BuildQaBlock(qa, null, null), "CNC:FrameFollowUp");
+            var coaching = IsScene(frameKind) ? SceneFollowUpPrompt : CharacterFollowUpPrompt;
+            var response = await Ask(WithFormat(coaching, FollowUpReturnFormat), BuildQaBlock(qa, null, null), "CNC:FrameFollowUp");
             var parsed = SafeParse<FollowUpResponse>(response);
             LastFollowUp = parsed?.follow_up ?? string.Empty;
             LastStatus = string.IsNullOrWhiteSpace(LastFollowUp) ? "No follow-up needed." : "Follow-up generated.";
@@ -106,7 +111,8 @@ namespace CNCDemo
         public async Task<DramaturgyBrief> CompileDramaturgyAsync(
             List<FrameQuestion> qa, string followUpQuestion, string followUpAnswer)
         {
-            var response = await Ask(CharacterCompilePrompt, BuildQaBlock(qa, followUpQuestion, followUpAnswer), "CNC:FrameCompileCharacter");
+            var response = await Ask(WithFormat(CharacterCompilePrompt, CharacterReturnFormat),
+                BuildQaBlock(qa, followUpQuestion, followUpAnswer), "CNC:FrameCompileCharacter");
             var brief = ParseCharacterBrief(response);
             LastCompiled = FormatBrief("compiled", brief);
             LastStatus = "Character compiled.";
@@ -124,7 +130,7 @@ namespace CNCDemo
                 "stance: " + (stance ?? string.Empty) + "\n\n" +
                 "The author wants to change this:\n" + (change ?? string.Empty);
 
-            var response = await Ask(CharacterRevisePrompt, user, "CNC:FrameReviseCharacter");
+            var response = await Ask(WithFormat(CharacterRevisePrompt, CharacterReturnFormat), user, "CNC:FrameReviseCharacter");
             var brief = ParseCharacterBrief(response);
             LastCompiled = FormatBrief("revised", brief);
             LastStatus = "Character revised.";
@@ -134,7 +140,8 @@ namespace CNCDemo
         public async Task<SceneBrief> CompileSceneAsync(
             List<FrameQuestion> qa, string followUpQuestion, string followUpAnswer)
         {
-            var response = await Ask(SceneCompilePrompt, BuildQaBlock(qa, followUpQuestion, followUpAnswer), "CNC:FrameCompileScene");
+            var response = await Ask(WithFormat(SceneCompilePrompt, SceneReturnFormat),
+                BuildQaBlock(qa, followUpQuestion, followUpAnswer), "CNC:FrameCompileScene");
             var parsed = SafeParse<SceneResponse>(response);
             var brief = new SceneBrief { sceneFrame = parsed?.scene_frame?.Trim() ?? string.Empty };
             LastCompiled = "scene_frame: " + brief.sceneFrame;
@@ -143,6 +150,12 @@ namespace CNCDemo
         }
 
         // --- Internals --------------------------------------------------------
+
+        /// <summary>Joins the editable coaching text with the fixed, non-editable return-format instruction.</summary>
+        private static string WithFormat(string coaching, string returnFormat)
+        {
+            return (coaching ?? string.Empty).Trim() + "\n\n" + returnFormat;
+        }
 
         private DramaturgyBrief ParseCharacterBrief(string response)
         {
