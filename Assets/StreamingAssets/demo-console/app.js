@@ -119,6 +119,8 @@
     var listState = useState([]); var behaviors = listState[0], setBehaviors = listState[1];
     var statusState = useState(""); var status = statusState[0], setStatus = statusState[1];
     var busyState = useState(false); var busy = busyState[0], setBusy = busyState[1];
+    var micsState = useState([]); var mics = micsState[0], setMics = micsState[1];
+    var micState = useState(""); var mic = micState[0], setMic = micState[1];
     var fileRef = useRef(null);
     var fileIndexRef = useRef(0);
 
@@ -127,7 +129,10 @@
         if (r && r.behaviors) setBehaviors(r.behaviors);
       });
     }
-    useEffect(refresh, []);
+    useEffect(function () {
+      refresh();
+      api("/api/expression/mics").then(function (r) { if (r && r.mics) setMics(r.mics); });
+    }, []);
 
     function edit(i, field, value) {
       var next = behaviors.slice();
@@ -157,7 +162,7 @@
           var next = behaviors.slice();
           var slot = -1;
           for (var i = 0; i < next.length; i++) { if (!(next[i].label || "").trim()) { slot = i; break; } }
-          if (slot < 0) { next.push({ label: "", colorHex: "#FFFFFF", brightness: 0.6, pulse: false, pulseSeconds: 2, hasSound: false, soundFile: "" }); slot = next.length - 1; }
+          if (slot < 0) { next.push({ label: "", colorHex: "#FFFFFF", brightness: 0.6, pulse: false, pulseCount: 0, pulseSeconds: 2, hasSound: false, soundFile: "" }); slot = next.length - 1; }
           var row = Object.assign({}, next[slot]); row.label = label; next[slot] = row;
           setBehaviors(next);
           setStatus("Suggested: “" + label + "” — now give it a light and a sound.");
@@ -167,12 +172,15 @@
     }
 
     function addRow() {
-      setBehaviors(behaviors.concat([{ label: "", colorHex: "#FFFFFF", brightness: 0.6, pulse: false, pulseSeconds: 2, hasSound: false, soundFile: "" }]));
+      setBehaviors(behaviors.concat([{ label: "", colorHex: "#FFFFFF", brightness: 0.6, pulse: false, pulseCount: 0, pulseSeconds: 2, hasSound: false, soundFile: "" }]));
     }
 
     function record(i) {
-      setBusy(true); setStatus("Recording 3 seconds — speak or make the sound now…");
-      api("/api/expression/record", { index: i, seconds: 3 }).then(function (r) {
+      // Apply edits first so the refresh afterwards can't wipe unsaved changes.
+      setBusy(true); setStatus("Recording 3 seconds — make the sound now…");
+      api("/api/expression/apply", { behaviors: behaviors }).then(function () {
+        return api("/api/expression/record", { index: i, seconds: 3, mic: mic });
+      }).then(function (r) {
         setStatus("Recording: " + ((r && r.status) || "?")); setBusy(false); refresh();
       });
     }
@@ -188,8 +196,9 @@
       if (!f) return;
       var ext = (f.name.split(".").pop() || "wav").toLowerCase();
       setBusy(true); setStatus("Loading " + f.name + "…");
-      fetch("/api/expression/sound-upload?index=" + fileIndexRef.current + "&ext=" + ext, { method: "POST", body: f })
-        .then(function (r) { return r.json().catch(function () { return {}; }); })
+      api("/api/expression/apply", { behaviors: behaviors }).then(function () {
+        return fetch("/api/expression/sound-upload?index=" + fileIndexRef.current + "&ext=" + ext, { method: "POST", body: f });
+      }).then(function (r) { return r.json().catch(function () { return {}; }); })
         .then(function (r) { setStatus("Sound: " + ((r && r.status) || "?")); setBusy(false); refresh(); });
     }
 
@@ -197,6 +206,13 @@
       h("h2", null, "How the Lamp Speaks"),
       h("p", { className: "lead" }, "Each behavior is something the lamp can do: a name, a light, and — if you like — a sound. “I say yes” and “I say no” are its core; invent the rest."),
       h("input", { type: "file", accept: "audio/*", style: { display: "none" }, ref: fileRef, onChange: onFile, name: "sound-file" }),
+      mics.length > 0
+        ? h("div", { className: "mic-row" },
+            h("span", null, "recording microphone:"),
+            h("select", { value: mic, name: "mic-select", onChange: function (e) { setMic(e.target.value); } },
+              h("option", { value: "" }, "system default"),
+              mics.map(function (m) { return h("option", { value: m, key: m }, m); })))
+        : null,
       h("div", { className: "exp-head" },
         h("span", null, "behavior"), h("span", null, "light"), h("span", null, "brightness"), h("span", null, "pulse"), h("span", null, "sound"), h("span", null, "")),
       behaviors.map(function (b, i) {
@@ -207,11 +223,18 @@
             onInput: function (e) { edit(i, "colorHex", e.target.value); } }),
           h("input", { type: "range", min: 0, max: 1, step: 0.05, value: b.brightness, name: "beh-bri-" + i,
             onInput: function (e) { edit(i, "brightness", parseFloat(e.target.value)); } }),
-          h("label", { className: "pulse-cell" },
+          h("div", { className: "pulse-cell" },
             h("input", { type: "checkbox", checked: !!b.pulse, name: "beh-pulse-" + i,
               onChange: function (e) { edit(i, "pulse", e.target.checked); } }),
-            b.pulse ? h("input", { type: "number", min: 0.5, max: 10, step: 0.5, value: b.pulseSeconds, className: "pulse-secs", name: "beh-psec-" + i,
-              onInput: function (e) { edit(i, "pulseSeconds", parseFloat(e.target.value) || 2); } }) : null),
+            b.pulse ? h(Fragment, null,
+              h("input", { type: "number", min: 0, max: 30, step: 1, value: b.pulseCount || 0, className: "pulse-secs", name: "beh-pcount-" + i,
+                title: "how many pulses (0 = keep pulsing)",
+                onInput: function (e) { edit(i, "pulseCount", parseInt(e.target.value, 10) || 0); } }),
+              h("span", { className: "pulse-sep" }, "× over"),
+              h("input", { type: "number", min: 0.5, max: 30, step: 0.5, value: b.pulseSeconds, className: "pulse-secs", name: "beh-psec-" + i,
+                title: "total seconds",
+                onInput: function (e) { edit(i, "pulseSeconds", parseFloat(e.target.value) || 2); } }),
+              h("span", { className: "pulse-sep" }, "s")) : null),
           h("div", { className: "sound-cell" },
             h("span", { className: "sound-dot" + (b.hasSound ? " on" : "") }),
             h("button", { className: "mini", onClick: function () { pickFile(i); }, disabled: busy }, "Load"),

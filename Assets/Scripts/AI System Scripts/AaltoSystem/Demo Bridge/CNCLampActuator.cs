@@ -26,7 +26,9 @@ namespace CNCDemo
         [Range(0f, 1f)] public float brightness = 1f;
         [Tooltip("If true, the light pulses (sinusoidal breathing) instead of holding steady.")]
         public bool pulse = false;
-        [Tooltip("Seconds per pulse cycle.")]
+        [Tooltip("How many pulses. 0 = keep pulsing until another behavior takes over.")]
+        public int pulseCount = 0;
+        [Tooltip("Total seconds the pulses take (with count 0: seconds per single pulse).")]
         public float pulseSeconds = 2f;
         [Tooltip("Sound file for this behavior (in the demo-sounds folder). Empty = light only.")]
         public string soundFile = "";
@@ -140,7 +142,7 @@ namespace CNCDemo
             var color = ParseColor(b.colorHex);
             if (b.pulse)
             {
-                _pulseRoutine = StartCoroutine(PulseLoop(color, Mathf.Clamp01(b.brightness), Mathf.Max(0.3f, b.pulseSeconds)));
+                _pulseRoutine = StartCoroutine(PulseLoop(color, Mathf.Clamp01(b.brightness), b.pulseCount, Mathf.Max(0.3f, b.pulseSeconds)));
             }
             else
             {
@@ -168,8 +170,11 @@ namespace CNCDemo
             }
         }
 
-        /// <summary>Records from the default microphone into behavior index's slot, saves WAV, loads it.</summary>
-        public async Task<string> RecordSoundAsync(int index, float seconds)
+        /// <summary>Names of the available microphones ("sound actuators" for recording).</summary>
+        public string[] GetMicrophones() => Microphone.devices ?? Array.Empty<string>();
+
+        /// <summary>Records from the chosen microphone (empty = system default) into behavior index's slot, saves WAV, loads it.</summary>
+        public async Task<string> RecordSoundAsync(int index, float seconds, string micName = null)
         {
             var b = At(index);
             if (b == null) return "no such behavior";
@@ -178,10 +183,13 @@ namespace CNCDemo
             if (Microphone.devices == null || Microphone.devices.Length == 0)
                 return "no microphone found";
 
-            var recording = Microphone.Start(null, false, Mathf.CeilToInt(seconds), 44100);
+            var mic = string.IsNullOrWhiteSpace(micName) ? null : micName;
+            if (mic != null && Array.IndexOf(Microphone.devices, mic) < 0) mic = null; // unknown -> default
+
+            var recording = Microphone.Start(mic, false, Mathf.CeilToInt(seconds), 44100);
             LastSoundStatus = "recording " + seconds + "s…";
             await Task.Delay(TimeSpan.FromSeconds(seconds + 0.15f));
-            Microphone.End(null);
+            Microphone.End(mic);
 
             if (recording == null) return "recording failed";
 
@@ -311,11 +319,18 @@ namespace CNCDemo
 
         // --- Light rendering ----------------------------------------------------
 
-        private System.Collections.IEnumerator PulseLoop(Color color, float brightness, float period)
+        /// <summary>
+        /// Pulses `count` times over `seconds` total, then settles at the steady brightness.
+        /// count 0 = pulse forever with `seconds` per cycle (until another behavior takes over).
+        /// </summary>
+        private System.Collections.IEnumerator PulseLoop(Color color, float brightness, int count, float seconds)
         {
             var floor = brightness * Mathf.Clamp01(PulseFloor);
+            var period = count > 0 ? seconds / count : seconds;
+            var total = count > 0 ? seconds : float.PositiveInfinity;
             var t0 = Time.time;
-            while (true)
+
+            while (Time.time - t0 < total)
             {
                 var phase = (Time.time - t0) / period * 2f * Mathf.PI;
                 var normalized = (Mathf.Sin(phase) + 1f) * 0.5f;
@@ -323,6 +338,9 @@ namespace CNCDemo
                 ApplyLightState(color, level, 0.35f, throttlePhysical: true);
                 yield return null;
             }
+
+            ApplyLightState(color, brightness, 0.4f); // settle steady after the pulses
+            _pulseRoutine = null;
         }
 
         private void ApplyLightState(Color color, float brightness01, float hueTransitionSeconds, bool throttlePhysical = false)

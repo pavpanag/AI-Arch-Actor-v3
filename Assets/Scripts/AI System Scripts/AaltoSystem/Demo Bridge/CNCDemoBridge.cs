@@ -308,6 +308,11 @@ namespace CNCDemo
                     WriteJson(ctx, 200, RunOnMainThread(BuildExpressionListJson));
                     break;
 
+                case "/api/expression/mics":
+                    WriteJson(ctx, 200, RunOnMainThread(() =>
+                        "{\"mics\":" + BuildJsonStringArrayLocal(Actuator != null ? Actuator.GetMicrophones() : Array.Empty<string>()) + "}"));
+                    break;
+
                 case "/api/expression/apply":
                 {
                     var req = ParseBehaviorApply(body);
@@ -326,6 +331,7 @@ namespace CNCDemo
                                     existing.colorHex = incoming.colorHex;
                                     existing.brightness = incoming.brightness;
                                     existing.pulse = incoming.pulse;
+                                    existing.pulseCount = incoming.pulseCount;
                                     existing.pulseSeconds = incoming.pulseSeconds;
                                     // soundFile is managed by record/upload, not the apply payload.
                                 }
@@ -372,7 +378,7 @@ namespace CNCDemo
                     var req = ParseIndexRequest(body);
                     var result = RunOnMainThreadAsync<string>(() =>
                         Actuator != null
-                            ? Actuator.RecordSoundAsync(req.index, req.seconds > 0 ? req.seconds : 3f)
+                            ? Actuator.RecordSoundAsync(req.index, req.seconds > 0 ? req.seconds : 3f, req.mic)
                             : Task.FromResult("actuator not assigned"));
                     RunOnMainThread(() => { SyncRegistryFromBehaviors(); return true; });
                     WriteJson(ctx, 200, "{\"status\":\"" + Escape(result ?? "timed out") + "\"}");
@@ -540,7 +546,7 @@ namespace CNCDemo
         private sealed class BehaviorApplyRequest { public List<CNCBehaviorSpec> behaviors = new List<CNCBehaviorSpec>(); }
 
         [Serializable]
-        private sealed class IndexRequest { public int index; public float seconds; }
+        private sealed class IndexRequest { public int index; public float seconds; public string mic; }
 
         private static BehaviorApplyRequest ParseBehaviorApply(string body)
         {
@@ -560,6 +566,17 @@ namespace CNCDemo
         {
             var raw = req.QueryString[key];
             return int.TryParse(raw, out var v) ? v : fallback;
+        }
+
+        private static string BuildJsonStringArrayLocal(string[] values)
+        {
+            var sb = new StringBuilder("[");
+            for (int i = 0; i < (values?.Length ?? 0); i++)
+            {
+                if (i > 0) sb.Append(",");
+                sb.Append("\"").Append(Escape(values[i] ?? "")).Append("\"");
+            }
+            return sb.Append("]").ToString();
         }
 
         private static byte[] ReadBodyBytes(HttpListenerRequest req)
@@ -588,6 +605,7 @@ namespace CNCDemo
                       .Append("\",\"colorHex\":\"").Append(Escape(b.colorHex ?? "#FFC073"))
                       .Append("\",\"brightness\":").Append(b.brightness.ToString(System.Globalization.CultureInfo.InvariantCulture))
                       .Append(",\"pulse\":").Append(b.pulse ? "true" : "false")
+                      .Append(",\"pulseCount\":").Append(b.pulseCount)
                       .Append(",\"pulseSeconds\":").Append(b.pulseSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture))
                       .Append(",\"hasSound\":").Append(string.IsNullOrWhiteSpace(b.soundFile) ? "false" : "true")
                       .Append(",\"soundFile\":\"").Append(Escape(b.soundFile ?? "")).Append("\"}");
