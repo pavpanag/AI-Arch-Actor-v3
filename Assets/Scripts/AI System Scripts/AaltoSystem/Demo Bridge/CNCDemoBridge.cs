@@ -222,7 +222,7 @@ namespace CNCDemo
                     var req = ParseFrameRequest(body);
                     var followUp = RunOnMainThreadAsync(() =>
                         FrameCompiler != null
-                            ? FrameCompiler.GenerateFollowUpAsync(req.type, req.items)
+                            ? FrameCompiler.GenerateFollowUpAsync(req.type, req.items, Performer != null ? Performer.CurrentCharacterSummary : null)
                             : Task.FromResult(string.Empty));
                     WriteJson(ctx, 200, "{\"followUp\":\"" + Escape(followUp) + "\"}");
                     break;
@@ -235,7 +235,7 @@ namespace CNCDemo
                     {
                         var brief = RunOnMainThreadAsync(() =>
                             FrameCompiler != null
-                                ? FrameCompiler.CompileSceneAsync(req.items, req.followUpQuestion, req.followUpAnswer)
+                                ? FrameCompiler.CompileSceneAsync(req.items, req.followUpQuestion, req.followUpAnswer, Performer != null ? Performer.CurrentCharacterSummary : null)
                                 : Task.FromResult<CNCFrameCompiler.SceneBrief>(null));
                         RunOnMainThread(() =>
                         {
@@ -279,7 +279,7 @@ namespace CNCDemo
                     {
                         var brief = RunOnMainThreadAsync(() =>
                             FrameCompiler != null
-                                ? FrameCompiler.EnrichSceneAsync(e.sceneFrame)
+                                ? FrameCompiler.EnrichSceneAsync(e.sceneFrame, Performer != null ? Performer.CurrentCharacterSummary : null)
                                 : Task.FromResult<CNCFrameCompiler.SceneBrief>(null));
                         RunOnMainThread(() => { ApplySceneFrame(brief); return true; });
                         WriteJson(ctx, 200, SceneBriefJson(brief));

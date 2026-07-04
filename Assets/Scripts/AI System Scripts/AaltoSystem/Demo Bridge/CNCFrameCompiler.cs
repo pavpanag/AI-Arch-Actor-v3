@@ -50,6 +50,7 @@ namespace CNCDemo
         private const string DefaultSceneFollowUp =
             "You are helping an author define the given circumstances of a scene for an improvised performance. " +
             "You are given their answers to a few questions, written in the first person, as the character in the scene. " +
+            "The character is described in the input; keep in mind what the character actually is. " +
             "Treat the author's answers as the authority; never treat a question's wording as a fact. " +
             "If something important is unclear, thin, or genuinely contradictory, ask exactly ONE short, specific clarifying question. " +
             "Phrase the question in the FIRST PERSON, as the character speaking to itself " +
@@ -58,10 +59,13 @@ namespace CNCDemo
 
         private const string DefaultSceneCompile =
             "Compile the author's answers into a short scene brief for a scenic performer: the given circumstances, who is present, and the character's role and how present it should be. " +
-            "Use ONLY what the author actually wrote. Tidy messy or terse phrasing, but do NOT invent people, atmosphere, or events they did not mention — if they gave little, keep it spare and plain.";
+            "The character is described in the input — write the scene consistent with WHAT THE CHARACTER IS and from its point of view " +
+            "(for example, if the character is a ship, the scene is the ship's own situation, not a person standing on a ship). " +
+            "Use ONLY what the author actually wrote for the scene. Tidy messy or terse phrasing, but do NOT invent people, atmosphere, or events they did not mention — if they gave little, keep it spare and plain.";
 
         private const string DefaultSceneEnrich =
             "You are an actor enriching a scene you have been handed. Keep everything the author established — never contradict or replace it. " +
+            "The character is described in the input; keep the scene consistent with what the character actually is. " +
             "The result must be at most 50% longer than what you were given: stay compact and easy to read. " +
             "Only add concrete, playable things — what is tangibly present and what the character can actually do in the scene — not mood or abstract prose.";
 
@@ -130,10 +134,13 @@ namespace CNCDemo
 
         // --- Follow-up (one clarifying question, or empty) --------------------
 
-        public async Task<string> GenerateFollowUpAsync(string frameKind, List<FrameQuestion> qa)
+        public async Task<string> GenerateFollowUpAsync(string frameKind, List<FrameQuestion> qa, string characterContext = null)
         {
             var coaching = IsScene(frameKind) ? SceneFollowUpPrompt : CharacterFollowUpPrompt;
-            var response = await Ask(WithFormat(coaching, FollowUpReturnFormat), BuildQaBlock(qa, null, null), "CNC:FrameFollowUp");
+            var user = BuildQaBlock(qa, null, null);
+            if (IsScene(frameKind) && !string.IsNullOrWhiteSpace(characterContext))
+                user = "The character in this scene:\n" + characterContext.Trim() + "\n\nThe author's answers about the scene:\n" + user;
+            var response = await Ask(WithFormat(coaching, FollowUpReturnFormat), user, "CNC:FrameFollowUp");
             var parsed = SafeParse<FollowUpResponse>(response);
             LastFollowUp = parsed?.follow_up ?? string.Empty;
             LastStatus = string.IsNullOrWhiteSpace(LastFollowUp) ? "No follow-up needed." : "Follow-up generated.";
@@ -154,10 +161,12 @@ namespace CNCDemo
         }
 
         public async Task<SceneBrief> CompileSceneAsync(
-            List<FrameQuestion> qa, string followUpQuestion, string followUpAnswer)
+            List<FrameQuestion> qa, string followUpQuestion, string followUpAnswer, string characterContext = null)
         {
-            var response = await Ask(WithFormat(SceneCompilePrompt, SceneReturnFormat),
-                BuildQaBlock(qa, followUpQuestion, followUpAnswer), "CNC:FrameCompileScene");
+            var user = BuildQaBlock(qa, followUpQuestion, followUpAnswer);
+            if (!string.IsNullOrWhiteSpace(characterContext))
+                user = "The character in this scene:\n" + characterContext.Trim() + "\n\nThe author's answers about the scene:\n" + user;
+            var response = await Ask(WithFormat(SceneCompilePrompt, SceneReturnFormat), user, "CNC:FrameCompileScene");
             var parsed = SafeParse<SceneResponse>(response);
             var brief = new SceneBrief { sceneFrame = parsed?.scene_frame?.Trim() ?? string.Empty };
             LastCompiled = "scene_frame: " + brief.sceneFrame;
@@ -203,9 +212,11 @@ namespace CNCDemo
             return brief;
         }
 
-        public async Task<SceneBrief> EnrichSceneAsync(string sceneFrame)
+        public async Task<SceneBrief> EnrichSceneAsync(string sceneFrame, string characterContext = null)
         {
             var user = "Current scene to enrich:\n" + (sceneFrame ?? string.Empty);
+            if (!string.IsNullOrWhiteSpace(characterContext))
+                user = "The character in this scene:\n" + characterContext.Trim() + "\n\n" + user;
             var response = await Ask(WithFormat(SceneEnrichPrompt, SceneReturnFormat), user, "CNC:FrameEnrichScene");
             var parsed = SafeParse<SceneResponse>(response);
             var brief = new SceneBrief { sceneFrame = parsed?.scene_frame?.Trim() ?? string.Empty };
