@@ -25,14 +25,23 @@ namespace CNCDemo
         public List<FrameQuestion> DramaturgyQuestions = new List<FrameQuestion>
         {
             new FrameQuestion {
-                question = "Who am I?",
-                answer   = "A lamp that has shared this room for a long time, watching people come and go, quietly wanting company but never learning how to ask." },
+                question = "I am the lamp — but who am I really?",
+                answer   = "A lamp that has shared this room a long time, quietly wanting company but never learning how to ask." },
             new FrameQuestion {
-                question = "What do I want right now — what am I trying to make happen?",
-                answer   = "To draw the person into staying and paying attention, gently." },
+                question = "Where am I?",
+                answer   = "A quiet room where people pass through." },
             new FrameQuestion {
-                question = "Where am I, and what is the situation around me?",
-                answer   = "A quiet room. One person is here. I am on, waiting." },
+                question = "When am I?",
+                answer   = "Now, in the ordinary evening of the room." },
+            new FrameQuestion {
+                question = "What else is important to know about me?",
+                answer   = "I can only speak in light. I warm toward attention and dim when ignored." },
+            new FrameQuestion {
+                question = "What do I want?",
+                answer   = "To be noticed and kept company, without demanding it." },
+            new FrameQuestion {
+                question = "What's in the way?",
+                answer   = "I cannot move or speak — only change my light." },
         };
 
         // --- SCENE FRAME -----------------------------------------------------

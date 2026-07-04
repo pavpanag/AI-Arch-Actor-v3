@@ -188,6 +188,88 @@
     );
   }
 
+  // --- character chat (minimal, one question at a time) ----------------
+  function CharacterChat(props) {
+    var questions = props.questions || [];
+    var idxState = useState(0); var idx = idxState[0], setIdx = idxState[1];
+    var answersState = useState([]); var answers = answersState[0], setAnswers = answersState[1];
+    var inputState = useState(""); var input = inputState[0], setInput = inputState[1];
+    var phaseState = useState("asking"); var phase = phaseState[0], setPhase = phaseState[1]; // asking|followup|thinking|done
+    var followUpState = useState(""); var followUp = followUpState[0], setFollowUp = followUpState[1];
+    var compiledState = useState(null); var compiled = compiledState[0], setCompiled = compiledState[1];
+
+    function itemsFrom(ans) {
+      return questions.map(function (q, i) { return { question: q.question, answer: ans[i] || "" }; });
+    }
+    function askFollowUpThenCompile(ans) {
+      setPhase("thinking");
+      api("/api/frame/followup", { type: "dramaturgy", items: itemsFrom(ans) }).then(function (r) {
+        if (r && r.followUp) { setFollowUp(r.followUp); setPhase("followup"); }
+        else compileNow(ans, "", "");
+      });
+    }
+    function compileNow(ans, fq, fa) {
+      setPhase("thinking");
+      api("/api/frame/compile", { type: "dramaturgy", items: itemsFrom(ans), followUpQuestion: fq, followUpAnswer: fa })
+        .then(function (r) { setCompiled(r || {}); setPhase("done"); });
+    }
+    function submit() {
+      var val = input.trim(); if (!val) return;
+      setInput("");
+      if (phase === "asking") {
+        var na = answers.slice(); na[idx] = val; setAnswers(na);
+        if (idx + 1 < questions.length) setIdx(idx + 1);
+        else askFollowUpThenCompile(na);
+      } else if (phase === "followup") {
+        compileNow(answers, followUp, val);
+      }
+    }
+
+    if (questions.length === 0)
+      return h("div", { className: "card" }, h("div", { className: "empty" }, "No questions configured."));
+
+    var current = phase === "asking" ? questions[idx].question : (phase === "followup" ? followUp : "");
+    var history = [];
+    for (var i = 0; i < answers.length; i++) {
+      if (answers[i]) history.push({ q: questions[i].question, a: answers[i] });
+    }
+
+    return h("div", { className: "card" },
+      h("h2", null, "Who the Lamp Is"),
+      h("p", { className: "lead" }, "Answer as the lamp, one thing at a time."),
+      phase === "asking" ? h("div", { className: "progress" }, (idx + 1) + " / " + questions.length) : null,
+      h("div", { className: "chat-log" },
+        history.map(function (turn, i) {
+          return h("div", { className: "chat-pair", key: i },
+            h("div", { className: "cq" }, turn.q),
+            h("div", { className: "ca" }, turn.a));
+        })
+      ),
+      (phase === "asking" || phase === "followup")
+        ? h("div", null,
+            h("div", { className: "followup" }, h("div", { className: "fq" }, current)),
+            h("div", { className: "stage-bar", style: { marginTop: "12px" } },
+              h("input", {
+                type: "text", value: input, placeholder: "…", autofocus: true,
+                onInput: function (e) { setInput(e.target.value); },
+                onKeyDown: function (e) { if (e.key === "Enter") submit(); }
+              }),
+              h("button", { className: "act", onClick: submit }, phase === "followup" ? "Answer" : "Next"))
+          )
+        : null,
+      phase === "thinking" ? h("div", { className: "status" }, "The lamp is gathering itself…") : null,
+      (phase === "done" && compiled)
+        ? h("div", null,
+            h("div", { className: "compiled" },
+              h("div", { className: "k" }, "Summary"),   h("div", { className: "v" }, compiled.summary || "—"),
+              h("div", { className: "k" }, "Objective"), h("div", { className: "v" }, compiled.objective || "—"),
+              h("div", { className: "k" }, "Stance"),    h("div", { className: "v" }, compiled.stance || "—")),
+            h("div", { className: "row" },
+              h("button", { className: "act", onClick: props.goToStage }, "Enter the scene")))
+        : null
+    );
+  }
+
   // --- app shell --------------------------------------------------------
   function App() {
     var stepState = useState("stage"); var step = stepState[0], setStep = stepState[1];
@@ -218,7 +300,7 @@
 
     var body;
     if (!ready) body = h("div", { className: "empty" }, "Lighting the lamp…");
-    else if (step === "dramaturgy") body = h(FrameStep, { kind: "dramaturgy", items: drama, setItems: setDrama });
+    else if (step === "dramaturgy") body = h(CharacterChat, { questions: drama, goToStage: function () { setStep("stage"); } });
     else if (step === "scene")      body = h(FrameStep, { kind: "scene", items: scene, setItems: setScene });
     else if (step === "expression") body = h(ExpressionStep, { expressions: expr });
     else                             body = h(Stage, null);
