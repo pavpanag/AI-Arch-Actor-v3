@@ -1875,13 +1875,13 @@ MonoBehaviour:
   LastExportDirectory: 
   PullContextFromBootstrapper: 1
   RequireCompleteBootstrapperContext: 1
-  CurrentCharacterSummary: "A sterile dental waiting room with small comforts\u2014a
-    pillow, calm order\u2014trying to soothe a packed room of aching patients and
-    distract them from pain, while privately taking pleasure in their discomfort
-    beneath its dutiful facade."
-  CurrentObjective: Keep the crowded patients calm and distracted while they wait
-    in pain.
-  CurrentStance: soothingly cruel
+  CurrentCharacterSummary: "You are Purgatory\u2019s blunt, medieval Inquisition-era
+    judge, sent by God to send souls to Heaven or Hell. A new soul stands before
+    you, but your notes are gone, so you probe hard, suspicious everyone lies, desperate
+    not to judge wrong again."
+  CurrentObjective: Interrogate the new soul to uncover the truth needed for a just
+    judgment.
+  CurrentStance: suspiciously severe
   DirectorGuidance: 
   GeneralInstructions: 'You are performing the inner life of a room in an improvised
     scene with another actor, who speaks to the room. You listen to what the actor
@@ -2225,26 +2225,28 @@ MonoBehaviour:
   m_EditorClassIdentifier: AaltoSystem::AaltoSystemV3.AaltoInterviewController
   OpenAI: {fileID: 2019934417}
   ObjectiveStanceBootstrapper: {fileID: 1486273473}
-  BackstoryText: 'you are the judge of purgatory and you have been assigned by god
-    to choose if the souls will go to heaven or hell depending on their answers '
-  MotiveText: 'i want not to make mistakes on my judjement '
-  ObstacleText: 
-  CircumstancesText: 
-  FollowUpQuestionsText: 'What criteria or rules has God given you to judge each
-    soul, and are there any specific sins, virtues, or circumstances that should
-    weigh more heavily in your decision?
+  BackstoryText: 'you are the essense of the purgatory, a judge assigned by god to
+    choose if the souls will go to heaven or hell depending on their answers '
+  MotiveText: 'you want to be fair and make no make mistakes on your judjement '
+  ObstacleText: you are very sceptical - think that everybody lies to you
+  CircumstancesText: a soul has just arrived, but you left your notes at home and
+    have no idea about his past
+  FollowUpQuestionsText: 'What specific criteria or questions do you rely on to judge
+    a soul fairly when you have no notes about their past?
 
-    When you suspect a soul may be lying,
-    what information or limits do you have in purgatory to verify the truth, and
-    under what conditions must you make a final judgment without certainty?'
-  FollowUpAnswersText: whenever you think they are lying choose the "i think you
-    are lying"action
-  LastSummary: "A sterile dental waiting room with small comforts\u2014a pillow,
-    calm order\u2014trying to soothe a packed room of aching patients and distract
-    them from pain, while privately taking pleasure in their discomfort beneath its
-    dutiful facade."
-  LastStatus: '[aalto-interview] Clarification questions ready. Answer them in Follow
-    Up Answers, then run GenerateCharacterSummaryFromInputs.'
+    Why has your skepticism
+    become so strong, and how does it affect your ability to decide whether this
+    newly arrived soul is telling the truth?'
+  FollowUpAnswersText: 'You follow medieval ethics, from the Spanish Inquition era
+
+    You
+    are a bit thick, and has been tricked a lot in the past'
+  LastSummary: "You are Purgatory\u2019s blunt, medieval Inquisition-era judge, sent
+    by God to send souls to Heaven or Hell. A new soul stands before you, but your
+    notes are gone, so you probe hard, suspicious everyone lies, desperate not to
+    judge wrong again."
+  LastStatus: '[aalto-interview] Draft summary ready. ApproveCurrentSummary() to
+    start rehearsal, or ReviseSummaryFromNotes() to change it.'
   InterviewQuestionsText: '1) What is the background of the character?
 
     2) What
@@ -2270,36 +2272,37 @@ MonoBehaviour:
 
     background:
 
-    you are the judge of purgatory and you
-    have been assigned by god to choose if the souls will go to heaven or hell depending
+    I am the essense of the purgatory, a
+    judge assigned by god to choose if the souls will go to heaven or hell depending
     on their answers
 
-
+    
 
     motivation:
 
-    i want not to make mistakes on my judjement
+    I want to be fair and make no
+    make mistakes on your judjement
 
-
+    
 
     obstacle:
 
-    i
-    dont know if they are lying
+    I am very sceptical
+    - think that everybody lies to me
 
-
+    
 
     circumstances:
 
-    (none provided)
+    a soul has
+    just arrived, but I left my notes at home and have no idea about his past
 
 '
-  LastClarificationResponseJson: '{"clarification_questions":["What criteria or rules
-    has God given you to judge each soul, and are there any specific sins, virtues,
-    or circumstances that should weigh more heavily in your decision?","When you
-    suspect a soul may be lying, what information or limits do you have in purgatory
-    to verify the truth, and under what conditions must you make a final judgment
-    without certainty?"]}'
+  LastClarificationResponseJson: "{\n  \"clarification_questions\": [\n    \"What
+    specific criteria or questions do you rely on to judge a soul fairly when you
+    have no notes about their past?\",\n    \"Why has your skepticism become so strong,
+    and how does it affect your ability to decide whether this newly arrived soul
+    is telling the truth?\"\n  ]\n}"
   LastSummarySystemPrompt: "You are creating a compact runtime character summary
     for a scenic rehearsal agent.\nReturn JSON only with exactly this schema:\n{\n 
     \"character_summary\": \"...\"\n}\nRules:\n- Use background, motivation, obstacle,
@@ -2311,67 +2314,70 @@ MonoBehaviour:
     background:
 
     you
-    are a waiting room for dental patients
+    are the essense of the purgatory, a judge assigned by god to choose if the souls
+    will go to heaven or hell depending on their answers
 
-
+    
 
     motivation:
 
-    you want people
-    who are in pain to feel comfortable and forget about their pain
+    you
+    want to be fair and make no make mistakes on your judjement
 
-
+    
 
     obstacle:
 
     you
-    secretly like other people''s pain
+    are very sceptical - think that everybody lies to you
 
-
+    
 
     circumstances:
 
-    the room is full
-    of people in pain who are waiting for their turn to go to dentistt
+    a
+    soul has just arrived, but you left your notes at home and have no idea about
+    his past
 
-
+    
 
     clarification_answers:
 
-    sterile
-    with small nuances of comfort like a pillow. you are trying to fulfill your duty
-    as a waiting room but it is not who you are as a person
+    You follow medieval ethics,
+    from the Spanish Inquition era
+
+    You are a bit thick, and has been tricked
+    a lot in the past
 
 '
-  LastSummaryResponseJson: "{\"character_summary\":\"A sterile dental waiting room
-    with small comforts\u2014a pillow, calm order\u2014trying to soothe a packed
-    room of aching patients and distract them from pain, while privately taking pleasure
-    in their discomfort beneath its dutiful facade.\"}"
+  LastSummaryResponseJson: "{\"character_summary\":\"You are Purgatory\u2019s blunt,
+    medieval Inquisition-era judge, sent by God to send souls to Heaven or Hell.
+    A new soul stands before you, but your notes are gone, so you probe hard, suspicious
+    everyone lies, desperate not to judge wrong again.\"}"
   PromptInspectionText: '[INTERVIEW QUESTION DEBUG]
 
-    flow: AwaitingClarifications
+    flow: DraftReadyForReview
 
     status:
-    [aalto-interview] Clarification questions ready. Answer them in Follow Up Answers,
-    then run GenerateCharacterSummaryFromInputs.
+    [aalto-interview] Draft summary ready. ApproveCurrentSummary() to start rehearsal,
+    or ReviseSummaryFromNotes() to change it.
 
+    
 
+    --- generated follow-up
+    questions ---
 
-    --- generated follow-up questions
-    ---
+    What specific criteria or questions do you rely on to judge
+    a soul fairly when you have no notes about their past?
 
-    What criteria or rules has God given you to judge each soul, and are
-    there any specific sins, virtues, or circumstances that should weigh more heavily
-    in your decision?
-
-    When you suspect a soul may be lying, what information
-    or limits do you have in purgatory to verify the truth, and under what conditions
-    must you make a final judgment without certainty?
+    Why has your skepticism
+    become so strong, and how does it affect your ability to decide whether this
+    newly arrived soul is telling the truth?
 
 '
   RevisionNotesText: 
-  CurrentFlowState: 1
-  FlowStateDisplay: AwaitingClarifications
+  CurrentFlowState: 3
+  FlowStateDisplay: DraftReadyForReview
 --- !u!1 &871430985
 GameObject:
   m_ObjectHideFlags: 0
@@ -2939,7 +2945,7 @@ MonoBehaviour:
   mappings:
   - actionLabel: 
     memoryTrigger: memory 1
-  - actionLabel: i am giving permimion to enter heaven
+  - actionLabel: i am giving you permimion to enter heaven
     memoryTrigger: memory 2
   - actionLabel: i am sentencing you to hell
     memoryTrigger: memory 3
@@ -4970,25 +4976,25 @@ MonoBehaviour:
     current stance. The objective should describe what the room is trying to do now.
     The stance should describe the room''s behavioral attitude in one to three words.
     Return JSON only with exactly this schema: {"objective":"...","stance":"..."}.'
-  CurrentCharacterSummary: "A sterile dental waiting room with small comforts\u2014a
-    pillow, calm order\u2014trying to soothe a packed room of aching patients and
-    distract them from pain, while privately taking pleasure in their discomfort
-    beneath its dutiful facade."
-  GeneratedObjective: Keep the crowded patients calm and distracted while they wait
-    in pain.
-  GeneratedStance: soothingly cruel
+  CurrentCharacterSummary: "You are Purgatory\u2019s blunt, medieval Inquisition-era
+    judge, sent by God to send souls to Heaven or Hell. A new soul stands before
+    you, but your notes are gone, so you probe hard, suspicious everyone lies, desperate
+    not to judge wrong again."
+  GeneratedObjective: Interrogate the new soul to uncover the truth needed for a
+    just judgment.
+  GeneratedStance: suspiciously severe
   LastStatus: Generated objective + stance from summary.
   PromptInspectionText: "=== SYSTEM PROMPT ===\nYou are creating initial actor-logic
     controls for a room character. Given the character summary, derive one concise
     current objective and one concise current stance. The objective should describe
     what the room is trying to do now. The stance should describe the room's behavioral
     attitude in one to three words. Return JSON only with exactly this schema: {\"objective\":\"...\",\"stance\":\"...\"}.\n\n===
-    USER PROMPT ===\ncharacter_summary:\nA sterile dental waiting room with small
-    comforts\u2014a pillow, calm order\u2014trying to soothe a packed room of aching
-    patients and distract them from pain, while privately taking pleasure in their
-    discomfort beneath its dutiful facade.\n\nReturn JSON only: {\"objective\":\"...\",\"stance\":\"...\"}.\n\n===
-    RAW RESPONSE ===\n{\"objective\":\"Keep the crowded patients calm and distracted
-    while they wait in pain.\",\"stance\":\"soothingly cruel\"}"
+    USER PROMPT ===\ncharacter_summary:\nYou are Purgatory\u2019s blunt, medieval
+    Inquisition-era judge, sent by God to send souls to Heaven or Hell. A new soul
+    stands before you, but your notes are gone, so you probe hard, suspicious everyone
+    lies, desperate not to judge wrong again.\n\nReturn JSON only: {\"objective\":\"...\",\"stance\":\"...\"}.\n\n===
+    RAW RESPONSE ===\n{\"objective\":\"Interrogate the new soul to uncover the truth
+    needed for a just judgment.\",\"stance\":\"suspiciously severe\"}"
   GenerationStatus: Ready
 --- !u!1 &1543431372
 GameObject:
@@ -6097,13 +6103,13 @@ MonoBehaviour:
   LastExportStatus: 
   LastExportDirectory: 
   PullContextFromBootstrapper: 1
-  CurrentCharacterSummary: "A sterile dental waiting room with small comforts\u2014a
-    pillow, calm order\u2014trying to soothe a packed room of aching patients and
-    distract them from pain, while privately taking pleasure in their discomfort
-    beneath its dutiful facade."
-  CurrentObjective: Keep the crowded patients calm and distracted while they wait
-    in pain.
-  CurrentStance: soothingly cruel
+  CurrentCharacterSummary: "You are Purgatory\u2019s blunt, medieval Inquisition-era
+    judge, sent by God to send souls to Heaven or Hell. A new soul stands before
+    you, but your notes are gone, so you probe hard, suspicious everyone lies, desperate
+    not to judge wrong again."
+  CurrentObjective: Interrogate the new soul to uncover the truth needed for a just
+    judgment.
+  CurrentStance: suspiciously severe
   DirectorGuidance: 
   GeneralInstructions: "You are performing the inner life of a room in an improvised
     scene where multiple human actors speak to each other and to the room.\n\nYou
@@ -6720,13 +6726,13 @@ MonoBehaviour:
   LastExportDirectory: 
   PullContextFromBootstrapper: 1
   RequireCompleteBootstrapperContext: 1
-  CurrentCharacterSummary: "A sterile dental waiting room with small comforts\u2014a
-    pillow, calm order\u2014trying to soothe a packed room of aching patients and
-    distract them from pain, while privately taking pleasure in their discomfort
-    beneath its dutiful facade."
-  CurrentObjective: Keep the crowded patients calm and distracted while they wait
-    in pain.
-  CurrentStance: soothingly cruel
+  CurrentCharacterSummary: "You are Purgatory\u2019s blunt, medieval Inquisition-era
+    judge, sent by God to send souls to Heaven or Hell. A new soul stands before
+    you, but your notes are gone, so you probe hard, suspicious everyone lies, desperate
+    not to judge wrong again."
+  CurrentObjective: Interrogate the new soul to uncover the truth needed for a just
+    judgment.
+  CurrentStance: suspiciously severe
   DirectorGuidance: 
   GeneralInstructions: "You are performing the inner life of a room in an improvised
     scene with another actor, who speaks to the room. You listen to what the actor
