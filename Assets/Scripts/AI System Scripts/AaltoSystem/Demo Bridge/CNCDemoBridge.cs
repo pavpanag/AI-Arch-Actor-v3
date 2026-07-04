@@ -6,8 +6,9 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using UnityEngine;
+using AaltoSystemV3;
 
-namespace AaltoSystemV3
+namespace CNCDemo
 {
     /// <summary>
     /// Local HTTP bridge that serves the React directing console and exposes the existing
@@ -19,7 +20,7 @@ namespace AaltoSystemV3
     /// the main thread via RunOnMainThread(...) (drained in Update), mirroring the queue pattern
     /// used by the OSC speech receivers.
     /// </summary>
-    public sealed class AaltoDemoBridge : MonoBehaviour
+    public sealed class CNCDemoBridge : MonoBehaviour
     {
         [Header("Server")]
         [Tooltip("Port for the local console. Open http://localhost:<port> in a browser on this machine.")]
@@ -36,7 +37,7 @@ namespace AaltoSystemV3
         public AaltoInterviewController Interview;
         public AaltoObjectiveStanceBootstrapper Bootstrapper;
         public AaltoActionMemoryRegistryDual Registry;
-        public AaltoFrameCompiler FrameCompiler;
+        public CNCFrameCompiler FrameCompiler;
 
         [Header("Default Scene")]
         [Tooltip("Preset loaded on Start so a visitor can walk up to a working directed lamp with no setup.")]
@@ -72,7 +73,7 @@ namespace AaltoSystemV3
             while (_mainThreadQueue.TryDequeue(out var action))
             {
                 try { action(); }
-                catch (Exception ex) { Debug.LogError("[AaltoDemoBridge] main-thread action failed: " + ex); }
+                catch (Exception ex) { Debug.LogError("[CNCDemoBridge] main-thread action failed: " + ex); }
             }
         }
 
@@ -90,13 +91,13 @@ namespace AaltoSystemV3
                 _listenerThread = new Thread(ListenLoop) { IsBackground = true };
                 _listenerThread.Start();
                 ServerStatus = $"Listening on http://{(AllowLanAccess ? "<this-machine-ip>" : "localhost")}:{Port}/";
-                Debug.Log("[AaltoDemoBridge] " + ServerStatus);
+                Debug.Log("[CNCDemoBridge] " + ServerStatus);
             }
             catch (Exception ex)
             {
                 ServerStatus = "Failed to start: " + ex.Message +
                     (AllowLanAccess ? " (LAN bind may need admin/urlacl on Windows)" : "");
-                Debug.LogError("[AaltoDemoBridge] " + ServerStatus);
+                Debug.LogError("[CNCDemoBridge] " + ServerStatus);
             }
         }
 
@@ -223,7 +224,7 @@ namespace AaltoSystemV3
                         var brief = RunOnMainThreadAsync(() =>
                             FrameCompiler != null
                                 ? FrameCompiler.CompileSceneAsync(req.items, req.followUpQuestion, req.followUpAnswer)
-                                : Task.FromResult<AaltoFrameCompiler.SceneBrief>(null));
+                                : Task.FromResult<CNCFrameCompiler.SceneBrief>(null));
                         RunOnMainThread(() =>
                         {
                             if (brief != null && !string.IsNullOrWhiteSpace(brief.sceneFrame))
@@ -240,7 +241,7 @@ namespace AaltoSystemV3
                         var brief = RunOnMainThreadAsync(() =>
                             FrameCompiler != null
                                 ? FrameCompiler.CompileDramaturgyAsync(req.items, req.followUpQuestion, req.followUpAnswer)
-                                : Task.FromResult<AaltoFrameCompiler.DramaturgyBrief>(null));
+                                : Task.FromResult<CNCFrameCompiler.DramaturgyBrief>(null));
                         RunOnMainThread(() =>
                         {
                             if (brief != null && Performer != null)
@@ -304,7 +305,7 @@ namespace AaltoSystemV3
             }
             catch (Exception ex)
             {
-                Debug.LogError("[AaltoDemoBridge] async op failed: " + ex.Message);
+                Debug.LogError("[CNCDemoBridge] async op failed: " + ex.Message);
                 return default;
             }
         }
@@ -448,7 +449,7 @@ namespace AaltoSystemV3
             _directingLines.Clear();
             ComposeGuidance();
 
-            Debug.Log("[AaltoDemoBridge] Loaded preset: " + preset.name);
+            Debug.Log("[CNCDemoBridge] Loaded preset: " + preset.name);
         }
 
         /// <summary>Folds the scene frame and any directing lines into the performer's guidance channel.</summary>

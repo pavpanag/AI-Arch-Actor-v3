@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
+using AaltoSystemV3;
 
-namespace AaltoSystemV3
+namespace CNCDemo
 {
     /// <summary>
     /// Turns a frame's question/answer list into a compact, playable brief, using the existing
@@ -14,7 +15,7 @@ namespace AaltoSystemV3
     ///
     /// New file only — nothing in the existing system is modified.
     /// </summary>
-    public sealed class AaltoFrameCompiler : MonoBehaviour
+    public sealed class CNCFrameCompiler : MonoBehaviour
     {
         [Header("Scene Refs")]
         public OpenAIClient OpenAI;
@@ -50,7 +51,7 @@ namespace AaltoSystemV3
                 "If the answers are already clear enough to work with, return an empty string. " +
                 "Return JSON only: {\"follow_up\":\"<one question, or empty>\"}.";
 
-            var response = await Ask(system, BuildQaBlock(qa, null, null), "Aalto:FrameFollowUp");
+            var response = await Ask(system, BuildQaBlock(qa, null, null), "CNC:FrameFollowUp");
             var parsed = SafeParse<FollowUpResponse>(response);
             LastFollowUp = parsed?.follow_up ?? string.Empty;
             LastStatus = string.IsNullOrWhiteSpace(LastFollowUp) ? "No follow-up needed." : "Follow-up generated.";
@@ -68,7 +69,7 @@ namespace AaltoSystemV3
                 "Keep the summary concrete and playable. Avoid abstraction and generic assistant language. Stay faithful to what the author wrote. " +
                 "Return JSON only: {\"summary\":\"...\",\"objective\":\"...\",\"stance\":\"...\"}.";
 
-            var response = await Ask(system, BuildQaBlock(qa, followUpQuestion, followUpAnswer), "Aalto:FrameCompileCharacter");
+            var response = await Ask(system, BuildQaBlock(qa, followUpQuestion, followUpAnswer), "CNC:FrameCompileCharacter");
             var parsed = SafeParse<DramaturgyResponse>(response);
             var brief = new DramaturgyBrief
             {
@@ -90,7 +91,7 @@ namespace AaltoSystemV3
                 "Keep it concrete and directive; a few sentences. Stay faithful to what the author wrote. " +
                 "Return JSON only: {\"scene_frame\":\"...\"}.";
 
-            var response = await Ask(system, BuildQaBlock(qa, followUpQuestion, followUpAnswer), "Aalto:FrameCompileScene");
+            var response = await Ask(system, BuildQaBlock(qa, followUpQuestion, followUpAnswer), "CNC:FrameCompileScene");
             var parsed = SafeParse<SceneResponse>(response);
             var brief = new SceneBrief { sceneFrame = parsed?.scene_frame?.Trim() ?? string.Empty };
             LastCompiled = "scene_frame: " + brief.sceneFrame;
@@ -124,7 +125,7 @@ namespace AaltoSystemV3
             catch (Exception ex)
             {
                 LastStatus = "Model call failed: " + ex.Message;
-                Debug.LogError("[AaltoFrameCompiler] " + LastStatus);
+                Debug.LogError("[CNCFrameCompiler] " + LastStatus);
                 return string.Empty;
             }
         }

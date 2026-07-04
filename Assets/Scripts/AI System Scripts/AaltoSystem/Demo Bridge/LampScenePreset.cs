@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace AaltoSystemV3
+namespace CNCDemo
 {
     /// <summary>
     /// A ready-to-play default scene loaded on boot, so a visitor can walk up and talk to a
@@ -14,7 +14,7 @@ namespace AaltoSystemV3
     /// modified; the bridge writes these values into the performer's public fields from outside.
     /// Create via: Assets > Create > Aalto System > Lamp Scene Preset.
     /// </summary>
-    [CreateAssetMenu(menuName = "Aalto System/Lamp Scene Preset", fileName = "LampScenePreset")]
+    [CreateAssetMenu(menuName = "C&C Demo/Lamp Scene Preset", fileName = "LampScenePreset")]
     public sealed class LampScenePreset : ScriptableObject
     {
         // --- DRAMATURGICAL FRAME ---------------------------------------------
