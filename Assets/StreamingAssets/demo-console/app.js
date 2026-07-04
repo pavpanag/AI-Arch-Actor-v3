@@ -1,8 +1,9 @@
-/* The Lamp — directing console. No build step: React (UMD) + htm, served by AaltoDemoBridge. */
+/* The Lamp — directing console. No build step, no eval: Preact (UMD) + htm, served by CNCDemoBridge. */
 (function () {
   "use strict";
-  var h = htm.bind(React.createElement);
-  var useState = React.useState, useEffect = React.useEffect, useRef = React.useRef;
+  var h = htm.bind(preact.h);
+  var Fragment = preact.Fragment;
+  var useState = preactHooks.useState, useEffect = preactHooks.useEffect, useRef = preactHooks.useRef;
 
   // --- tiny API helper ---------------------------------------------------
   function api(path, body) {
@@ -26,7 +27,7 @@
       h("label", null, props.q.question),
       h("textarea", {
         value: props.q.answer || "",
-        onChange: function (e) { props.onChange(props.index, e.target.value); }
+        onInput: function (e) { props.onChange(props.index, e.target.value); }
       })
     );
   }
@@ -36,11 +37,11 @@
     var kind = props.kind;                     // "dramaturgy" | "scene"
     var items = props.items;                   // [{question, answer}]
     var setItems = props.setItems;
-    var [followUp, setFollowUp] = useState("");
-    var [followAns, setFollowAns] = useState("");
-    var [compiled, setCompiled] = useState(null);
-    var [status, setStatus] = useState("");
-    var [busy, setBusy] = useState(false);
+    var followUpState = useState(""); var followUp = followUpState[0], setFollowUp = followUpState[1];
+    var followAnsState = useState(""); var followAns = followAnsState[0], setFollowAns = followAnsState[1];
+    var compiledState = useState(null); var compiled = compiledState[0], setCompiled = compiledState[1];
+    var statusState = useState(""); var status = statusState[0], setStatus = statusState[1];
+    var busyState = useState(false); var busy = busyState[0], setBusy = busyState[1];
 
     function edit(i, val) {
       var next = items.slice();
@@ -80,7 +81,7 @@
       followUp
         ? h("div", { className: "followup" },
             h("div", { className: "fq" }, followUp),
-            h("textarea", { value: followAns, onChange: function (e) { setFollowAns(e.target.value); } }))
+            h("textarea", { value: followAns, onInput: function (e) { setFollowAns(e.target.value); } }))
         : null,
       h("div", { className: "row" },
         h("button", { className: "ghost", onClick: askFollowUp, disabled: busy }, "Ask a follow-up"),
@@ -107,7 +108,7 @@
       h("p", { className: "lead" }, "The lamp answers only in light. Each behaviour is a name it can choose; you set what the light actually does, by hand, on the fixtures."),
       h("div", { className: "vocab" },
         props.expressions.map(function (e, i) {
-          return h(React.Fragment, { key: i },
+          return h(Fragment, { key: i },
             h("div", { className: "lbl" }, h("input", { type: "text", value: e.actionLabel, readOnly: true })),
             h("div", { className: "mem" }, "→ " + e.memory)
           );
@@ -118,10 +119,11 @@
   }
 
   // --- stage: talk, direct, and watch the lamp explain itself -----------
-  function Stage(props) {
-    var [state, setState] = useState({ dialogue: [], objective: "", stance: "" });
-    var [say, setSay] = useState("");
-    var [direct, setDirect] = useState("");
+  function Stage() {
+    var stateState = useState({ dialogue: [], objective: "", stance: "" });
+    var state = stateState[0], setState = stateState[1];
+    var sayState = useState(""); var say = sayState[0], setSay = sayState[1];
+    var directState = useState(""); var direct = directState[0], setDirect = directState[1];
     var feedRef = useRef(null);
 
     useEffect(function () {
@@ -133,10 +135,6 @@
       var id = setInterval(poll, 1500);
       return function () { live = false; clearInterval(id); };
     }, []);
-
-    useEffect(function () {
-      if (feedRef.current) feedRef.current.scrollTop = 0;
-    }, [state.dialogue && state.dialogue.length]);
 
     function sendSay() {
       var t = say.trim(); if (!t) return;
@@ -154,7 +152,7 @@
         h("div", { className: "stage-bar" },
           h("input", {
             type: "text", placeholder: "Say something to the lamp…", value: say,
-            onChange: function (e) { setSay(e.target.value); },
+            onInput: function (e) { setSay(e.target.value); },
             onKeyDown: function (e) { if (e.key === "Enter") sendSay(); }
           }),
           h("button", { className: "act", onClick: sendSay }, "Speak")
@@ -162,7 +160,7 @@
         h("div", { className: "stage-bar", style: { marginTop: "10px" } },
           h("input", {
             type: "text", placeholder: "Direct the lamp (e.g. \"keep them here\")…", value: direct,
-            onChange: function (e) { setDirect(e.target.value); },
+            onInput: function (e) { setDirect(e.target.value); },
             onKeyDown: function (e) { if (e.key === "Enter") sendDirect(); }
           }),
           h("button", { className: "ghost", onClick: sendDirect }, "Direct")
@@ -192,11 +190,11 @@
 
   // --- app shell --------------------------------------------------------
   function App() {
-    var [step, setStep] = useState("stage");
-    var [drama, setDrama] = useState([]);
-    var [scene, setScene] = useState([]);
-    var [expr, setExpr] = useState([]);
-    var [ready, setReady] = useState(false);
+    var stepState = useState("stage"); var step = stepState[0], setStep = stepState[1];
+    var dramaState = useState([]); var drama = dramaState[0], setDrama = dramaState[1];
+    var sceneState = useState([]); var scene = sceneState[0], setScene = sceneState[1];
+    var exprState = useState([]); var expr = exprState[0], setExpr = exprState[1];
+    var readyState = useState(false); var ready = readyState[0], setReady = readyState[1];
 
     useEffect(function () {
       api("/api/frames").then(function (f) {
@@ -247,5 +245,5 @@
     );
   }
 
-  ReactDOM.createRoot(document.getElementById("root")).render(h(App, null));
+  preact.render(h(App, null), document.getElementById("root"));
 })();
