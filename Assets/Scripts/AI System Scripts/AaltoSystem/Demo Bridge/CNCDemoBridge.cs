@@ -37,6 +37,7 @@ namespace CNCDemo
         public AaltoDirectedRoomPerformerController Performer;
         public AaltoActionMemoryRegistryDual Registry;
         public CNCFrameCompiler FrameCompiler;
+        public CNCLampActuator Actuator;
 
         [Header("Default Scene")]
         [Tooltip("Preset loaded on Start so a visitor can walk up to a working directed lamp with no setup.")]
@@ -70,6 +71,9 @@ namespace CNCDemo
             {
                 Performer.PullContextFromBootstrapper = false;
                 Performer.RequireCompleteBootstrapperContext = false;
+                // Labels come live from the registry (which the bridge keeps in sync with the
+                // behavior list), so the manual pulled-snapshot workflow is bypassed.
+                Performer.UsePulledActionLabelsSnapshot = false;
             }
 
             if (LoadDefaultSceneOnStart && DefaultScene != null)
@@ -157,7 +161,11 @@ namespace CNCDemo
                 return;
             }
 
-            var body = ReadBody(ctx.Request);
+            // The sound upload is raw bytes; everything else is small JSON text.
+            byte[] rawBody = null;
+            string body = null;
+            if (path == "/api/expression/sound-upload") rawBody = ReadBodyBytes(ctx.Request);
+            else body = ReadBody(ctx.Request);
 
             switch (path)
             {
@@ -296,9 +304,93 @@ namespace CNCDemo
                     break;
                 }
 
-                case "/api/expression":
-                    WriteJson(ctx, 501, "{\"error\":\"not_implemented_yet\"}");
+                case "/api/expression/list":
+                    WriteJson(ctx, 200, RunOnMainThread(BuildExpressionListJson));
                     break;
+
+                case "/api/expression/apply":
+                {
+                    var req = ParseBehaviorApply(body);
+                    var json = RunOnMainThread(() =>
+                    {
+                        if (Actuator != null && req.behaviors != null)
+                        {
+                            for (int i = 0; i < req.behaviors.Count; i++)
+                            {
+                                var incoming = req.behaviors[i];
+                                if (incoming == null) continue;
+                                if (i < Actuator.Behaviors.Count)
+                                {
+                                    var existing = Actuator.Behaviors[i];
+                                    existing.label = incoming.label;
+                                    existing.colorHex = incoming.colorHex;
+                                    existing.brightness = incoming.brightness;
+                                    existing.pulse = incoming.pulse;
+                                    existing.pulseSeconds = incoming.pulseSeconds;
+                                    // soundFile is managed by record/upload, not the apply payload.
+                                }
+                                else
+                                {
+                                    incoming.soundFile = "";
+                                    Actuator.Behaviors.Add(incoming);
+                                }
+                            }
+                            SyncRegistryFromBehaviors();
+                        }
+                        return BuildExpressionListJson();
+                    });
+                    WriteJson(ctx, 200, json);
+                    break;
+                }
+
+                case "/api/expression/test":
+                {
+                    var req = ParseIndexRequest(body);
+                    RunOnMainThread(() => { Actuator?.TestBehavior(req.index); return true; });
+                    WriteJson(ctx, 200, "{\"ok\":true}");
+                    break;
+                }
+
+                case "/api/expression/suggest":
+                {
+                    var label = RunOnMainThreadAsync<string>(() =>
+                    {
+                        if (FrameCompiler == null) return Task.FromResult(string.Empty);
+                        var labels = new List<string>();
+                        if (Actuator != null)
+                            foreach (var b in Actuator.Behaviors)
+                                if (b != null && !string.IsNullOrWhiteSpace(b.label)) labels.Add(b.label);
+                        return FrameCompiler.SuggestBehaviorAsync(
+                            Performer != null ? Performer.CurrentCharacterSummary : "", _sceneFrame, labels);
+                    });
+                    WriteJson(ctx, 200, "{\"behavior\":\"" + Escape(label) + "\"}");
+                    break;
+                }
+
+                case "/api/expression/record":
+                {
+                    var req = ParseIndexRequest(body);
+                    var result = RunOnMainThreadAsync<string>(() =>
+                        Actuator != null
+                            ? Actuator.RecordSoundAsync(req.index, req.seconds > 0 ? req.seconds : 3f)
+                            : Task.FromResult("actuator not assigned"));
+                    RunOnMainThread(() => { SyncRegistryFromBehaviors(); return true; });
+                    WriteJson(ctx, 200, "{\"status\":\"" + Escape(result ?? "timed out") + "\"}");
+                    break;
+                }
+
+                case "/api/expression/sound-upload":
+                {
+                    var idx = ParseQueryInt(ctx.Request, "index", -1);
+                    var ext = ctx.Request.QueryString["ext"] ?? "wav";
+                    var result = RunOnMainThreadAsync<string>(() =>
+                        Actuator != null
+                            ? Actuator.SaveUploadedSoundAsync(idx, rawBody, ext)
+                            : Task.FromResult("actuator not assigned"));
+                    RunOnMainThread(() => { SyncRegistryFromBehaviors(); return true; });
+                    WriteJson(ctx, 200, "{\"status\":\"" + Escape(result ?? "timed out") + "\"}");
+                    break;
+                }
 
                 default:
                     WriteJson(ctx, 404, "{\"error\":\"unknown_endpoint\"}");
@@ -442,6 +534,69 @@ namespace CNCDemo
             return "{\"sceneFrame\":\"" + Escape(b != null ? b.sceneFrame : string.Empty) + "\"}";
         }
 
+        // --- Expression endpoint helpers ---------------------------------------
+
+        [Serializable]
+        private sealed class BehaviorApplyRequest { public List<CNCBehaviorSpec> behaviors = new List<CNCBehaviorSpec>(); }
+
+        [Serializable]
+        private sealed class IndexRequest { public int index; public float seconds; }
+
+        private static BehaviorApplyRequest ParseBehaviorApply(string body)
+        {
+            if (string.IsNullOrWhiteSpace(body)) return new BehaviorApplyRequest();
+            try { return JsonUtility.FromJson<BehaviorApplyRequest>(body) ?? new BehaviorApplyRequest(); }
+            catch { return new BehaviorApplyRequest(); }
+        }
+
+        private static IndexRequest ParseIndexRequest(string body)
+        {
+            if (string.IsNullOrWhiteSpace(body)) return new IndexRequest { index = -1 };
+            try { return JsonUtility.FromJson<IndexRequest>(body) ?? new IndexRequest { index = -1 }; }
+            catch { return new IndexRequest { index = -1 }; }
+        }
+
+        private static int ParseQueryInt(HttpListenerRequest req, string key, int fallback)
+        {
+            var raw = req.QueryString[key];
+            return int.TryParse(raw, out var v) ? v : fallback;
+        }
+
+        private static byte[] ReadBodyBytes(HttpListenerRequest req)
+        {
+            if (!req.HasEntityBody) return Array.Empty<byte>();
+            using (var ms = new MemoryStream())
+            {
+                req.InputStream.CopyTo(ms);
+                return ms.ToArray();
+            }
+        }
+
+        private string BuildExpressionListJson()
+        {
+            var sb = new StringBuilder();
+            sb.Append("{\"behaviors\":[");
+            var list = Actuator != null ? Actuator.Behaviors : null;
+            if (list != null)
+            {
+                for (int i = 0; i < list.Count; i++)
+                {
+                    var b = list[i];
+                    if (b == null) continue;
+                    if (i > 0) sb.Append(",");
+                    sb.Append("{\"label\":\"").Append(Escape(b.label ?? ""))
+                      .Append("\",\"colorHex\":\"").Append(Escape(b.colorHex ?? "#FFC073"))
+                      .Append("\",\"brightness\":").Append(b.brightness.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                      .Append(",\"pulse\":").Append(b.pulse ? "true" : "false")
+                      .Append(",\"pulseSeconds\":").Append(b.pulseSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                      .Append(",\"hasSound\":").Append(string.IsNullOrWhiteSpace(b.soundFile) ? "false" : "true")
+                      .Append(",\"soundFile\":\"").Append(Escape(b.soundFile ?? "")).Append("\"}");
+                }
+            }
+            sb.Append("]}");
+            return sb.ToString();
+        }
+
         // --- State snapshot ---------------------------------------------------
 
         private string BuildStateJson()
@@ -500,15 +655,15 @@ namespace CNCDemo
             sb.Append(",");
 
             sb.Append("\"expressions\":[");
-            var ex = DefaultScene != null ? DefaultScene.Expressions : null;
+            var ex = Actuator != null ? Actuator.Behaviors : (DefaultScene != null ? DefaultScene.Behaviors : null);
             if (ex != null)
             {
                 for (int i = 0; i < ex.Count; i++)
                 {
                     if (ex[i] == null) continue;
                     if (i > 0) sb.Append(",");
-                    sb.Append("{\"actionLabel\":\"").Append(Escape(ex[i].actionLabel))
-                      .Append("\",\"memory\":\"").Append(Escape(ex[i].memory)).Append("\"}");
+                    sb.Append("{\"actionLabel\":\"").Append(Escape(ex[i].label))
+                      .Append("\",\"memory\":\"memory ").Append(i + 1).Append("\"}");
                 }
             }
             sb.Append("]}");
@@ -554,7 +709,51 @@ namespace CNCDemo
             _directingLines.Clear();
             ComposeGuidance();
 
+            if (Actuator != null)
+            {
+                var specs = new List<CNCBehaviorSpec>();
+                if (preset.Behaviors != null)
+                {
+                    foreach (var b in preset.Behaviors)
+                    {
+                        if (b == null) continue;
+                        specs.Add(new CNCBehaviorSpec
+                        {
+                            label = b.label, colorHex = b.colorHex, brightness = b.brightness,
+                            pulse = b.pulse, pulseSeconds = b.pulseSeconds, soundFile = b.soundFile
+                        });
+                    }
+                }
+                Actuator.SetBehaviors(specs);
+                SyncRegistryFromBehaviors();
+            }
+
             Debug.Log("[CNCDemoBridge] Loaded preset: " + preset.name);
+        }
+
+        /// <summary>
+        /// Rebuilds the dual registry's mappings from the behavior list, preserving the seam:
+        /// behavior i => label -> "memory i+1" (+ "sound i+1" when it has a sound).
+        /// </summary>
+        private void SyncRegistryFromBehaviors()
+        {
+            if (Registry == null || Actuator == null || Actuator.Behaviors == null) return;
+
+            Registry.mappings.Clear();
+            for (int i = 0; i < Actuator.Behaviors.Count; i++)
+            {
+                var b = Actuator.Behaviors[i];
+                if (b == null || string.IsNullOrWhiteSpace(b.label)) continue;
+
+                var hasSound = !string.IsNullOrWhiteSpace(b.soundFile);
+                Registry.mappings.Add(new AaltoActionMemoryRoute
+                {
+                    actionLabel = b.label.Trim(),
+                    routeMode = hasSound ? AaltoActionMemoryRouteMode.Both : AaltoActionMemoryRouteMode.LightOnly,
+                    lightMemoryTrigger = "memory " + (i + 1),
+                    soundMemoryTrigger = hasSound ? "sound " + (i + 1) : ""
+                });
+            }
         }
 
         /// <summary>Folds the scene frame and any directing lines into the performer's guidance channel.</summary>

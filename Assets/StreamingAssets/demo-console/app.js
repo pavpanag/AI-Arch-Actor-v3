@@ -114,20 +114,116 @@
     );
   }
 
-  // --- expression vocabulary (simple: label -> memory) ------------------
-  function ExpressionStep(props) {
+  // --- expression vocabulary: label + light (colour/brightness/pulse) + sound
+  function ExpressionStep() {
+    var listState = useState([]); var behaviors = listState[0], setBehaviors = listState[1];
+    var statusState = useState(""); var status = statusState[0], setStatus = statusState[1];
+    var busyState = useState(false); var busy = busyState[0], setBusy = busyState[1];
+    var fileRef = useRef(null);
+    var fileIndexRef = useRef(0);
+
+    function refresh() {
+      api("/api/expression/list").then(function (r) {
+        if (r && r.behaviors) setBehaviors(r.behaviors);
+      });
+    }
+    useEffect(refresh, []);
+
+    function edit(i, field, value) {
+      var next = behaviors.slice();
+      var row = Object.assign({}, next[i]); row[field] = value; next[i] = row;
+      setBehaviors(next);
+    }
+
+    function applyAll() {
+      setBusy(true); setStatus("Applying…");
+      api("/api/expression/apply", { behaviors: behaviors }).then(function (r) {
+        if (r && r.behaviors) setBehaviors(r.behaviors);
+        setStatus("Applied. The lamp can use these now."); setBusy(false);
+      });
+    }
+
+    function test(i) {
+      api("/api/expression/apply", { behaviors: behaviors }).then(function () {
+        return api("/api/expression/test", { index: i });
+      });
+    }
+
+    function suggest() {
+      setBusy(true); setStatus("Thinking of one more behavior…");
+      api("/api/expression/suggest", {}).then(function (r) {
+        var label = (r && r.behavior) || "";
+        if (label) {
+          var next = behaviors.slice();
+          var slot = -1;
+          for (var i = 0; i < next.length; i++) { if (!(next[i].label || "").trim()) { slot = i; break; } }
+          if (slot < 0) { next.push({ label: "", colorHex: "#FFFFFF", brightness: 0.6, pulse: false, pulseSeconds: 2, hasSound: false, soundFile: "" }); slot = next.length - 1; }
+          var row = Object.assign({}, next[slot]); row.label = label; next[slot] = row;
+          setBehaviors(next);
+          setStatus("Suggested: “" + label + "” — now give it a light and a sound.");
+        } else setStatus("No suggestion came back.");
+        setBusy(false);
+      });
+    }
+
+    function addRow() {
+      setBehaviors(behaviors.concat([{ label: "", colorHex: "#FFFFFF", brightness: 0.6, pulse: false, pulseSeconds: 2, hasSound: false, soundFile: "" }]));
+    }
+
+    function record(i) {
+      setBusy(true); setStatus("Recording 3 seconds — speak or make the sound now…");
+      api("/api/expression/record", { index: i, seconds: 3 }).then(function (r) {
+        setStatus("Recording: " + ((r && r.status) || "?")); setBusy(false); refresh();
+      });
+    }
+
+    function pickFile(i) {
+      fileIndexRef.current = i;
+      if (fileRef.current) fileRef.current.click();
+    }
+
+    function onFile(e) {
+      var f = e.target.files && e.target.files[0];
+      e.target.value = "";
+      if (!f) return;
+      var ext = (f.name.split(".").pop() || "wav").toLowerCase();
+      setBusy(true); setStatus("Loading " + f.name + "…");
+      fetch("/api/expression/sound-upload?index=" + fileIndexRef.current + "&ext=" + ext, { method: "POST", body: f })
+        .then(function (r) { return r.json().catch(function () { return {}; }); })
+        .then(function (r) { setStatus("Sound: " + ((r && r.status) || "?")); setBusy(false); refresh(); });
+    }
+
     return h("div", { className: "card" },
       h("h2", null, "How the Lamp Speaks"),
-      h("p", { className: "lead" }, "The lamp answers only in light. Each behaviour is a name it can choose; you set what the light actually does, by hand, on the fixtures."),
-      h("div", { className: "vocab" },
-        props.expressions.map(function (e, i) {
-          return h(Fragment, { key: i },
-            h("div", { className: "lbl" }, h("input", { type: "text", value: e.actionLabel, readOnly: true, name: "expression-" + i })),
-            h("div", { className: "mem" }, "→ " + e.memory)
-          );
-        })
-      ),
-      h("p", { className: "hint" }, "For the demo these behaviours are pre-authored. What each memory looks like in light is directed on the light controller — the seam between name and light stays where the scenographer wants it.")
+      h("p", { className: "lead" }, "Each behavior is something the lamp can do: a name, a light, and — if you like — a sound. “I say yes” and “I say no” are its core; invent the rest."),
+      h("input", { type: "file", accept: "audio/*", style: { display: "none" }, ref: fileRef, onChange: onFile, name: "sound-file" }),
+      h("div", { className: "exp-head" },
+        h("span", null, "behavior"), h("span", null, "light"), h("span", null, "brightness"), h("span", null, "pulse"), h("span", null, "sound"), h("span", null, "")),
+      behaviors.map(function (b, i) {
+        return h("div", { className: "exp-row", key: i },
+          h("input", { type: "text", value: b.label || "", placeholder: "i …", name: "beh-label-" + i,
+            onInput: function (e) { edit(i, "label", e.target.value); } }),
+          h("input", { type: "color", value: b.colorHex || "#FFC073", name: "beh-color-" + i,
+            onInput: function (e) { edit(i, "colorHex", e.target.value); } }),
+          h("input", { type: "range", min: 0, max: 1, step: 0.05, value: b.brightness, name: "beh-bri-" + i,
+            onInput: function (e) { edit(i, "brightness", parseFloat(e.target.value)); } }),
+          h("label", { className: "pulse-cell" },
+            h("input", { type: "checkbox", checked: !!b.pulse, name: "beh-pulse-" + i,
+              onChange: function (e) { edit(i, "pulse", e.target.checked); } }),
+            b.pulse ? h("input", { type: "number", min: 0.5, max: 10, step: 0.5, value: b.pulseSeconds, className: "pulse-secs", name: "beh-psec-" + i,
+              onInput: function (e) { edit(i, "pulseSeconds", parseFloat(e.target.value) || 2); } }) : null),
+          h("div", { className: "sound-cell" },
+            h("span", { className: "sound-dot" + (b.hasSound ? " on" : "") }),
+            h("button", { className: "mini", onClick: function () { pickFile(i); }, disabled: busy }, "Load"),
+            h("button", { className: "mini", onClick: function () { record(i); }, disabled: busy }, "Rec")),
+          h("button", { className: "mini", onClick: function () { test(i); }, }, "Try"));
+      }),
+      h("div", { className: "row", style: { marginTop: "16px" } },
+        h("button", { className: "ghost", onClick: suggest, disabled: busy }, "Suggest one more behavior"),
+        h("button", { className: "ghost", onClick: addRow, disabled: busy }, "+ Add"),
+        h("button", { className: "act", onClick: applyAll, disabled: busy }, "Apply")),
+      h("div", { className: "status" }, status),
+      h("p", { className: "hint" }, "“Try” plays the behavior on the lamp so you can judge it. The light and sound you design here is what the lamp will use when it chooses this behavior in the scene.")
     );
   }
 
@@ -344,7 +440,7 @@
     if (!ready) body = h("div", { className: "empty" }, "Lighting the lamp…");
     else if (step === "dramaturgy") body = h(CharacterChat, { questions: drama, goToStage: function () { setStep("stage"); } });
     else if (step === "scene")      body = h(FrameStep, { kind: "scene", items: scene, setItems: setScene });
-    else if (step === "expression") body = h(ExpressionStep, { expressions: expr });
+    else if (step === "expression") body = h(ExpressionStep, null);
     else                             body = h(Stage, null);
 
     return h("div", { className: "wrap" },

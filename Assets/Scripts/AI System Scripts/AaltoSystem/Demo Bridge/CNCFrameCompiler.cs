@@ -63,6 +63,13 @@ namespace CNCDemo
             "(for example, if the character is a ship, the scene is the ship's own situation, not a person standing on a ship). " +
             "Use ONLY what the author actually wrote for the scene. Tidy messy or terse phrasing, but do NOT invent people, atmosphere, or events they did not mention — if they gave little, keep it spare and plain.";
 
+        private const string DefaultSuggestBehavior =
+            "You are helping an author build the expressive vocabulary of a scenic character that acts only through light and sound. " +
+            "Given the character, the scene, and the behaviors it already has, propose exactly ONE new behavior. " +
+            "It must be a short first-person expressive act (like 'i say yes' or 'i call for help') — a verb, something the character DOES, " +
+            "specific to this character and scene, clearly distinct from the existing behaviors, and performable as a light or sound change. " +
+            "Keep it under six words. The author will design the light and sound for it themselves.";
+
         private const string DefaultSceneEnrich =
             "You are an actor enriching a scene you have been handed. Keep everything the author established — never contradict or replace it. " +
             "The character is described in the input; keep the scene consistent with what the character actually is. " +
@@ -99,6 +106,10 @@ namespace CNCDemo
         [Tooltip("How the model ENRICHES a scene (optional, on demand). Bounded and executable. The JSON return shape is fixed by the system.")]
         [TextArea(3, 8)] public string SceneEnrichPrompt = DefaultSceneEnrich;
 
+        [Header("Coaching — Behavior Suggestion (return format is added automatically)")]
+        [Tooltip("How the model proposes ONE new expressive behavior from character + scene. The JSON return shape is fixed by the system.")]
+        [TextArea(3, 8)] public string SuggestBehaviorPrompt = DefaultSuggestBehavior;
+
         [Header("Debug (read-only)")]
         [TextArea(2, 6)] public string LastFollowUp;
         [TextArea(2, 8)] public string LastCompiled;
@@ -111,6 +122,8 @@ namespace CNCDemo
             "Return JSON only, with exactly these keys and no others: {\"summary\":\"...\",\"objective\":\"...\",\"obstacle\":\"...\",\"stance\":\"...\"}.";
         private const string SceneReturnFormat =
             "Return JSON only, with exactly this shape and no other keys: {\"scene_frame\":\"...\"}.";
+        private const string BehaviorReturnFormat =
+            "Return JSON only, with exactly this shape and no other keys: {\"behavior\":\"<one short first-person behavior label>\"}.";
 
         public sealed class DramaturgyBrief { public string summary; public string objective; public string obstacle; public string stance; }
         public sealed class SceneBrief { public string sceneFrame; }
@@ -118,6 +131,7 @@ namespace CNCDemo
         [Serializable] private sealed class FollowUpResponse { public string follow_up; }
         [Serializable] private sealed class DramaturgyResponse { public string summary; public string objective; public string obstacle; public string stance; }
         [Serializable] private sealed class SceneResponse { public string scene_frame; }
+        [Serializable] private sealed class BehaviorResponse { public string behavior; }
 
         [ContextMenu("Reset Prompts To Defaults")]
         public void ResetPromptsToDefaults()
@@ -129,6 +143,7 @@ namespace CNCDemo
             SceneFollowUpPrompt = DefaultSceneFollowUp;
             SceneCompilePrompt = DefaultSceneCompile;
             SceneEnrichPrompt = DefaultSceneEnrich;
+            SuggestBehaviorPrompt = DefaultSuggestBehavior;
             LastStatus = "Prompts reset to defaults.";
         }
 
@@ -223,6 +238,22 @@ namespace CNCDemo
             LastCompiled = "scene_frame (enriched): " + brief.sceneFrame;
             LastStatus = "Scene enriched.";
             return brief;
+        }
+
+        // --- Suggest one behavior (from character + scene) --------------------
+
+        public async Task<string> SuggestBehaviorAsync(string characterSummary, string sceneFrame, List<string> existingLabels)
+        {
+            var user =
+                "The character:\n" + (characterSummary ?? "(none)") + "\n\n" +
+                "The scene:\n" + (string.IsNullOrWhiteSpace(sceneFrame) ? "(none)" : sceneFrame) + "\n\n" +
+                "Behaviors it already has:\n- " + string.Join("\n- ", existingLabels ?? new List<string>());
+
+            var response = await Ask(WithFormat(SuggestBehaviorPrompt, BehaviorReturnFormat), user, "CNC:SuggestBehavior");
+            var parsed = SafeParse<BehaviorResponse>(response);
+            var label = (parsed?.behavior ?? string.Empty).Trim();
+            LastStatus = string.IsNullOrWhiteSpace(label) ? "No behavior suggested." : "Suggested: " + label;
+            return label;
         }
 
         // --- Internals --------------------------------------------------------

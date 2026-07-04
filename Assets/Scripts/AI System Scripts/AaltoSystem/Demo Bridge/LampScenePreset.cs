@@ -79,17 +79,18 @@ namespace CNCDemo
             "Scene: a quiet room, one lamp, one visitor — an intimate encounter. You are the lamp: mostly still, answering only in light, taking modest space. Respond when spoken to and when the person moves or rises; do not perform constantly.";
 
         // --- EXPRESSION VOCABULARY ------------------------------------------
-        // Simple: an action label (a name you write) pointing at a memory slot. You direct the
-        // actual light condition of each memory by hand; the seam stays exactly where it is.
+        // Each behavior: a label the model can choose, a light condition (colour/brightness/
+        // pulse), and an optional sound. Slot i maps to "memory i+1" / "sound i+1", so the
+        // label -> trigger seam is unchanged and the Python rig stays a drop-in alternative.
+        // "i say yes" and "i say no" are the fixed core; the third is meant to be suggested
+        // from the character and scene.
 
-        [Header("Expression Vocabulary (label -> memory slot)")]
-        public List<ExpressionBinding> Expressions = new List<ExpressionBinding>
+        [Header("Expression Vocabulary (behaviors)")]
+        public List<CNCBehaviorSpec> Behaviors = new List<CNCBehaviorSpec>
         {
-            new ExpressionBinding { actionLabel = "behavior 1", memory = "memory 1" },
-            new ExpressionBinding { actionLabel = "behavior 2", memory = "memory 2" },
-            new ExpressionBinding { actionLabel = "behavior 3", memory = "memory 3" },
-            new ExpressionBinding { actionLabel = "behavior 4", memory = "memory 4" },
-            new ExpressionBinding { actionLabel = "behavior 5", memory = "memory 5" },
+            new CNCBehaviorSpec { label = "i say yes", colorHex = "#FFC073", brightness = 1f,   pulse = false, pulseSeconds = 2f },
+            new CNCBehaviorSpec { label = "i say no",  colorHex = "#4A6DE5", brightness = 0.3f, pulse = false, pulseSeconds = 2f },
+            new CNCBehaviorSpec { label = "",          colorHex = "#FFFFFF", brightness = 0.6f, pulse = true,  pulseSeconds = 3f },
         };
 
         [Header("Pre-directed Rule (optional first 'wow' beat)")]
@@ -105,12 +106,4 @@ namespace CNCDemo
         [TextArea(1, 4)] public string answer;
     }
 
-    [Serializable]
-    public sealed class ExpressionBinding
-    {
-        [Tooltip("The action label the model chooses from — a plain name you write.")]
-        public string actionLabel;
-        [Tooltip("The memory slot it resolves to. You direct what this memory looks like by hand.")]
-        public string memory;
-    }
 }
