@@ -1,0 +1,12 @@
+python "C:/Users/pavpa/Basic interactions/Assets/Scripts/Python Scripts/Responsive System/final form/Full body gesture/full body custom gesture detection v2.py"
+
+
+python "C:/Users/pavpa/Basic interactions/Assets/Scripts/Python Scripts/Responsive System/final form/Lights controller/lights controller v14.py"
+
+python "C:/Users/pavpa/Basic interactions/Assets/Scripts/Python Scripts/Responsive System/final form/position tracking/position tracking v2.py"
+
+python "C:/Users/pavpa/Basic interactions/Assets/Scripts/Python Scripts/Responsive System/final form/Sound control/Sound adaptation v11.py"
+
+python "C:\Users\pavpa\Basic interactions\Assets\Scripts\Python Scripts\Responsive System\final form\Speech to text\speech to sentiment v3.py"
+
+python "C:\Users\pavpa\Basic interactions\Assets\Scripts\Python Scripts\Responsive System\speech to text\g-Vosk_TextToSpeech_English+emotion detection v02.py"

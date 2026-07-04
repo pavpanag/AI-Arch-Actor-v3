@@ -1,0 +1,37 @@
+[USER] hello
+[AI ANALYSIS] {
+  "Sentiment": "Neutral",
+  "Emotion": "Neutral",
+  "Atmosphere": "Neutral",
+  "Other Context": "None"
+}
+[LIGHT] Hue: 34600, Brightness: 200, Saturation: 100
+[USER] hello
+[AI ANALYSIS] {
+    "Sentiment": "Neutral",
+    "Emotion": "Neutral",
+    "Atmosphere": "Neutral",
+    "Other Context": "None"
+}
+[ROOM] The room hesitates before responding...
+[LIGHT] Hue: 34600, Brightness: 200, Saturation: 100
+[USER] do you want to tell me
+[AI ANALYSIS] {"Sentiment": "Neutral", "Emotion": "Anticipation", "Atmosphere": "Calm", "Other Context": "None"}
+[LIGHT] Hue: 34600, Brightness: 200, Saturation: 100
+[USER] can you change the light
+[AI ANALYSIS] {
+    "Sentiment": "Neutral",
+    "Emotion": "Neutral",
+    "Atmosphere": "Neutral",
+    "Other Context": "None"
+}
+[LIGHT] Hue: 34600, Brightness: 200, Saturation: 100
+[USER] do something red
+[AI ANALYSIS] {
+  "Sentiment": "Neutral",
+  "Emotion": "Neutral",
+  "Atmosphere": "Neutral",
+  "Other Context": "None"
+}
+[ROOM] The room hesitates before responding...
+[LIGHT] Hue: 34600, Brightness: 200, Saturation: 100

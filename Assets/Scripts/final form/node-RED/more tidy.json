@@ -1,0 +1,2443 @@
+[
+    {
+        "id": "6d1a337790b585d7",
+        "type": "tab",
+        "label": "Flow 1",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "1cdbadf025baf067",
+        "type": "osc",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "path": "",
+        "metadata": false,
+        "x": 150,
+        "y": 180,
+        "wires": [
+            [
+                "d23f614f127226f9"
+            ]
+        ]
+    },
+    {
+        "id": "75d034cb0a0b1473",
+        "type": "udp in",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "iface": "",
+        "port": "3333",
+        "ipv": "udp4",
+        "multicast": "false",
+        "group": "",
+        "datatype": "buffer",
+        "x": 100,
+        "y": 180,
+        "wires": [
+            [
+                "1cdbadf025baf067"
+            ]
+        ]
+    },
+    {
+        "id": "c705cd5498befb04",
+        "type": "debug",
+        "z": "6d1a337790b585d7",
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1640,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "e95c61a38814859d",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "input template",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 170,
+        "y": 1640,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "f1e223e5ba7de57c",
+        "type": "switch",
+        "z": "6d1a337790b585d7",
+        "name": "Filter",
+        "property": "payload",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "detected",
+                "vt": "str"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 1,
+        "x": 550,
+        "y": 180,
+        "wires": [
+            [
+                "70aed7cfecea9002"
+            ]
+        ]
+    },
+    {
+        "id": "0d74b5c8b94ed529",
+        "type": "osc",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "path": "",
+        "metadata": false,
+        "x": 950,
+        "y": 180,
+        "wires": [
+            [
+                "029a7beeb86f6e92"
+            ]
+        ]
+    },
+    {
+        "id": "e631883441425dc7",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "open door",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "detected",
+                "fromt": "str",
+                "to": "open_door",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 1070,
+        "y": 1520,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "a5a5871fec350b21",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "lights 1",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "detected",
+                "fromt": "str",
+                "to": "lights_1",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 1070,
+        "y": 1580,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "c53542efd8a7ee5a",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "close door",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "detected",
+                "fromt": "str",
+                "to": "close_door",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 1240,
+        "y": 1520,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "3485cd7c2c982e86",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "lights 2",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "detected",
+                "fromt": "str",
+                "to": "lights_2",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 1230,
+        "y": 1580,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "4b858b9cbc30f12f",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "...was said template",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "yes",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 170,
+        "y": 1680,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "86bdb428995c311c",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "thumbs up",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "Thumb_Up",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 210,
+        "y": 1920,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "733092ef325e1905",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "thumbs down",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "Thumb_Down",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 660,
+        "y": 1700,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "e0ff643e44fc1d2d",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "smile",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "smile",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 660,
+        "y": 1800,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "99e75d12d61f1a22",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "output template",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "detected",
+                "fromt": "str",
+                "to": "trigger",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 1170,
+        "y": 1700,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "edd704a4e86666cd",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "\"yes\" was said",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "yes",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 390,
+        "y": 1500,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "2e9d6b8d11640eaa",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "Duration detecter",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "3",
+                "fromt": "num",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 400,
+        "y": 1620,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "a7ecf807ebf34c09",
+        "type": "function",
+        "z": "6d1a337790b585d7",
+        "name": "Continuous State Monitoring",
+        "func": "//Continuous State Monitoring\n\n// Declare a variable to hold the previous state and a timer reference\nlet previousState = context.get('previousState') || null;\nlet timer = context.get('timer') || null;\n\n// Get the current input message\nlet currentState = msg.payload;\n\n// Function to handle the continuous state\nconst sendContinuousState = () => {\n    node.send({ payload: 'continuous state' });\n};\n\nif (currentState === previousState) {\n    // If the state is the same as the previous one\n    if (!timer) {\n        // Start sending 'continuous state' messages every 2 seconds\n        timer = setInterval(sendContinuousState, 2000);\n        context.set('timer', timer);\n    }\n} else {\n    // If the state has changed\n    // Clear the existing timer if it exists\n    if (timer) {\n        clearInterval(timer);\n        timer = null;\n        context.set('timer', timer);\n    }\n\n    // Send 'state changed' message\n    node.send({ payload: 'state changed' });\n}\n\n// Update the previous state\ncontext.set('previousState', currentState);\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 170,
+        "y": 1820,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "d85c28fa31245165",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "no gesture",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "no gesture",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 140,
+        "y": 1760,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "1405bdb3fd3f52f5",
+        "type": "function",
+        "z": "6d1a337790b585d7",
+        "name": "Duration Detection ",
+        "func": "// Node-RED Function: Detection Duration Module\n\n// Declare a variable to hold the state and timer references\nlet detectedPeriod = context.get('detectedPeriod') || 5; // Default detection period in seconds\n\nlet detectionStart = context.get('detectionStart') || null;\nlet detectionTimer = context.get('detectionTimer') || null;\n\n\n// Get the current input message\nlet currentState = msg.payload;\nlet currentTime = Date.now();\n\n// Function to handle sending the detected message\nconst sendDetected = () => {\n    node.send({ payload: 'detected' });\n};\n\nif (currentState === 'detected') {\n    if (!detectionStart) {\n        // If detection starts, record the start time\n        detectionStart = currentTime;\n        context.set('detectionStart', detectionStart);\n    } else if ((currentTime - detectionStart) / 1000 >= detectedPeriod) {\n        // If detection period is met, send detected message\n        sendDetected();\n        detectionStart = null; // Reset start time after sending\n        context.set('detectionStart', detectionStart);\n    }\n} else {\n    // Reset detection start if state is not 'detected'\n    detectionStart = null;\n    context.set('detectionStart', detectionStart);\n}\n\nreturn null; // No message will pass through other than 'detected'\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 370,
+        "y": 1800,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "6ded9488f5f17116",
+        "type": "function",
+        "z": "6d1a337790b585d7",
+        "name": "Position Identification",
+        "func": "// Define range boundaries\nconst x1 = 1;\nconst x2 = 20;\nconst y1 = 37;\nconst y2 = 57;\n\n// Extract x and y from payload\nconst [x, y] = msg.payload;\n\n// Check if within range\nif (x1 < x && x < x2 && y1 < y && y < y2) {\n    msg.payload = 'detected';\n    return msg;\n} else {\n    return null;\n}",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 200,
+        "y": 840,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "d1c7b934d42b223f",
+        "type": "function",
+        "z": "6d1a337790b585d7",
+        "name": "Pair generator",
+        "func": "// Function to produce test inputs (xa, ya, xb, yb)\nfunction produceTestInputs() {\n    // Example test inputs\n    const testInputs = [\n        { xa: 1, ya: 1, xb: 5, yb: 5 },\n        { xa: 4, ya: 4, xb: 3, yb: 3 },\n        \n    ];\n\n    return testInputs;\n}\n\n// Generate the test inputs and send each as a separate message\nconst testInputs = produceTestInputs();\ntestInputs.forEach(input => {\n    node.send({ payload: input });\n});",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 160,
+        "y": 1800,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "35d1813338b73873",
+        "type": "function",
+        "z": "6d1a337790b585d7",
+        "name": "Spatial Relatioship Identification",
+        "func": "// Define the distance range boundaries\nconst d1 = 3;\nconst d2 = 6;\n\n// Function to calculate the distance between two points (xa, ya) and (xb, yb)\nfunction calculateDistance(xa, ya, xb, yb) {\n    const dx = xb - xa;\n    const dy = yb - ya;\n    return Math.sqrt(dx * dx + dy * dy);\n}\n\n// Get the input points from the message payload\nconst xa = msg.payload.xa;\nconst ya = msg.payload.ya;\nconst xb = msg.payload.xb;\nconst yb = msg.payload.yb;\n\n// Calculate the distance\nconst distance = calculateDistance(xa, ya, xb, yb);\n\n// Check if the distance is within the specified range\nif (distance >= d1 && distance <= d2) {\n    msg.payload.result = 'detected';\n} else {\n    msg.payload.result = 'out of range';\n}\n\n// Include the calculated distance in the message payload\nmsg.payload.distance = distance;\n\n// Return the message\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 190,
+        "y": 900,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "8af7cbbca53b0943",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "open palm",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "Open_Palm",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 640,
+        "y": 1740,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "4756cea8f2d51487",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "pointing up",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "Pointing_Up",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 620,
+        "y": 1600,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "d92a3ba4778052d9",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "victory",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "Victory",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 430,
+        "y": 1860,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "750be0b61bc1d0ae",
+        "type": "debug",
+        "z": "6d1a337790b585d7",
+        "name": "debug 2",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 670,
+        "y": 1440,
+        "wires": []
+    },
+    {
+        "id": "849d433551bceed3",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "custom gesture detected",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "custom_gesture_detected",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 160,
+        "y": 1520,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "f70532f389dba432",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "custom facial shape 1",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "expression_1",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 590,
+        "y": 1520,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "a7702062c386b186",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "custom body shape detected",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "custom_pose_detected",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 170,
+        "y": 1580,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "a5cbcf414aaa1817",
+        "type": "function",
+        "z": "6d1a337790b585d7",
+        "name": "Greek Text Identifier",
+        "func": "// Define the word and sentiment to match\nconst chosenWord = \"όχι\"; // Replace with the word you want to match\nconst chosenSentiment = \"neutral\"; // Replace with the sentiment you want to match\n\n// Check if the incoming message matches either the text or sentiment\nif (\n    (msg.topic === \"/speech_text\" && msg.payload === chosenWord) ||\n    (msg.topic === \"/speech_sentiment\" && msg.payload === chosenSentiment)\n) {\n    // Output \"Detected\" if either condition matches\n    return { payload: \"Detected\" };\n}\n\n// If no match, do not pass the message further\nreturn null;\n\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 430,
+        "y": 1740,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "4721222bca190179",
+        "type": "udp out",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "addr": "192.168.1.75",
+        "iface": "",
+        "port": "4444",
+        "ipv": "udp4",
+        "outport": "",
+        "base64": false,
+        "multicast": "false",
+        "x": 1490,
+        "y": 520,
+        "wires": []
+    },
+    {
+        "id": "029a7beeb86f6e92",
+        "type": "udp out",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "addr": "127.0.0.1",
+        "iface": "",
+        "port": "4444",
+        "ipv": "udp4",
+        "outport": "",
+        "base64": false,
+        "multicast": "false",
+        "x": 1050,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "b4fad9e9e9392f75",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "Lights Memory 2",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "detected",
+                "fromt": "str",
+                "to": "memory 2",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 750,
+        "y": 280,
+        "wires": [
+            [
+                "c00fdccb7dc91090"
+            ]
+        ]
+    },
+    {
+        "id": "247756d81a645a9b",
+        "type": "osc",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "path": "",
+        "metadata": false,
+        "x": 170,
+        "y": 280,
+        "wires": [
+            [
+                "a4f2d44e0269dcae"
+            ]
+        ]
+    },
+    {
+        "id": "711b5245ea897b29",
+        "type": "udp in",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "iface": "",
+        "port": "3333",
+        "ipv": "udp4",
+        "multicast": "false",
+        "group": "",
+        "datatype": "buffer",
+        "x": 100,
+        "y": 280,
+        "wires": [
+            [
+                "247756d81a645a9b"
+            ]
+        ]
+    },
+    {
+        "id": "27d77f7513e3e4c9",
+        "type": "debug",
+        "z": "6d1a337790b585d7",
+        "name": "debug 3",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1460,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "b0ab1db3230c4837",
+        "type": "switch",
+        "z": "6d1a337790b585d7",
+        "name": "Filter",
+        "property": "payload",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "detected",
+                "vt": "str"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 1,
+        "x": 570,
+        "y": 280,
+        "wires": [
+            [
+                "b4fad9e9e9392f75"
+            ]
+        ]
+    },
+    {
+        "id": "c00fdccb7dc91090",
+        "type": "osc",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "path": "",
+        "metadata": false,
+        "x": 950,
+        "y": 280,
+        "wires": [
+            [
+                "da7d9f506cc1808e"
+            ]
+        ]
+    },
+    {
+        "id": "d45cc7c39a46e475",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "thumbs up",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "Thumb_Up",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 570,
+        "y": 1800,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "0fae0eb800c366d8",
+        "type": "debug",
+        "z": "6d1a337790b585d7",
+        "name": "debug 4",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1640,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "c01fe09a954abc13",
+        "type": "udp out",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "addr": "192.168.1.75",
+        "iface": "",
+        "port": "4444",
+        "ipv": "udp4",
+        "outport": "",
+        "base64": false,
+        "multicast": "false",
+        "x": 1490,
+        "y": 420,
+        "wires": []
+    },
+    {
+        "id": "da7d9f506cc1808e",
+        "type": "udp out",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "addr": "127.0.0.1",
+        "iface": "",
+        "port": "4444",
+        "ipv": "udp4",
+        "outport": "",
+        "base64": false,
+        "multicast": "false",
+        "x": 1050,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "936e9761de0d0e92",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "Lights Memory 3",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "detected",
+                "fromt": "str",
+                "to": "memory 3",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 420,
+        "y": 1920,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "ae205c33d25eaab2",
+        "type": "osc",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "path": "",
+        "metadata": false,
+        "x": 170,
+        "y": 540,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "4a4c21e9718f7480",
+        "type": "udp in",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "iface": "",
+        "port": "3333",
+        "ipv": "udp4",
+        "multicast": "false",
+        "group": "",
+        "datatype": "buffer",
+        "x": 100,
+        "y": 540,
+        "wires": [
+            [
+                "ae205c33d25eaab2"
+            ]
+        ]
+    },
+    {
+        "id": "bbb91ee61869ee30",
+        "type": "debug",
+        "z": "6d1a337790b585d7",
+        "name": "debug 5",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1460,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "555dae0ab707e603",
+        "type": "switch",
+        "z": "6d1a337790b585d7",
+        "name": "Filter",
+        "property": "payload",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "detected",
+                "vt": "str"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 1,
+        "x": 570,
+        "y": 540,
+        "wires": [
+            [
+                "e29f4cb011f62870"
+            ]
+        ]
+    },
+    {
+        "id": "b6b28c64160ea397",
+        "type": "osc",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "path": "",
+        "metadata": false,
+        "x": 950,
+        "y": 540,
+        "wires": [
+            [
+                "1f6e2586f713ff60"
+            ]
+        ]
+    },
+    {
+        "id": "9978f5c367214266",
+        "type": "debug",
+        "z": "6d1a337790b585d7",
+        "name": "debug 6",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1460,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "583d598d43cc4d63",
+        "type": "udp out",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "addr": "192.168.1.75",
+        "iface": "",
+        "port": "4444",
+        "ipv": "udp4",
+        "outport": "",
+        "base64": false,
+        "multicast": "false",
+        "x": 1490,
+        "y": 360,
+        "wires": []
+    },
+    {
+        "id": "1f6e2586f713ff60",
+        "type": "udp out",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "addr": "127.0.0.1",
+        "iface": "",
+        "port": "5555",
+        "ipv": "udp4",
+        "outport": "",
+        "base64": false,
+        "multicast": "false",
+        "x": 1070,
+        "y": 540,
+        "wires": []
+    },
+    {
+        "id": "b75555d4c10b6f28",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "victory",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "Victory",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 690,
+        "y": 1740,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "10b41e12ae8ac009",
+        "type": "debug",
+        "z": "6d1a337790b585d7",
+        "name": "debug 7",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1440,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "89db060b7833be24",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "Lights memory 5",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "detected",
+                "fromt": "str",
+                "to": "memory 5",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 1130,
+        "y": 1460,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "650e69565fbc6f02",
+        "type": "osc",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "path": "",
+        "metadata": false,
+        "x": 150,
+        "y": 620,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "27209cf356119131",
+        "type": "udp in",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "iface": "",
+        "port": "3333",
+        "ipv": "udp4",
+        "multicast": "false",
+        "group": "",
+        "datatype": "buffer",
+        "x": 100,
+        "y": 620,
+        "wires": [
+            [
+                "650e69565fbc6f02"
+            ]
+        ]
+    },
+    {
+        "id": "9c8db7e91dbf9e01",
+        "type": "switch",
+        "z": "6d1a337790b585d7",
+        "name": "Filter",
+        "property": "payload",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "detected",
+                "vt": "str"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 1,
+        "x": 570,
+        "y": 620,
+        "wires": [
+            [
+                "479858633070ae32"
+            ]
+        ]
+    },
+    {
+        "id": "af72d7327939128e",
+        "type": "osc",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "path": "",
+        "metadata": false,
+        "x": 950,
+        "y": 620,
+        "wires": [
+            [
+                "dd9e191217a81812"
+            ]
+        ]
+    },
+    {
+        "id": "acbe60e4dba075c3",
+        "type": "udp out",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "addr": "192.168.1.75",
+        "iface": "",
+        "port": "4444",
+        "ipv": "udp4",
+        "outport": "",
+        "base64": false,
+        "multicast": "false",
+        "x": 1490,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "dd9e191217a81812",
+        "type": "udp out",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "addr": "127.0.0.1",
+        "iface": "",
+        "port": "5555",
+        "ipv": "udp4",
+        "outport": "",
+        "base64": false,
+        "multicast": "false",
+        "x": 1090,
+        "y": 620,
+        "wires": []
+    },
+    {
+        "id": "b15323f6763db88a",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "trust detector",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "trust",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 440,
+        "y": 1020,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "93f1dee64049043e",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "gesture 2",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "gesture_2",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 360,
+        "y": 1860,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "414eb1745f85c2f4",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "gesture 1",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "gesture_1",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 180,
+        "y": 1860,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "a13b5559b060b7ce",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "no gesture",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "gesture_none",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 420,
+        "y": 1200,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "b6d1ebf04e351f69",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "pose_1",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "pose_1",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 450,
+        "y": 1800,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "dd925c1a634bcbe6",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "pose_2",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "pose_2",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 220,
+        "y": 1860,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "232b9b63a00e3a52",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "custom facial none",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "expression_none",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 1830,
+        "y": 880,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "d23f614f127226f9",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "full_body_gesture_1",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "full_body_gesture_1",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 340,
+        "y": 180,
+        "wires": [
+            [
+                "f1e223e5ba7de57c"
+            ]
+        ]
+    },
+    {
+        "id": "e29f4cb011f62870",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "Sound 1",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "detected",
+                "fromt": "str",
+                "to": "sound 1",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 780,
+        "y": 540,
+        "wires": [
+            [
+                "b6b28c64160ea397"
+            ]
+        ]
+    },
+    {
+        "id": "a4f2d44e0269dcae",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "full_body_gesture_2",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "full_body_gesture_2",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 360,
+        "y": 280,
+        "wires": [
+            [
+                "b0ab1db3230c4837"
+            ]
+        ]
+    },
+    {
+        "id": "1948b280a27e17a6",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "Lights Memory 2",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "detected",
+                "fromt": "str",
+                "to": "memory 2",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 1070,
+        "y": 960,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "ee697240fca09985",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": ".....was said",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "όχι",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 450,
+        "y": 900,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "61ab385e93f0a898",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "Sound 3",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "detected",
+                "fromt": "str",
+                "to": "sound 3",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 820,
+        "y": 960,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "0ed469e355b09a60",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "Sound 4",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "detected",
+                "fromt": "str",
+                "to": "sound 4",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 820,
+        "y": 1020,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "1ab8582d2edc435f",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "Sound 5",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "detected",
+                "fromt": "str",
+                "to": "sound 5",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 820,
+        "y": 1080,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "6c0ff1c9a81ffad0",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "Sound 6",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "detected",
+                "fromt": "str",
+                "to": "sound 6",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 818,
+        "y": 1129,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "af794708b68d1749",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "Lights Memory 3",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "detected",
+                "fromt": "str",
+                "to": "memory 3",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 1070,
+        "y": 1020,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "8ffbd3765a2481c1",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "Lights Memory 4",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "detected",
+                "fromt": "str",
+                "to": "memory 4",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 1070,
+        "y": 1080,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "948910a7b2a5a3b8",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "Lights Memory 5",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "detected",
+                "fromt": "str",
+                "to": "memory 5",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 1070,
+        "y": 1140,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "a447537b0bfd8ea4",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "Lights Memory 1",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "detected",
+                "fromt": "str",
+                "to": "memory 1",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 1070,
+        "y": 900,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "5ed66f49534e9fd5",
+        "type": "osc",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "path": "",
+        "metadata": false,
+        "x": 150,
+        "y": 680,
+        "wires": [
+            [
+                "c5332dbc8ea09f54"
+            ]
+        ]
+    },
+    {
+        "id": "5854162e7ceea1f0",
+        "type": "udp in",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "iface": "",
+        "port": "3333",
+        "ipv": "udp4",
+        "multicast": "false",
+        "group": "",
+        "datatype": "buffer",
+        "x": 100,
+        "y": 680,
+        "wires": [
+            [
+                "5ed66f49534e9fd5"
+            ]
+        ]
+    },
+    {
+        "id": "fb8ec94b7f4167ef",
+        "type": "switch",
+        "z": "6d1a337790b585d7",
+        "name": "filter",
+        "property": "payload",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "detected",
+                "vt": "str"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 1,
+        "x": 570,
+        "y": 680,
+        "wires": [
+            [
+                "f465118a85b046d7"
+            ]
+        ]
+    },
+    {
+        "id": "812f6352de944e88",
+        "type": "osc",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "path": "",
+        "metadata": false,
+        "x": 950,
+        "y": 680,
+        "wires": [
+            [
+                "1e8169a6fc8954eb"
+            ]
+        ]
+    },
+    {
+        "id": "1e8169a6fc8954eb",
+        "type": "udp out",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "addr": "127.0.0.1",
+        "iface": "",
+        "port": "5555",
+        "ipv": "udp4",
+        "outport": "",
+        "base64": false,
+        "multicast": "false",
+        "x": 1090,
+        "y": 680,
+        "wires": []
+    },
+    {
+        "id": "c5332dbc8ea09f54",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "full_body_gesture_1",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "full_body_gesture_1",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 360,
+        "y": 680,
+        "wires": [
+            [
+                "fb8ec94b7f4167ef"
+            ]
+        ]
+    },
+    {
+        "id": "7fec989743a2d032",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "Lights Memory 1",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "detected",
+                "fromt": "str",
+                "to": "memory 1",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 750,
+        "y": 360,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "977f3a04c6c66142",
+        "type": "osc",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "path": "",
+        "metadata": false,
+        "x": 170,
+        "y": 360,
+        "wires": [
+            [
+                "815102dc91fc25c9"
+            ]
+        ]
+    },
+    {
+        "id": "0746385970f4d41a",
+        "type": "udp in",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "iface": "",
+        "port": "3333",
+        "ipv": "udp4",
+        "multicast": "false",
+        "group": "",
+        "datatype": "buffer",
+        "x": 100,
+        "y": 360,
+        "wires": [
+            [
+                "977f3a04c6c66142"
+            ]
+        ]
+    },
+    {
+        "id": "49dd4318f9524dee",
+        "type": "switch",
+        "z": "6d1a337790b585d7",
+        "name": "Filter",
+        "property": "payload",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "detected",
+                "vt": "str"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 1,
+        "x": 570,
+        "y": 360,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "ac424715881cd9d5",
+        "type": "osc",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "path": "",
+        "metadata": false,
+        "x": 950,
+        "y": 360,
+        "wires": [
+            [
+                "0bd0df9795fd161b"
+            ]
+        ]
+    },
+    {
+        "id": "0bd0df9795fd161b",
+        "type": "udp out",
+        "z": "6d1a337790b585d7",
+        "name": "",
+        "addr": "127.0.0.1",
+        "iface": "",
+        "port": "4444",
+        "ipv": "udp4",
+        "outport": "",
+        "base64": false,
+        "multicast": "false",
+        "x": 1050,
+        "y": 360,
+        "wires": []
+    },
+    {
+        "id": "815102dc91fc25c9",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "fear detector",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "fear",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 350,
+        "y": 360,
+        "wires": [
+            [
+                "49dd4318f9524dee"
+            ]
+        ]
+    },
+    {
+        "id": "70aed7cfecea9002",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "Lights Memory 1",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "detected",
+                "fromt": "str",
+                "to": "memory 1",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 750,
+        "y": 180,
+        "wires": [
+            [
+                "0d74b5c8b94ed529"
+            ]
+        ]
+    },
+    {
+        "id": "479858633070ae32",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "Sound 2",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "detected",
+                "fromt": "str",
+                "to": "sound 2",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 780,
+        "y": 620,
+        "wires": [
+            [
+                "af72d7327939128e"
+            ]
+        ]
+    },
+    {
+        "id": "f465118a85b046d7",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "Sound 3",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "detected",
+                "fromt": "str",
+                "to": "sound 3",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 780,
+        "y": 680,
+        "wires": [
+            [
+                "812f6352de944e88"
+            ]
+        ]
+    },
+    {
+        "id": "7d78531dea0b78ba",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "hapiness detector",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "hapiness",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 190,
+        "y": 1020,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "ad1ea944ad86b5ea",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "sadness detector",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "sadness",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 190,
+        "y": 1080,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "469d8d644105fc8b",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "anger detector",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "anger",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 192,
+        "y": 1132,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "cf37bfb60bae6fdb",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "surprise detector",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "surprise",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 196,
+        "y": 1181,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "fe4430eaa5f08bb1",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "anticipation detector",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "anticipation",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 440,
+        "y": 1100,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "520a33de9d72f6a3",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "neutral emotion detector",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "neutral",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 450,
+        "y": 1160,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "63110cbbf30f7359",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "positive sentiment detector",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "positive",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 180,
+        "y": 960,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "99085d50f7f47627",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "negative sentiment detector",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "negative",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 460,
+        "y": 960,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "d3df26c8e7eceb82",
+        "type": "change",
+        "z": "6d1a337790b585d7",
+        "name": "disgust detector",
+        "rules": [
+            {
+                "t": "change",
+                "p": "payload",
+                "pt": "msg",
+                "from": "disgust",
+                "fromt": "str",
+                "to": "detected",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 440,
+        "y": 1060,
+        "wires": [
+            []
+        ]
+    }
+]
