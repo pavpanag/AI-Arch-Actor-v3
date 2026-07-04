@@ -15,7 +15,9 @@ namespace AaltoSystemV3
     public sealed class AaltoLaunchSessionLogger : MonoBehaviour
     {
         private const string RunCounterPrefsKey = "AaltoLaunchSessionLogger.RunCounter";
-        public const string ExportRootRelativePath = "Assets/Recordings/AaltoExports";
+        // Write logs OUTSIDE Assets/ so Unity does not try to import live-written files
+        // (that caused an endless reimport loop that pinned the main thread).
+        public const string ExportRootRelativePath = "Recordings/AaltoExports";
         public const string FullEventLogsSubfolder = "full-event-logs";
         public const string DialogArchivesSubfolder = "dialog-archives";
 
