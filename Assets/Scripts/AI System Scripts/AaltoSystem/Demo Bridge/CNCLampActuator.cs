@@ -61,8 +61,11 @@ namespace CNCDemo
         [Header("Physical Hue (optional)")]
         public bool EnablePhysicalHue = false;
         public string BridgeIP = "192.168.1.106";
-        public string UserApi = "";
-        public int BulbId = 1;
+        [Tooltip("Hue bridge API username (same one lights controller v15.py uses).")]
+        public string UserApi = "0fLeSuFEFbk1UV2ehHFZKAyOBDL7dlSbE2szNqwR";
+        [Tooltip("\"auto\" = ask the bridge for its lights and drive ALL of them (one lamp works whatever its ID). Or a fixed list like \"1,3\".")]
+        public string BulbIds = "auto";
+        [TextArea(1, 2)] public string HueStatus;
 
         [Header("Behaviors (runtime; loaded from the preset by the bridge)")]
         public List<CNCBehaviorSpec> Behaviors = new List<CNCBehaviorSpec>();
@@ -94,10 +97,13 @@ namespace CNCDemo
             _audio.spatialBlend = 0f; // one speaker, plain stereo out
         }
 
+        private readonly List<int> _discoveredBulbs = new List<int>();
+
         private void Start()
         {
             Directory.CreateDirectory(SoundsDirectory);
             if (EnableOscListeners) StartListeners();
+            if (EnablePhysicalHue && !string.IsNullOrWhiteSpace(UserApi)) StartCoroutine(DiscoverBulbs());
             _ = ReloadAllClipsAsync();
         }
 
@@ -372,12 +378,102 @@ namespace CNCDemo
                   ",\"transitiontime\":" + Mathf.RoundToInt(transitionSeconds * 10f) + "}"
                 : "{\"on\":false}";
 
-            var url = "http://" + BridgeIP + "/api/" + UserApi + "/lights/" + BulbId + "/state";
-            using (var req = UnityWebRequest.Put(url, body))
+            // One lamp, whatever its ID: broadcast the state to every resolved bulb.
+            foreach (var id in ResolveBulbIds())
             {
-                req.SetRequestHeader("Content-Type", "application/json");
-                yield return req.SendWebRequest();
+                var url = "http://" + BridgeIP + "/api/" + UserApi + "/lights/" + id + "/state";
+                using (var req = UnityWebRequest.Put(url, body))
+                {
+                    req.SetRequestHeader("Content-Type", "application/json");
+                    yield return req.SendWebRequest();
+                }
             }
+        }
+
+        private List<int> ResolveBulbIds()
+        {
+            var csv = (BulbIds ?? "auto").Trim();
+            if (!string.Equals(csv, "auto", StringComparison.OrdinalIgnoreCase))
+            {
+                var manual = new List<int>();
+                foreach (var part in csv.Split(','))
+                    if (int.TryParse(part.Trim(), out var id) && id > 0) manual.Add(id);
+                if (manual.Count > 0) return manual;
+            }
+
+            if (_discoveredBulbs.Count > 0) return _discoveredBulbs;
+
+            // Discovery hasn't answered (yet): fall back to broadcasting IDs 1-8,
+            // matching the lights controller's slot range.
+            return new List<int> { 1, 2, 3, 4, 5, 6, 7, 8 };
+        }
+
+        /// <summary>Asks the bridge for its lights (same as lights controller v15's mapping step) and drives all of them.</summary>
+        private System.Collections.IEnumerator DiscoverBulbs()
+        {
+            var url = "http://" + BridgeIP + "/api/" + UserApi + "/lights";
+            using (var req = UnityWebRequest.Get(url))
+            {
+                req.timeout = 5;
+                yield return req.SendWebRequest();
+                if (req.result != UnityWebRequest.Result.Success)
+                {
+                    HueStatus = "Bridge not reachable (" + req.error + ") — broadcasting to IDs 1-8.";
+                    yield break;
+                }
+
+                _discoveredBulbs.Clear();
+                foreach (var key in TopLevelJsonKeys(req.downloadHandler.text))
+                    if (int.TryParse(key, out var id)) _discoveredBulbs.Add(id);
+                _discoveredBulbs.Sort();
+
+                HueStatus = _discoveredBulbs.Count > 0
+                    ? "Driving bridge light IDs: " + string.Join(", ", _discoveredBulbs)
+                    : "Bridge answered but reported no lights — broadcasting to IDs 1-8.";
+                Debug.Log("[CNCLampActuator] " + HueStatus);
+            }
+        }
+
+        /// <summary>Extracts the top-level object keys of a JSON object like {"1":{...},"4":{...}}.</summary>
+        private static List<string> TopLevelJsonKeys(string json)
+        {
+            var keys = new List<string>();
+            if (string.IsNullOrWhiteSpace(json)) return keys;
+
+            int depth = 0;
+            bool inString = false, escaped = false;
+            var current = new StringBuilder();
+            bool capturing = false;
+
+            for (int i = 0; i < json.Length; i++)
+            {
+                var c = json[i];
+                if (inString)
+                {
+                    if (escaped) { escaped = false; if (capturing) current.Append(c); }
+                    else if (c == '\\') { escaped = true; }
+                    else if (c == '"')
+                    {
+                        inString = false;
+                        if (capturing)
+                        {
+                            // It's a key only if the next non-space char is ':'.
+                            int j = i + 1;
+                            while (j < json.Length && char.IsWhiteSpace(json[j])) j++;
+                            if (j < json.Length && json[j] == ':') keys.Add(current.ToString());
+                            capturing = false;
+                        }
+                    }
+                    else if (capturing) current.Append(c);
+                    continue;
+                }
+
+                if (c == '"') { inString = true; if (depth == 1) { capturing = true; current.Length = 0; } }
+                else if (c == '{' || c == '[') depth++;
+                else if (c == '}' || c == ']') depth--;
+            }
+
+            return keys;
         }
 
         // --- Clip loading / WAV ------------------------------------------------
