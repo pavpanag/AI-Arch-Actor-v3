@@ -10,27 +10,19 @@ namespace CNCDemo
     /// <summary>
     /// Turns a frame's question/answer list into a compact, playable brief, using the existing
     /// OpenAIClient. The dramaturgical frame compiles to summary + objective + obstacle + stance;
-    /// the scene frame compiles to a scene brief. Each frame can first ask ONE follow-up question,
-    /// phrased in the character's own first-person voice. The character can also be revised after
-    /// the fact from a plain-language change request.
+    /// the scene frame compiles to a scene brief. Compile stays strictly faithful (tidy, invent
+    /// nothing); Enrich is an optional step that fills the gaps with bounded, executable invention.
     ///
-    /// Prompts are split in two: the editable "coaching" fields below (how the model should read,
-    /// question, and summarize) and a FIXED return-format that the code appends automatically. So
-    /// you can rewrite the behaviour freely without ever breaking the JSON the code parses.
+    /// Prompts are split in two: the editable "coaching" fields (how the model should read,
+    /// question, summarize, enrich) and a FIXED return-format the code appends automatically — so
+    /// editing a prompt can never break the JSON the code parses. Right-click the component ->
+    /// "Reset Prompts To Defaults" to pull in the latest coaching without touching your references.
     /// </summary>
     public sealed class CNCFrameCompiler : MonoBehaviour
     {
-        [Header("Scene Refs")]
-        public OpenAIClient OpenAI;
-
-        [Header("Model")]
-        [Tooltip("Model id for authoring steps. Cheaper is fine here (e.g. gpt-4o-mini); the performance model can differ.")]
-        public string Model = "gpt-4o-mini";
-
-        [Header("Coaching — Character Frame (return format is added automatically)")]
-        [Tooltip("How the model should read the answers and phrase ONE clarifying question about the character. The JSON return shape is fixed by the system; you cannot break it here.")]
-        [TextArea(3, 8)]
-        public string CharacterFollowUpPrompt =
+        // Canonical default coaching text. Fields initialise from these, and the context-menu
+        // reset restores them — so updating a default here reaches the component with one click.
+        private const string DefaultCharacterFollowUp =
             "You are helping an author define the inner life of a character for an improvised scene. " +
             "You are given their answers to a few questions, written in the first person, as the character. " +
             "Treat the author's answers as the authority on what the character is; never treat a question's wording as a fact about the character. " +
@@ -39,31 +31,23 @@ namespace CNCDemo
             "(for example 'Why do I want to keep people close?', never 'Why do you want...'). " +
             "If the answers are already clear enough to work with, ask nothing.";
 
-        [Tooltip("How the model should compile the answers into the character. The JSON return shape (summary/objective/obstacle/stance) is fixed by the system; you cannot break it here.")]
-        [TextArea(3, 12)]
-        public string CharacterCompilePrompt =
+        private const string DefaultCharacterCompile =
             "Compile the author's answers (written in the first person, as the character) into runtime controls for a scenic performer. " +
             "Produce a compact character summary; a current objective (what the character wants now); an obstacle (what stands in the way of that objective); and a stance (its attitude in a few words). " +
             "Use ONLY what the author actually wrote. Tidy and clarify messy or terse phrasing, but do NOT invent details, motives, people, or circumstances they did not give — if they gave little, keep it spare. " +
             "The character is whatever the author says it is — do not assume it is a lamp or a room unless they say so.";
 
-        [Tooltip("How the model should ENRICH a character, filling gaps with playable invention. Only runs when the author presses Enrich. The JSON return shape is fixed by the system.")]
-        [TextArea(3, 8)]
-        public string CharacterEnrichPrompt =
-            "You are an actor enriching a character you have been handed. Keep everything the author established — never contradict or replace it — " +
-            "then fill the gaps with vivid, concrete, playable invention: specific details, texture, and colour that make the character richer to perform.";
+        private const string DefaultCharacterEnrich =
+            "You are an actor enriching a character you have been handed. Keep everything the author established — never contradict or replace it. " +
+            "The result must be at most 50% longer than what you were given: stay compact and easy to read. " +
+            "Only add concrete, playable things — specific behaviours and tangible details the character can actually act on — not atmosphere or abstract description.";
 
-        [Tooltip("How the model should rewrite an existing character from a plain-language change request. The JSON return shape is fixed by the system; you cannot break it here.")]
-        [TextArea(3, 10)]
-        public string CharacterRevisePrompt =
+        private const string DefaultCharacterRevise =
             "You are revising a character for a scenic performer. You are given the current summary, objective, obstacle, and stance, " +
             "and a change the author wants. Rewrite all four so the requested change is fully incorporated, while keeping everything " +
             "else faithful to what was there. The character is whatever the author says it is. Keep everything concrete and playable.";
 
-        [Header("Coaching — Scene Frame (return format is added automatically)")]
-        [Tooltip("How the model should read the answers and phrase ONE clarifying question about the scene. The JSON return shape is fixed by the system; you cannot break it here.")]
-        [TextArea(3, 8)]
-        public string SceneFollowUpPrompt =
+        private const string DefaultSceneFollowUp =
             "You are helping an author define the given circumstances of a scene for an improvised performance. " +
             "You are given their answers to a few questions, written in the first person, as the character in the scene. " +
             "Treat the author's answers as the authority; never treat a question's wording as a fact. " +
@@ -72,17 +56,44 @@ namespace CNCDemo
             "(for example 'Who else is in the room with me?', never 'Who else is with you?'). " +
             "If the answers are already clear enough to work with, ask nothing.";
 
-        [Tooltip("How the model should compile the answers into a scene brief. The JSON return shape is fixed by the system; you cannot break it here.")]
-        [TextArea(3, 10)]
-        public string SceneCompilePrompt =
+        private const string DefaultSceneCompile =
             "Compile the author's answers into a short scene brief for a scenic performer: the given circumstances, who is present, and the character's role and how present it should be. " +
             "Use ONLY what the author actually wrote. Tidy messy or terse phrasing, but do NOT invent people, atmosphere, or events they did not mention — if they gave little, keep it spare and plain.";
 
-        [Tooltip("How the model should ENRICH a scene, filling gaps with playable invention. Only runs when the author presses Enrich. The JSON return shape is fixed by the system.")]
-        [TextArea(3, 8)]
-        public string SceneEnrichPrompt =
-            "You are an actor enriching a scene you have been handed. Keep everything the author established — never contradict or replace it — " +
-            "then fill the gaps with vivid, playable invention: atmosphere, specifics, and texture that make the world richer to inhabit.";
+        private const string DefaultSceneEnrich =
+            "You are an actor enriching a scene you have been handed. Keep everything the author established — never contradict or replace it. " +
+            "The result must be at most 50% longer than what you were given: stay compact and easy to read. " +
+            "Only add concrete, playable things — what is tangibly present and what the character can actually do in the scene — not mood or abstract prose.";
+
+        [Header("Scene Refs")]
+        public OpenAIClient OpenAI;
+
+        [Header("Model")]
+        [Tooltip("Model id for authoring steps. Cheaper is fine here (e.g. gpt-4o-mini); the performance model can differ.")]
+        public string Model = "gpt-4o-mini";
+
+        [Header("Coaching — Character Frame (return format is added automatically)")]
+        [Tooltip("How the model reads the answers and phrases ONE clarifying question. The JSON return shape is fixed by the system.")]
+        [TextArea(3, 8)] public string CharacterFollowUpPrompt = DefaultCharacterFollowUp;
+
+        [Tooltip("How the model compiles the answers into the character — faithful, invents nothing. The JSON return shape is fixed by the system.")]
+        [TextArea(3, 10)] public string CharacterCompilePrompt = DefaultCharacterCompile;
+
+        [Tooltip("How the model ENRICHES a character (optional, on demand). Bounded and executable. The JSON return shape is fixed by the system.")]
+        [TextArea(3, 8)] public string CharacterEnrichPrompt = DefaultCharacterEnrich;
+
+        [Tooltip("How the model rewrites a character from a plain-language change request. The JSON return shape is fixed by the system.")]
+        [TextArea(3, 8)] public string CharacterRevisePrompt = DefaultCharacterRevise;
+
+        [Header("Coaching — Scene Frame (return format is added automatically)")]
+        [Tooltip("How the model reads the answers and phrases ONE clarifying question about the scene. The JSON return shape is fixed by the system.")]
+        [TextArea(3, 8)] public string SceneFollowUpPrompt = DefaultSceneFollowUp;
+
+        [Tooltip("How the model compiles the answers into a scene brief — faithful, invents nothing. The JSON return shape is fixed by the system.")]
+        [TextArea(3, 8)] public string SceneCompilePrompt = DefaultSceneCompile;
+
+        [Tooltip("How the model ENRICHES a scene (optional, on demand). Bounded and executable. The JSON return shape is fixed by the system.")]
+        [TextArea(3, 8)] public string SceneEnrichPrompt = DefaultSceneEnrich;
 
         [Header("Debug (read-only)")]
         [TextArea(2, 6)] public string LastFollowUp;
@@ -104,9 +115,21 @@ namespace CNCDemo
         [Serializable] private sealed class DramaturgyResponse { public string summary; public string objective; public string obstacle; public string stance; }
         [Serializable] private sealed class SceneResponse { public string scene_frame; }
 
+        [ContextMenu("Reset Prompts To Defaults")]
+        public void ResetPromptsToDefaults()
+        {
+            CharacterFollowUpPrompt = DefaultCharacterFollowUp;
+            CharacterCompilePrompt = DefaultCharacterCompile;
+            CharacterEnrichPrompt = DefaultCharacterEnrich;
+            CharacterRevisePrompt = DefaultCharacterRevise;
+            SceneFollowUpPrompt = DefaultSceneFollowUp;
+            SceneCompilePrompt = DefaultSceneCompile;
+            SceneEnrichPrompt = DefaultSceneEnrich;
+            LastStatus = "Prompts reset to defaults.";
+        }
+
         // --- Follow-up (one clarifying question, or empty) --------------------
 
-        /// <summary>Returns one short first-person follow-up question, or empty if the answers are clear enough.</summary>
         public async Task<string> GenerateFollowUpAsync(string frameKind, List<FrameQuestion> qa)
         {
             var coaching = IsScene(frameKind) ? SceneFollowUpPrompt : CharacterFollowUpPrompt;
@@ -117,7 +140,7 @@ namespace CNCDemo
             return (LastFollowUp ?? string.Empty).Trim();
         }
 
-        // --- Compile ----------------------------------------------------------
+        // --- Compile (faithful) ----------------------------------------------
 
         public async Task<DramaturgyBrief> CompileDramaturgyAsync(
             List<FrameQuestion> qa, string followUpQuestion, string followUpAnswer)
@@ -129,6 +152,20 @@ namespace CNCDemo
             LastStatus = "Character compiled.";
             return brief;
         }
+
+        public async Task<SceneBrief> CompileSceneAsync(
+            List<FrameQuestion> qa, string followUpQuestion, string followUpAnswer)
+        {
+            var response = await Ask(WithFormat(SceneCompilePrompt, SceneReturnFormat),
+                BuildQaBlock(qa, followUpQuestion, followUpAnswer), "CNC:FrameCompileScene");
+            var parsed = SafeParse<SceneResponse>(response);
+            var brief = new SceneBrief { sceneFrame = parsed?.scene_frame?.Trim() ?? string.Empty };
+            LastCompiled = "scene_frame: " + brief.sceneFrame;
+            LastStatus = "Scene compiled.";
+            return brief;
+        }
+
+        // --- Revise (from a change request) ----------------------------------
 
         public async Task<DramaturgyBrief> ReviseCharacterAsync(
             string summary, string objective, string obstacle, string stance, string change)
@@ -148,19 +185,7 @@ namespace CNCDemo
             return brief;
         }
 
-        public async Task<SceneBrief> CompileSceneAsync(
-            List<FrameQuestion> qa, string followUpQuestion, string followUpAnswer)
-        {
-            var response = await Ask(WithFormat(SceneCompilePrompt, SceneReturnFormat),
-                BuildQaBlock(qa, followUpQuestion, followUpAnswer), "CNC:FrameCompileScene");
-            var parsed = SafeParse<SceneResponse>(response);
-            var brief = new SceneBrief { sceneFrame = parsed?.scene_frame?.Trim() ?? string.Empty };
-            LastCompiled = "scene_frame: " + brief.sceneFrame;
-            LastStatus = "Scene compiled.";
-            return brief;
-        }
-
-        // --- Enrich (optional: fill the gaps with imagination) ---------------
+        // --- Enrich (optional: bounded, executable gap-filling) --------------
 
         public async Task<DramaturgyBrief> EnrichCharacterAsync(string summary, string objective, string obstacle, string stance)
         {
