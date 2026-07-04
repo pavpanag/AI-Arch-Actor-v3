@@ -44,8 +44,14 @@ namespace CNCDemo
         public string CharacterCompilePrompt =
             "Compile the author's answers (written in the first person, as the character) into runtime controls for a scenic performer. " +
             "Produce a compact character summary; a current objective (what the character wants now); an obstacle (what stands in the way of that objective); and a stance (its attitude in a few words). " +
-            "The character is whatever the author says it is — do not assume it is a lamp or a room unless they say so. " +
-            "Keep everything concrete and playable. Avoid abstraction and generic assistant language. Stay faithful to what the author wrote.";
+            "Use ONLY what the author actually wrote. Tidy and clarify messy or terse phrasing, but do NOT invent details, motives, people, or circumstances they did not give — if they gave little, keep it spare. " +
+            "The character is whatever the author says it is — do not assume it is a lamp or a room unless they say so.";
+
+        [Tooltip("How the model should ENRICH a character, filling gaps with playable invention. Only runs when the author presses Enrich. The JSON return shape is fixed by the system.")]
+        [TextArea(3, 8)]
+        public string CharacterEnrichPrompt =
+            "You are an actor enriching a character you have been handed. Keep everything the author established — never contradict or replace it — " +
+            "then fill the gaps with vivid, concrete, playable invention: specific details, texture, and colour that make the character richer to perform.";
 
         [Tooltip("How the model should rewrite an existing character from a plain-language change request. The JSON return shape is fixed by the system; you cannot break it here.")]
         [TextArea(3, 10)]
@@ -69,9 +75,14 @@ namespace CNCDemo
         [Tooltip("How the model should compile the answers into a scene brief. The JSON return shape is fixed by the system; you cannot break it here.")]
         [TextArea(3, 10)]
         public string SceneCompilePrompt =
-            "Compile the author's answers into a short scene brief for a scenic performer. " +
-            "State the given circumstances, who is present, and the character's role and how present it should be. " +
-            "Keep it concrete and directive; a few sentences. Stay faithful to what the author wrote.";
+            "Compile the author's answers into a short scene brief for a scenic performer: the given circumstances, who is present, and the character's role and how present it should be. " +
+            "Use ONLY what the author actually wrote. Tidy messy or terse phrasing, but do NOT invent people, atmosphere, or events they did not mention — if they gave little, keep it spare and plain.";
+
+        [Tooltip("How the model should ENRICH a scene, filling gaps with playable invention. Only runs when the author presses Enrich. The JSON return shape is fixed by the system.")]
+        [TextArea(3, 8)]
+        public string SceneEnrichPrompt =
+            "You are an actor enriching a scene you have been handed. Keep everything the author established — never contradict or replace it — " +
+            "then fill the gaps with vivid, playable invention: atmosphere, specifics, and texture that make the world richer to inhabit.";
 
         [Header("Debug (read-only)")]
         [TextArea(2, 6)] public string LastFollowUp;
@@ -146,6 +157,35 @@ namespace CNCDemo
             var brief = new SceneBrief { sceneFrame = parsed?.scene_frame?.Trim() ?? string.Empty };
             LastCompiled = "scene_frame: " + brief.sceneFrame;
             LastStatus = "Scene compiled.";
+            return brief;
+        }
+
+        // --- Enrich (optional: fill the gaps with imagination) ---------------
+
+        public async Task<DramaturgyBrief> EnrichCharacterAsync(string summary, string objective, string obstacle, string stance)
+        {
+            var user =
+                "Current character to enrich:\n" +
+                "summary: " + (summary ?? string.Empty) + "\n" +
+                "objective: " + (objective ?? string.Empty) + "\n" +
+                "obstacle: " + (obstacle ?? string.Empty) + "\n" +
+                "stance: " + (stance ?? string.Empty);
+
+            var response = await Ask(WithFormat(CharacterEnrichPrompt, CharacterReturnFormat), user, "CNC:FrameEnrichCharacter");
+            var brief = ParseCharacterBrief(response);
+            LastCompiled = FormatBrief("enriched", brief);
+            LastStatus = "Character enriched.";
+            return brief;
+        }
+
+        public async Task<SceneBrief> EnrichSceneAsync(string sceneFrame)
+        {
+            var user = "Current scene to enrich:\n" + (sceneFrame ?? string.Empty);
+            var response = await Ask(WithFormat(SceneEnrichPrompt, SceneReturnFormat), user, "CNC:FrameEnrichScene");
+            var parsed = SafeParse<SceneResponse>(response);
+            var brief = new SceneBrief { sceneFrame = parsed?.scene_frame?.Trim() ?? string.Empty };
+            LastCompiled = "scene_frame (enriched): " + brief.sceneFrame;
+            LastStatus = "Scene enriched.";
             return brief;
         }
 

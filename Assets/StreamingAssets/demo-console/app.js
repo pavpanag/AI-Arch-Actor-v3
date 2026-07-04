@@ -76,6 +76,12 @@
       }
     }
 
+    function enrich() {
+      setBusy(true); setStatus("Enriching…");
+      api("/api/frame/enrich", { type: kind, sceneFrame: (compiled && compiled.sceneFrame) || "" })
+        .then(function (r) { setCompiled(r || compiled); setStatus("Enriched."); setBusy(false); });
+    }
+
     var isScene = kind === "scene";
     return h("div", { className: "card" },
       h("h2", null, isScene ? "The Scene" : "Who the Lamp Is"),
@@ -94,14 +100,16 @@
       ),
       h("div", { className: "status" }, status),
       compiled
-        ? h("div", { className: "compiled" },
-            isScene
-              ? h("div", null, h("div", { className: "k" }, "Scene"), h("div", { className: "v" }, compiled.sceneFrame || "—"))
-              : h("div", null,
-                  h("div", { className: "k" }, "Summary"),   h("div", { className: "v" }, compiled.summary || "—"),
-                  h("div", { className: "k" }, "Objective"), h("div", { className: "v" }, compiled.objective || "—"),
-                  h("div", { className: "k" }, "Stance"),    h("div", { className: "v" }, compiled.stance || "—"))
-          )
+        ? h("div", null,
+            h("div", { className: "compiled" },
+              isScene
+                ? h("div", null, h("div", { className: "k" }, "Scene"), h("div", { className: "v" }, compiled.sceneFrame || "—"))
+                : h("div", null,
+                    h("div", { className: "k" }, "Summary"),   h("div", { className: "v" }, compiled.summary || "—"),
+                    h("div", { className: "k" }, "Objective"), h("div", { className: "v" }, compiled.objective || "—"),
+                    h("div", { className: "k" }, "Stance"),    h("div", { className: "v" }, compiled.stance || "—"))),
+            h("div", { className: "row", style: { marginTop: "12px" } },
+              h("button", { className: "ghost", onClick: enrich, disabled: busy }, "Enrich with imagination")))
         : null
     );
   }
@@ -229,6 +237,14 @@
         obstacle: cur.obstacle || "", stance: cur.stance || "", change: val
       }).then(function (r) { setCompiled(r || cur); setPhase("done"); });
     }
+    function enrich() {
+      var cur = compiled || {};
+      setPhase("thinking");
+      api("/api/frame/enrich", {
+        type: "dramaturgy", summary: cur.summary || "", objective: cur.objective || "",
+        obstacle: cur.obstacle || "", stance: cur.stance || ""
+      }).then(function (r) { setCompiled(r || cur); setPhase("done"); });
+    }
     function submit() {
       var val = (inputRef.current ? inputRef.current.value : "").trim(); if (!val) return;
       if (inputRef.current) inputRef.current.value = "";
@@ -290,6 +306,7 @@
               }),
               h("button", { className: "ghost", onClick: revise }, "Adjust")),
             h("div", { className: "row", style: { marginTop: "14px" } },
+              h("button", { className: "ghost", onClick: enrich }, "Enrich with imagination"),
               h("button", { className: "act", onClick: props.goToStage }, "Enter the scene")))
         : null
     );

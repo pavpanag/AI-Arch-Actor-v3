@@ -272,6 +272,30 @@ namespace CNCDemo
                     break;
                 }
 
+                case "/api/frame/enrich":
+                {
+                    var e = ParseEnrichRequest(body);
+                    if (IsSceneType(e.type))
+                    {
+                        var brief = RunOnMainThreadAsync(() =>
+                            FrameCompiler != null
+                                ? FrameCompiler.EnrichSceneAsync(e.sceneFrame)
+                                : Task.FromResult<CNCFrameCompiler.SceneBrief>(null));
+                        RunOnMainThread(() => { ApplySceneFrame(brief); return true; });
+                        WriteJson(ctx, 200, SceneBriefJson(brief));
+                    }
+                    else
+                    {
+                        var brief = RunOnMainThreadAsync(() =>
+                            FrameCompiler != null
+                                ? FrameCompiler.EnrichCharacterAsync(e.summary, e.objective, e.obstacle, e.stance)
+                                : Task.FromResult<CNCFrameCompiler.DramaturgyBrief>(null));
+                        RunOnMainThread(() => { ApplyCharacterBrief(brief); return true; });
+                        WriteJson(ctx, 200, CharacterBriefJson(brief));
+                    }
+                    break;
+                }
+
                 case "/api/expression":
                     WriteJson(ctx, 501, "{\"error\":\"not_implemented_yet\"}");
                     break;
@@ -386,6 +410,36 @@ namespace CNCDemo
                    "\"objective\":\"" + Escape(b != null ? b.objective : string.Empty) + "\"," +
                    "\"obstacle\":\"" + Escape(b != null ? b.obstacle : string.Empty) + "\"," +
                    "\"stance\":\"" + Escape(b != null ? b.stance : string.Empty) + "\"}";
+        }
+
+        [Serializable]
+        private sealed class EnrichRequest
+        {
+            public string type;
+            public string summary;
+            public string objective;
+            public string obstacle;
+            public string stance;
+            public string sceneFrame;
+        }
+
+        private static EnrichRequest ParseEnrichRequest(string body)
+        {
+            if (string.IsNullOrWhiteSpace(body)) return new EnrichRequest();
+            try { return JsonUtility.FromJson<EnrichRequest>(body) ?? new EnrichRequest(); }
+            catch { return new EnrichRequest(); }
+        }
+
+        private void ApplySceneFrame(CNCFrameCompiler.SceneBrief brief)
+        {
+            if (brief == null || string.IsNullOrWhiteSpace(brief.sceneFrame)) return;
+            _sceneFrame = brief.sceneFrame;
+            ComposeGuidance();
+        }
+
+        private static string SceneBriefJson(CNCFrameCompiler.SceneBrief b)
+        {
+            return "{\"sceneFrame\":\"" + Escape(b != null ? b.sceneFrame : string.Empty) + "\"}";
         }
 
         // --- State snapshot ---------------------------------------------------
