@@ -26,7 +26,7 @@
     return h("div", { className: "q" },
       h("label", null, props.q.question),
       h("textarea", {
-        value: props.q.answer || "",
+        value: props.q.answer || "", name: "frame-answer-" + props.index,
         onInput: function (e) { props.onChange(props.index, e.target.value); }
       })
     );
@@ -81,7 +81,7 @@
       followUp
         ? h("div", { className: "followup" },
             h("div", { className: "fq" }, followUp),
-            h("textarea", { value: followAns, onInput: function (e) { setFollowAns(e.target.value); } }))
+            h("textarea", { value: followAns, name: "frame-followup", onInput: function (e) { setFollowAns(e.target.value); } }))
         : null,
       h("div", { className: "row" },
         h("button", { className: "ghost", onClick: askFollowUp, disabled: busy }, "Ask a follow-up"),
@@ -109,7 +109,7 @@
       h("div", { className: "vocab" },
         props.expressions.map(function (e, i) {
           return h(Fragment, { key: i },
-            h("div", { className: "lbl" }, h("input", { type: "text", value: e.actionLabel, readOnly: true })),
+            h("div", { className: "lbl" }, h("input", { type: "text", value: e.actionLabel, readOnly: true, name: "expression-" + i })),
             h("div", { className: "mem" }, "→ " + e.memory)
           );
         })
@@ -151,7 +151,7 @@
       h("div", { className: "card" },
         h("div", { className: "stage-bar" },
           h("input", {
-            type: "text", placeholder: "Say something to the lamp…", value: say,
+            type: "text", placeholder: "Say something to the lamp…", value: say, name: "say-line",
             onInput: function (e) { setSay(e.target.value); },
             onKeyDown: function (e) { if (e.key === "Enter") sendSay(); }
           }),
@@ -159,7 +159,7 @@
         ),
         h("div", { className: "stage-bar", style: { marginTop: "10px" } },
           h("input", {
-            type: "text", placeholder: "Direct the lamp (e.g. \"keep them here\")…", value: direct,
+            type: "text", placeholder: "Direct the lamp (e.g. \"keep them here\")…", value: direct, name: "direct-line",
             onInput: function (e) { setDirect(e.target.value); },
             onKeyDown: function (e) { if (e.key === "Enter") sendDirect(); }
           }),
@@ -250,7 +250,7 @@
             h("div", { className: "followup" }, h("div", { className: "fq" }, current)),
             h("div", { className: "stage-bar", style: { marginTop: "12px" } },
               h("input", {
-                type: "text", placeholder: "…", key: "chat-input", ref: inputRef,
+                type: "text", placeholder: "…", key: "chat-input", ref: inputRef, name: "chat-answer",
                 onKeyDown: function (e) { if (e.key === "Enter") submit(); }
               }),
               h("button", { className: "act", onClick: submit }, phase === "followup" ? "Answer" : "Next"))
