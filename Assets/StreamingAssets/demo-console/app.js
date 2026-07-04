@@ -193,7 +193,7 @@
     var questions = props.questions || [];
     var idxState = useState(0); var idx = idxState[0], setIdx = idxState[1];
     var answersState = useState([]); var answers = answersState[0], setAnswers = answersState[1];
-    var inputState = useState(""); var input = inputState[0], setInput = inputState[1];
+    var inputRef = useRef(null);
     var phaseState = useState("asking"); var phase = phaseState[0], setPhase = phaseState[1]; // asking|followup|thinking|done
     var followUpState = useState(""); var followUp = followUpState[0], setFollowUp = followUpState[1];
     var compiledState = useState(null); var compiled = compiledState[0], setCompiled = compiledState[1];
@@ -214,8 +214,8 @@
         .then(function (r) { setCompiled(r || {}); setPhase("done"); });
     }
     function submit() {
-      var val = input.trim(); if (!val) return;
-      setInput("");
+      var val = (inputRef.current ? inputRef.current.value : "").trim(); if (!val) return;
+      if (inputRef.current) inputRef.current.value = "";
       if (phase === "asking") {
         var na = answers.slice(); na[idx] = val; setAnswers(na);
         if (idx + 1 < questions.length) setIdx(idx + 1);
@@ -250,8 +250,7 @@
             h("div", { className: "followup" }, h("div", { className: "fq" }, current)),
             h("div", { className: "stage-bar", style: { marginTop: "12px" } },
               h("input", {
-                type: "text", value: input, placeholder: "…", key: "chat-input",
-                onInput: function (e) { setInput(e.target.value); },
+                type: "text", placeholder: "…", key: "chat-input", ref: inputRef,
                 onKeyDown: function (e) { if (e.key === "Enter") submit(); }
               }),
               h("button", { className: "act", onClick: submit }, phase === "followup" ? "Answer" : "Next"))
