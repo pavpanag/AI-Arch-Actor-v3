@@ -495,6 +495,9 @@ namespace CNCDemo
 
             var bytes = File.ReadAllBytes(full);
             ctx.Response.ContentType = ContentTypeFor(full);
+            // Never cache the console during the demo, so an old page can't linger in the browser.
+            ctx.Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate";
+            ctx.Response.Headers["Pragma"] = "no-cache";
             ctx.Response.StatusCode = 200;
             ctx.Response.ContentLength64 = bytes.Length;
             ctx.Response.OutputStream.Write(bytes, 0, bytes.Length);
