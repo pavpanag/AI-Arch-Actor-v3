@@ -24,6 +24,42 @@ namespace CNCDemo
         [Tooltip("Model id for authoring steps. Cheaper is fine here (e.g. gpt-4o-mini); the performance model can differ.")]
         public string Model = "gpt-4o-mini";
 
+        [Header("Prompts — Character Frame")]
+        [Tooltip("Prompt that decides whether to ask one clarifying question about the character. MUST end by asking for JSON {\"follow_up\":\"...\"}.")]
+        [TextArea(3, 8)]
+        public string CharacterFollowUpPrompt =
+            "You are helping an author define the inner life of a character (a room or object that performs) for an improvised scene. " +
+            "You are given their answers to a few questions, written in the first person. " +
+            "If something important is unclear, thin, or contradictory, ask exactly ONE short, specific clarifying question. " +
+            "If the answers are already clear enough to work with, return an empty string. " +
+            "Return JSON only: {\"follow_up\":\"<one question, or empty>\"}.";
+
+        [Tooltip("Prompt that compiles the character answers into summary + objective + stance. MUST end by asking for JSON {\"summary\":\"...\",\"objective\":\"...\",\"stance\":\"...\"}.")]
+        [TextArea(3, 10)]
+        public string CharacterCompilePrompt =
+            "Compile the author's answers (written in the first person, as the character) into runtime controls for a scenic performer. " +
+            "Produce: a compact character summary; one current objective (what the character wants now); and one stance (its attitude in a few words). " +
+            "Keep the summary concrete and playable. Avoid abstraction and generic assistant language. Stay faithful to what the author wrote. " +
+            "Return JSON only: {\"summary\":\"...\",\"objective\":\"...\",\"stance\":\"...\"}.";
+
+        [Header("Prompts — Scene Frame")]
+        [Tooltip("Prompt that decides whether to ask one clarifying question about the scene. MUST end by asking for JSON {\"follow_up\":\"...\"}.")]
+        [TextArea(3, 8)]
+        public string SceneFollowUpPrompt =
+            "You are helping an author define the given circumstances of a scene for an improvised performance. " +
+            "You are given their answers to a few questions, written in the first person. " +
+            "If something important is unclear, thin, or contradictory, ask exactly ONE short, specific clarifying question. " +
+            "If the answers are already clear enough to work with, return an empty string. " +
+            "Return JSON only: {\"follow_up\":\"<one question, or empty>\"}.";
+
+        [Tooltip("Prompt that compiles the scene answers into a scene brief. MUST end by asking for JSON {\"scene_frame\":\"...\"}.")]
+        [TextArea(3, 10)]
+        public string SceneCompilePrompt =
+            "Compile the author's answers into a short scene brief for a scenic performer. " +
+            "State the given circumstances, who is present, and the character's role and how present it should be. " +
+            "Keep it concrete and directive; a few sentences. Stay faithful to what the author wrote. " +
+            "Return JSON only: {\"scene_frame\":\"...\"}.";
+
         [Header("Debug (read-only)")]
         [TextArea(2, 6)] public string LastFollowUp;
         [TextArea(2, 8)] public string LastCompiled;
@@ -41,15 +77,7 @@ namespace CNCDemo
         /// <summary>Returns one short follow-up question, or empty string if the answers are clear enough.</summary>
         public async Task<string> GenerateFollowUpAsync(string frameKind, List<FrameQuestion> qa)
         {
-            var system =
-                "You are helping an author define " +
-                (IsScene(frameKind)
-                    ? "the given circumstances of a scene for an improvised performance"
-                    : "the inner life of a character (a room or object that performs) for an improvised scene") +
-                ". You are given their answers to a few questions, written in the first person. " +
-                "If something important is unclear, thin, or contradictory, ask exactly ONE short, specific clarifying question. " +
-                "If the answers are already clear enough to work with, return an empty string. " +
-                "Return JSON only: {\"follow_up\":\"<one question, or empty>\"}.";
+            var system = IsScene(frameKind) ? SceneFollowUpPrompt : CharacterFollowUpPrompt;
 
             var response = await Ask(system, BuildQaBlock(qa, null, null), "CNC:FrameFollowUp");
             var parsed = SafeParse<FollowUpResponse>(response);
@@ -63,11 +91,7 @@ namespace CNCDemo
         public async Task<DramaturgyBrief> CompileDramaturgyAsync(
             List<FrameQuestion> qa, string followUpQuestion, string followUpAnswer)
         {
-            var system =
-                "Compile the author's answers (written in the first person, as the character) into runtime controls for a scenic performer. " +
-                "Produce: a compact character summary; one current objective (what the character wants now); and one stance (its attitude in a few words). " +
-                "Keep the summary concrete and playable. Avoid abstraction and generic assistant language. Stay faithful to what the author wrote. " +
-                "Return JSON only: {\"summary\":\"...\",\"objective\":\"...\",\"stance\":\"...\"}.";
+            var system = CharacterCompilePrompt;
 
             var response = await Ask(system, BuildQaBlock(qa, followUpQuestion, followUpAnswer), "CNC:FrameCompileCharacter");
             var parsed = SafeParse<DramaturgyResponse>(response);
@@ -85,11 +109,7 @@ namespace CNCDemo
         public async Task<SceneBrief> CompileSceneAsync(
             List<FrameQuestion> qa, string followUpQuestion, string followUpAnswer)
         {
-            var system =
-                "Compile the author's answers into a short scene brief for a scenic performer. " +
-                "State the given circumstances, who is present, and the character's role and how present it should be. " +
-                "Keep it concrete and directive; a few sentences. Stay faithful to what the author wrote. " +
-                "Return JSON only: {\"scene_frame\":\"...\"}.";
+            var system = SceneCompilePrompt;
 
             var response = await Ask(system, BuildQaBlock(qa, followUpQuestion, followUpAnswer), "CNC:FrameCompileScene");
             var parsed = SafeParse<SceneResponse>(response);

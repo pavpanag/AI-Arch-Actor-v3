@@ -35,8 +35,6 @@ namespace CNCDemo
 
         [Header("Wired Controllers (assign in Inspector)")]
         public AaltoDirectedRoomPerformerController Performer;
-        public AaltoInterviewController Interview;
-        public AaltoObjectiveStanceBootstrapper Bootstrapper;
         public AaltoActionMemoryRegistryDual Registry;
         public CNCFrameCompiler FrameCompiler;
 
@@ -65,6 +63,14 @@ namespace CNCDemo
             // main-thread queue never drains when the editor is in the background, and every
             // API call times out. Set in code so it works without touching Player settings.
             Application.runInBackground = true;
+
+            // The bridge owns character context, so the performer must never block a turn waiting
+            // for a bootstrapper. Force this off even if no preset is assigned.
+            if (Performer != null)
+            {
+                Performer.PullContextFromBootstrapper = false;
+                Performer.RequireCompleteBootstrapperContext = false;
+            }
 
             if (LoadDefaultSceneOnStart && DefaultScene != null)
                 ApplyPreset(DefaultScene);
