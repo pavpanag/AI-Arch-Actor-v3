@@ -36,6 +36,7 @@ namespace AaltoSystemV3
         public AaltoInterviewController Interview;
         public AaltoObjectiveStanceBootstrapper Bootstrapper;
         public AaltoActionMemoryRegistryDual Registry;
+        public AaltoFrameCompiler FrameCompiler;
 
         [Header("Default Scene")]
         [Tooltip("Preset loaded on Start so a visitor can walk up to a working directed lamp with no setup.")]
@@ -114,12 +115,18 @@ namespace AaltoSystemV3
                 try { ctx = _listener.GetContext(); }
                 catch { break; } // listener stopped
 
-                try { HandleRequest(ctx); }
-                catch (Exception ex)
+                // Handle each request off the accept loop so a long model call (frame compile)
+                // doesn't stall the live feed. Actual Unity access is still serialized via the
+                // main-thread queue, so shared state stays safe.
+                ThreadPool.QueueUserWorkItem(_ =>
                 {
-                    try { WriteJson(ctx, 500, "{\"error\":\"" + Escape(ex.Message) + "\"}"); }
-                    catch { }
-                }
+                    try { HandleRequest(ctx); }
+                    catch (Exception ex)
+                    {
+                        try { WriteJson(ctx, 500, "{\"error\":\"" + Escape(ex.Message) + "\"}"); }
+                        catch { }
+                    }
+                });
             }
         }
 
@@ -143,6 +150,10 @@ namespace AaltoSystemV3
             {
                 case "/api/state":
                     WriteJson(ctx, 200, RunOnMainThread(BuildStateJson));
+                    break;
+
+                case "/api/frames":
+                    WriteJson(ctx, 200, RunOnMainThread(BuildFramesJson));
                     break;
 
                 case "/api/say":
@@ -193,8 +204,61 @@ namespace AaltoSystemV3
                     WriteJson(ctx, 200, "{\"ok\":true}");
                     break;
 
-                // Compiling raw frame answers -> summary/scene text (model call) is handled by the
-                // frame compiler component; wired in the next step.
+                case "/api/frame/followup":
+                {
+                    var req = ParseFrameRequest(body);
+                    var followUp = RunOnMainThreadAsync(() =>
+                        FrameCompiler != null
+                            ? FrameCompiler.GenerateFollowUpAsync(req.type, req.items)
+                            : Task.FromResult(string.Empty));
+                    WriteJson(ctx, 200, "{\"followUp\":\"" + Escape(followUp) + "\"}");
+                    break;
+                }
+
+                case "/api/frame/compile":
+                {
+                    var req = ParseFrameRequest(body);
+                    if (IsSceneType(req.type))
+                    {
+                        var brief = RunOnMainThreadAsync(() =>
+                            FrameCompiler != null
+                                ? FrameCompiler.CompileSceneAsync(req.items, req.followUpQuestion, req.followUpAnswer)
+                                : Task.FromResult<AaltoFrameCompiler.SceneBrief>(null));
+                        RunOnMainThread(() =>
+                        {
+                            if (brief != null && !string.IsNullOrWhiteSpace(brief.sceneFrame))
+                            {
+                                _sceneFrame = brief.sceneFrame;
+                                ComposeGuidance();
+                            }
+                            return true;
+                        });
+                        WriteJson(ctx, 200, "{\"sceneFrame\":\"" + Escape(brief != null ? brief.sceneFrame : string.Empty) + "\"}");
+                    }
+                    else
+                    {
+                        var brief = RunOnMainThreadAsync(() =>
+                            FrameCompiler != null
+                                ? FrameCompiler.CompileDramaturgyAsync(req.items, req.followUpQuestion, req.followUpAnswer)
+                                : Task.FromResult<AaltoFrameCompiler.DramaturgyBrief>(null));
+                        RunOnMainThread(() =>
+                        {
+                            if (brief != null && Performer != null)
+                            {
+                                if (!string.IsNullOrWhiteSpace(brief.summary)) Performer.CurrentCharacterSummary = brief.summary;
+                                if (!string.IsNullOrWhiteSpace(brief.objective)) Performer.CurrentObjective = brief.objective;
+                                if (!string.IsNullOrWhiteSpace(brief.stance)) Performer.CurrentStance = brief.stance;
+                            }
+                            return true;
+                        });
+                        WriteJson(ctx, 200,
+                            "{\"summary\":\"" + Escape(brief != null ? brief.summary : string.Empty) + "\"," +
+                            "\"objective\":\"" + Escape(brief != null ? brief.objective : string.Empty) + "\"," +
+                            "\"stance\":\"" + Escape(brief != null ? brief.stance : string.Empty) + "\"}");
+                    }
+                    break;
+                }
+
                 case "/api/expression":
                     WriteJson(ctx, 501, "{\"error\":\"not_implemented_yet\"}");
                     break;
@@ -222,6 +286,55 @@ namespace AaltoSystemV3
             }
             return result;
         }
+
+        /// <summary>
+        /// Starts an async operation on the Unity main thread (required for UnityWebRequest/model
+        /// calls) and blocks the listener thread until it completes. Its await-continuations run on
+        /// the main thread via Unity's sync context, so the main thread is not itself blocked.
+        /// </summary>
+        private T RunOnMainThreadAsync<T>(Func<Task<T>> asyncFunc, int timeoutSeconds = 40)
+        {
+            var tcs = new TaskCompletionSource<T>();
+            _mainThreadQueue.Enqueue(() => _ = PumpAsync(asyncFunc, tcs));
+            try
+            {
+                if (!tcs.Task.Wait(TimeSpan.FromSeconds(timeoutSeconds)))
+                    return default;
+                return tcs.Task.Result;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("[AaltoDemoBridge] async op failed: " + ex.Message);
+                return default;
+            }
+        }
+
+        private static async Task PumpAsync<T>(Func<Task<T>> asyncFunc, TaskCompletionSource<T> tcs)
+        {
+            try { tcs.TrySetResult(await asyncFunc()); }
+            catch (Exception ex) { tcs.TrySetException(ex); }
+        }
+
+        // --- Incoming frame payload ------------------------------------------
+
+        [Serializable]
+        private sealed class FrameRequest
+        {
+            public string type;
+            public List<FrameQuestion> items = new List<FrameQuestion>();
+            public string followUpQuestion;
+            public string followUpAnswer;
+        }
+
+        private static FrameRequest ParseFrameRequest(string body)
+        {
+            if (string.IsNullOrWhiteSpace(body)) return new FrameRequest();
+            try { return JsonUtility.FromJson<FrameRequest>(body) ?? new FrameRequest(); }
+            catch { return new FrameRequest(); }
+        }
+
+        private static bool IsSceneType(string type) =>
+            !string.IsNullOrEmpty(type) && type.IndexOf("scene", StringComparison.OrdinalIgnoreCase) >= 0;
 
         // --- State snapshot ---------------------------------------------------
 
@@ -264,6 +377,52 @@ namespace AaltoSystemV3
             sb.Append("]");
             sb.Append("}");
             return sb.ToString();
+        }
+
+        /// <summary>Exposes the preset's editable question lists + expression vocabulary to the console.</summary>
+        private string BuildFramesJson()
+        {
+            var sb = new StringBuilder();
+            sb.Append("{");
+
+            sb.Append("\"dramaturgy\":");
+            AppendFrameQuestions(sb, DefaultScene != null ? DefaultScene.DramaturgyQuestions : null);
+            sb.Append(",");
+
+            sb.Append("\"scene\":");
+            AppendFrameQuestions(sb, DefaultScene != null ? DefaultScene.SceneQuestions : null);
+            sb.Append(",");
+
+            sb.Append("\"expressions\":[");
+            var ex = DefaultScene != null ? DefaultScene.Expressions : null;
+            if (ex != null)
+            {
+                for (int i = 0; i < ex.Count; i++)
+                {
+                    if (ex[i] == null) continue;
+                    if (i > 0) sb.Append(",");
+                    sb.Append("{\"actionLabel\":\"").Append(Escape(ex[i].actionLabel))
+                      .Append("\",\"memory\":\"").Append(Escape(ex[i].memory)).Append("\"}");
+                }
+            }
+            sb.Append("]}");
+            return sb.ToString();
+        }
+
+        private static void AppendFrameQuestions(StringBuilder sb, List<FrameQuestion> qs)
+        {
+            sb.Append("[");
+            if (qs != null)
+            {
+                for (int i = 0; i < qs.Count; i++)
+                {
+                    if (qs[i] == null) continue;
+                    if (i > 0) sb.Append(",");
+                    sb.Append("{\"question\":\"").Append(Escape(qs[i].question))
+                      .Append("\",\"answer\":\"").Append(Escape(qs[i].answer)).Append("\"}");
+                }
+            }
+            sb.Append("]");
         }
 
         // --- Preset application ----------------------------------------------
