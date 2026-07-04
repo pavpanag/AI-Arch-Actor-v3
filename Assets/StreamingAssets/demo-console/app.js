@@ -1,7 +1,7 @@
 /* The Lamp — directing console. No build step, no eval: Preact (UMD) + htm, served by CNCDemoBridge. */
 (function () {
   "use strict";
-  var h = htm.bind(preact.h);
+  var h = preact.h;
   var Fragment = preact.Fragment;
   var useState = preactHooks.useState, useEffect = preactHooks.useEffect, useRef = preactHooks.useRef;
 
