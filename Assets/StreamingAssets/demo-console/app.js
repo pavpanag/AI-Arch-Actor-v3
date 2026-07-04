@@ -39,6 +39,7 @@
     var setItems = props.setItems;
     var followUpState = useState(""); var followUp = followUpState[0], setFollowUp = followUpState[1];
     var followAnsState = useState(""); var followAns = followAnsState[0], setFollowAns = followAnsState[1];
+    var checkedState = useState(false); var checked = checkedState[0], setChecked = checkedState[1];
     var compiledState = useState(null); var compiled = compiledState[0], setCompiled = compiledState[1];
     var statusState = useState(""); var status = statusState[0], setStatus = statusState[1];
     var busyState = useState(false); var busy = busyState[0], setBusy = busyState[1];
@@ -49,25 +50,30 @@
       setItems(next);
     }
 
-    function askFollowUp() {
-      setBusy(true); setStatus("The lamp is considering what it still needs to know…");
-      api("/api/frame/followup", { type: kind, items: items }).then(function (r) {
-        setFollowUp((r && r.followUp) || "");
-        setStatus((r && r.followUp) ? "" : "Nothing unclear — you can compile.");
-        setBusy(false);
-      });
-    }
-
-    function compile() {
-      setBusy(true); setStatus("Compiling…");
+    function compileNow() {
+      setBusy(true); setStatus("Confirming…");
       api("/api/frame/compile", {
         type: kind, items: items,
         followUpQuestion: followUp, followUpAnswer: followAns
       }).then(function (r) {
         setCompiled(r || {});
-        setStatus("Applied. The lamp is playing this now.");
+        setStatus("Confirmed. The lamp is playing this now.");
         setBusy(false);
       });
+    }
+
+    function confirm() {
+      if (!checked) {
+        // First Confirm: let the system decide whether it needs one clarification.
+        setBusy(true); setStatus("The lamp is considering what it still needs to know…");
+        api("/api/frame/followup", { type: kind, items: items }).then(function (r) {
+          setChecked(true);
+          if (r && r.followUp) { setFollowUp(r.followUp); setStatus(""); setBusy(false); }
+          else { compileNow(); }
+        });
+      } else {
+        compileNow();
+      }
     }
 
     var isScene = kind === "scene";
@@ -84,8 +90,7 @@
             h("textarea", { value: followAns, name: "frame-followup", onInput: function (e) { setFollowAns(e.target.value); } }))
         : null,
       h("div", { className: "row" },
-        h("button", { className: "ghost", onClick: askFollowUp, disabled: busy }, "Ask a follow-up"),
-        h("button", { className: "act", onClick: compile, disabled: busy }, "Compile & apply")
+        h("button", { className: "act", onClick: confirm, disabled: busy }, "Confirm")
       ),
       h("div", { className: "status" }, status),
       compiled
