@@ -39,6 +39,8 @@ namespace CNCDemo
         public string CharacterCompilePrompt =
             "Compile the author's answers (written in the first person, as the character) into runtime controls for a scenic performer. " +
             "Produce: a compact character summary; one current objective (what the character wants now); and one stance (its attitude in a few words). " +
+            "The character is whatever the author says it is — do not assume it is a lamp or a room unless they say so. " +
+            "The summary MUST include what stands in the character's way (its obstacle), so it is not lost. " +
             "Keep the summary concrete and playable. Avoid abstraction and generic assistant language. Stay faithful to what the author wrote. " +
             "Return JSON only: {\"summary\":\"...\",\"objective\":\"...\",\"stance\":\"...\"}.";
 

@@ -25,7 +25,7 @@ namespace CNCDemo
         public List<FrameQuestion> DramaturgyQuestions = new List<FrameQuestion>
         {
             new FrameQuestion {
-                question = "I am the lamp — but who am I really?",
+                question = "Who am I?",
                 answer   = "A lamp that has shared this room a long time, quietly wanting company but never learning how to ask." },
             new FrameQuestion {
                 question = "Where am I?",

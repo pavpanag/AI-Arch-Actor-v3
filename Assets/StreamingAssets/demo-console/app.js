@@ -293,7 +293,7 @@
         return api("/api/frames");
       }).then(function (f) {
         if (f) { setDrama(f.dramaturgy || []); setScene(f.scene || []); setExpr(f.expressions || []); }
-        setStep("stage");
+        setStep("dramaturgy");
       });
     }
 
@@ -321,7 +321,7 @@
       ),
       body,
       h("div", { className: "footer" },
-        h("button", { className: "ghost", onClick: resetVisitor }, "New visitor — reset the Lamp")
+        h("button", { className: "ghost", onClick: resetVisitor }, "Reset the character")
       )
     );
   }
