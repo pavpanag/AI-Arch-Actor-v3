@@ -250,7 +250,7 @@
             h("div", { className: "followup" }, h("div", { className: "fq" }, current)),
             h("div", { className: "stage-bar", style: { marginTop: "12px" } },
               h("input", {
-                type: "text", value: input, placeholder: "…", autofocus: true,
+                type: "text", value: input, placeholder: "…", key: "chat-input",
                 onInput: function (e) { setInput(e.target.value); },
                 onKeyDown: function (e) { if (e.key === "Enter") submit(); }
               }),
