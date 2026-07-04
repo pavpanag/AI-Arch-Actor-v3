@@ -9,11 +9,12 @@ namespace CNCDemo
 {
     /// <summary>
     /// Turns a frame's question/answer list into a compact, playable brief, using the existing
-    /// OpenAIClient. Generic over frame kind: the dramaturgical frame compiles to a character
-    /// summary + objective + stance; the scene frame compiles to a scene brief. Each frame can
-    /// first ask ONE follow-up question when an answer is thin.
+    /// OpenAIClient. The dramaturgical frame compiles to summary + objective + obstacle + stance;
+    /// the scene frame compiles to a scene brief. Each frame can first ask ONE follow-up question,
+    /// phrased in the character's own first-person voice. The character can also be revised after
+    /// the fact from a plain-language change request.
     ///
-    /// New file only — nothing in the existing system is modified.
+    /// Every prompt is an editable field, so nothing the model is told is hidden. New file only.
     /// </summary>
     public sealed class CNCFrameCompiler : MonoBehaviour
     {
@@ -25,36 +26,48 @@ namespace CNCDemo
         public string Model = "gpt-4o-mini";
 
         [Header("Prompts — Character Frame")]
-        [Tooltip("Prompt that decides whether to ask one clarifying question about the character. MUST end by asking for JSON {\"follow_up\":\"...\"}.")]
+        [Tooltip("Decides whether to ask one clarifying question about the character. MUST keep the first-person instruction and end by asking for JSON {\"follow_up\":\"...\"}.")]
         [TextArea(3, 8)]
         public string CharacterFollowUpPrompt =
-            "You are helping an author define the inner life of a character (a room or object that performs) for an improvised scene. " +
-            "You are given their answers to a few questions, written in the first person. " +
+            "You are helping an author define the inner life of a character for an improvised scene. " +
+            "You are given their answers to a few questions, written in the first person, as the character. " +
             "If something important is unclear, thin, or contradictory, ask exactly ONE short, specific clarifying question. " +
+            "Phrase the question in the FIRST PERSON, as the character speaking to itself " +
+            "(for example 'Why do I want to keep people close?', never 'Why do you want...'). " +
             "If the answers are already clear enough to work with, return an empty string. " +
-            "Return JSON only: {\"follow_up\":\"<one question, or empty>\"}.";
+            "Return JSON only: {\"follow_up\":\"<one first-person question, or empty>\"}.";
 
-        [Tooltip("Prompt that compiles the character answers into summary + objective + stance. MUST end by asking for JSON {\"summary\":\"...\",\"objective\":\"...\",\"stance\":\"...\"}.")]
-        [TextArea(3, 10)]
+        [Tooltip("Compiles the character answers into summary + objective + obstacle + stance. MUST end by asking for JSON with those four keys.")]
+        [TextArea(3, 12)]
         public string CharacterCompilePrompt =
             "Compile the author's answers (written in the first person, as the character) into runtime controls for a scenic performer. " +
-            "Produce: a compact character summary; one current objective (what the character wants now); and one stance (its attitude in a few words). " +
+            "Produce four things: a compact character summary; one current objective (what the character wants now); " +
+            "one obstacle (what stands in the way of that objective); and one stance (its attitude in a few words). " +
             "The character is whatever the author says it is — do not assume it is a lamp or a room unless they say so. " +
-            "The summary MUST include what stands in the character's way (its obstacle), so it is not lost. " +
-            "Keep the summary concrete and playable. Avoid abstraction and generic assistant language. Stay faithful to what the author wrote. " +
-            "Return JSON only: {\"summary\":\"...\",\"objective\":\"...\",\"stance\":\"...\"}.";
+            "Keep everything concrete and playable. Avoid abstraction and generic assistant language. Stay faithful to what the author wrote. " +
+            "Return JSON only: {\"summary\":\"...\",\"objective\":\"...\",\"obstacle\":\"...\",\"stance\":\"...\"}.";
+
+        [Tooltip("Rewrites an existing character from a plain-language change request. MUST end by asking for JSON with the same four keys.")]
+        [TextArea(3, 10)]
+        public string CharacterRevisePrompt =
+            "You are revising a character for a scenic performer. You are given the current summary, objective, obstacle, and stance, " +
+            "and a change the author wants. Rewrite all four so the requested change is fully incorporated, while keeping everything " +
+            "else faithful to what was there. The character is whatever the author says it is. Keep everything concrete and playable. " +
+            "Return JSON only: {\"summary\":\"...\",\"objective\":\"...\",\"obstacle\":\"...\",\"stance\":\"...\"}.";
 
         [Header("Prompts — Scene Frame")]
-        [Tooltip("Prompt that decides whether to ask one clarifying question about the scene. MUST end by asking for JSON {\"follow_up\":\"...\"}.")]
+        [Tooltip("Decides whether to ask one clarifying question about the scene. MUST keep the first-person instruction and end by asking for JSON {\"follow_up\":\"...\"}.")]
         [TextArea(3, 8)]
         public string SceneFollowUpPrompt =
             "You are helping an author define the given circumstances of a scene for an improvised performance. " +
-            "You are given their answers to a few questions, written in the first person. " +
+            "You are given their answers to a few questions, written in the first person, as the character in the scene. " +
             "If something important is unclear, thin, or contradictory, ask exactly ONE short, specific clarifying question. " +
+            "Phrase the question in the FIRST PERSON, as the character speaking to itself " +
+            "(for example 'Who else is in the room with me?', never 'Who else is with you?'). " +
             "If the answers are already clear enough to work with, return an empty string. " +
-            "Return JSON only: {\"follow_up\":\"<one question, or empty>\"}.";
+            "Return JSON only: {\"follow_up\":\"<one first-person question, or empty>\"}.";
 
-        [Tooltip("Prompt that compiles the scene answers into a scene brief. MUST end by asking for JSON {\"scene_frame\":\"...\"}.")]
+        [Tooltip("Compiles the scene answers into a scene brief. MUST end by asking for JSON {\"scene_frame\":\"...\"}.")]
         [TextArea(3, 10)]
         public string SceneCompilePrompt =
             "Compile the author's answers into a short scene brief for a scenic performer. " +
@@ -67,16 +80,16 @@ namespace CNCDemo
         [TextArea(2, 8)] public string LastCompiled;
         [TextArea(1, 3)] public string LastStatus;
 
-        public sealed class DramaturgyBrief { public string summary; public string objective; public string stance; }
+        public sealed class DramaturgyBrief { public string summary; public string objective; public string obstacle; public string stance; }
         public sealed class SceneBrief { public string sceneFrame; }
 
         [Serializable] private sealed class FollowUpResponse { public string follow_up; }
-        [Serializable] private sealed class DramaturgyResponse { public string summary; public string objective; public string stance; }
+        [Serializable] private sealed class DramaturgyResponse { public string summary; public string objective; public string obstacle; public string stance; }
         [Serializable] private sealed class SceneResponse { public string scene_frame; }
 
         // --- Follow-up (one clarifying question, or empty) --------------------
 
-        /// <summary>Returns one short follow-up question, or empty string if the answers are clear enough.</summary>
+        /// <summary>Returns one short first-person follow-up question, or empty if the answers are clear enough.</summary>
         public async Task<string> GenerateFollowUpAsync(string frameKind, List<FrameQuestion> qa)
         {
             var system = IsScene(frameKind) ? SceneFollowUpPrompt : CharacterFollowUpPrompt;
@@ -93,27 +106,35 @@ namespace CNCDemo
         public async Task<DramaturgyBrief> CompileDramaturgyAsync(
             List<FrameQuestion> qa, string followUpQuestion, string followUpAnswer)
         {
-            var system = CharacterCompilePrompt;
-
-            var response = await Ask(system, BuildQaBlock(qa, followUpQuestion, followUpAnswer), "CNC:FrameCompileCharacter");
-            var parsed = SafeParse<DramaturgyResponse>(response);
-            var brief = new DramaturgyBrief
-            {
-                summary = parsed?.summary?.Trim() ?? string.Empty,
-                objective = parsed?.objective?.Trim() ?? string.Empty,
-                stance = parsed?.stance?.Trim() ?? string.Empty
-            };
-            LastCompiled = "summary: " + brief.summary + "\nobjective: " + brief.objective + "\nstance: " + brief.stance;
+            var response = await Ask(CharacterCompilePrompt, BuildQaBlock(qa, followUpQuestion, followUpAnswer), "CNC:FrameCompileCharacter");
+            var brief = ParseCharacterBrief(response);
+            LastCompiled = FormatBrief("compiled", brief);
             LastStatus = "Character compiled.";
+            return brief;
+        }
+
+        public async Task<DramaturgyBrief> ReviseCharacterAsync(
+            string summary, string objective, string obstacle, string stance, string change)
+        {
+            var user =
+                "Current character:\n" +
+                "summary: " + (summary ?? string.Empty) + "\n" +
+                "objective: " + (objective ?? string.Empty) + "\n" +
+                "obstacle: " + (obstacle ?? string.Empty) + "\n" +
+                "stance: " + (stance ?? string.Empty) + "\n\n" +
+                "The author wants to change this:\n" + (change ?? string.Empty);
+
+            var response = await Ask(CharacterRevisePrompt, user, "CNC:FrameReviseCharacter");
+            var brief = ParseCharacterBrief(response);
+            LastCompiled = FormatBrief("revised", brief);
+            LastStatus = "Character revised.";
             return brief;
         }
 
         public async Task<SceneBrief> CompileSceneAsync(
             List<FrameQuestion> qa, string followUpQuestion, string followUpAnswer)
         {
-            var system = SceneCompilePrompt;
-
-            var response = await Ask(system, BuildQaBlock(qa, followUpQuestion, followUpAnswer), "CNC:FrameCompileScene");
+            var response = await Ask(SceneCompilePrompt, BuildQaBlock(qa, followUpQuestion, followUpAnswer), "CNC:FrameCompileScene");
             var parsed = SafeParse<SceneResponse>(response);
             var brief = new SceneBrief { sceneFrame = parsed?.scene_frame?.Trim() ?? string.Empty };
             LastCompiled = "scene_frame: " + brief.sceneFrame;
@@ -122,6 +143,24 @@ namespace CNCDemo
         }
 
         // --- Internals --------------------------------------------------------
+
+        private DramaturgyBrief ParseCharacterBrief(string response)
+        {
+            var parsed = SafeParse<DramaturgyResponse>(response);
+            return new DramaturgyBrief
+            {
+                summary = parsed?.summary?.Trim() ?? string.Empty,
+                objective = parsed?.objective?.Trim() ?? string.Empty,
+                obstacle = parsed?.obstacle?.Trim() ?? string.Empty,
+                stance = parsed?.stance?.Trim() ?? string.Empty
+            };
+        }
+
+        private static string FormatBrief(string tag, DramaturgyBrief b)
+        {
+            return tag + "\nsummary: " + b.summary + "\nobjective: " + b.objective +
+                   "\nobstacle: " + b.obstacle + "\nstance: " + b.stance;
+        }
 
         private static bool IsScene(string frameKind) =>
             !string.IsNullOrEmpty(frameKind) && frameKind.IndexOf("scene", StringComparison.OrdinalIgnoreCase) >= 0;
@@ -136,8 +175,8 @@ namespace CNCDemo
 
             var messages = new List<OpenAIClient.Msg>
             {
-                new OpenAIClient.Msg("system", system),
-                new OpenAIClient.Msg("user", user)
+                new OpenAIClient.Msg("system", system ?? string.Empty),
+                new OpenAIClient.Msg("user", user ?? string.Empty)
             };
 
             try

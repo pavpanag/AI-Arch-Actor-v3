@@ -194,6 +194,7 @@
     var idxState = useState(0); var idx = idxState[0], setIdx = idxState[1];
     var answersState = useState([]); var answers = answersState[0], setAnswers = answersState[1];
     var inputRef = useRef(null);
+    var reviseRef = useRef(null);
     var phaseState = useState("asking"); var phase = phaseState[0], setPhase = phaseState[1]; // asking|followup|thinking|done
     var followUpState = useState(""); var followUp = followUpState[0], setFollowUp = followUpState[1];
     var compiledState = useState(null); var compiled = compiledState[0], setCompiled = compiledState[1];
@@ -212,6 +213,16 @@
       setPhase("thinking");
       api("/api/frame/compile", { type: "dramaturgy", items: itemsFrom(ans), followUpQuestion: fq, followUpAnswer: fa })
         .then(function (r) { setCompiled(r || {}); setPhase("done"); });
+    }
+    function revise() {
+      var val = (reviseRef.current ? reviseRef.current.value : "").trim(); if (!val) return;
+      if (reviseRef.current) reviseRef.current.value = "";
+      var cur = compiled || {};
+      setPhase("thinking");
+      api("/api/frame/revise", {
+        summary: cur.summary || "", objective: cur.objective || "",
+        obstacle: cur.obstacle || "", stance: cur.stance || "", change: val
+      }).then(function (r) { setCompiled(r || cur); setPhase("done"); });
     }
     function submit() {
       var val = (inputRef.current ? inputRef.current.value : "").trim(); if (!val) return;
@@ -262,8 +273,18 @@
             h("div", { className: "compiled" },
               h("div", { className: "k" }, "Summary"),   h("div", { className: "v" }, compiled.summary || "—"),
               h("div", { className: "k" }, "Objective"), h("div", { className: "v" }, compiled.objective || "—"),
+              h("div", { className: "k" }, "Obstacle"),  h("div", { className: "v" }, compiled.obstacle || "—"),
               h("div", { className: "k" }, "Stance"),    h("div", { className: "v" }, compiled.stance || "—")),
-            h("div", { className: "row" },
+            h("div", { className: "followup", style: { marginTop: "14px" } },
+              h("div", { className: "fq" }, "Want to change something about the character?")),
+            h("div", { className: "stage-bar", style: { marginTop: "10px" } },
+              h("input", {
+                type: "text", placeholder: "e.g. make it more forgiving; give it a new obstacle…",
+                key: "revise-input", ref: reviseRef, name: "revise",
+                onKeyDown: function (e) { if (e.key === "Enter") revise(); }
+              }),
+              h("button", { className: "ghost", onClick: revise }, "Adjust")),
+            h("div", { className: "row", style: { marginTop: "14px" } },
               h("button", { className: "act", onClick: props.goToStage }, "Enter the scene")))
         : null
     );

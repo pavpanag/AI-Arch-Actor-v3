@@ -254,21 +254,21 @@ namespace CNCDemo
                             FrameCompiler != null
                                 ? FrameCompiler.CompileDramaturgyAsync(req.items, req.followUpQuestion, req.followUpAnswer)
                                 : Task.FromResult<CNCFrameCompiler.DramaturgyBrief>(null));
-                        RunOnMainThread(() =>
-                        {
-                            if (brief != null && Performer != null)
-                            {
-                                if (!string.IsNullOrWhiteSpace(brief.summary)) Performer.CurrentCharacterSummary = brief.summary;
-                                if (!string.IsNullOrWhiteSpace(brief.objective)) Performer.CurrentObjective = brief.objective;
-                                if (!string.IsNullOrWhiteSpace(brief.stance)) Performer.CurrentStance = brief.stance;
-                            }
-                            return true;
-                        });
-                        WriteJson(ctx, 200,
-                            "{\"summary\":\"" + Escape(brief != null ? brief.summary : string.Empty) + "\"," +
-                            "\"objective\":\"" + Escape(brief != null ? brief.objective : string.Empty) + "\"," +
-                            "\"stance\":\"" + Escape(brief != null ? brief.stance : string.Empty) + "\"}");
+                        RunOnMainThread(() => { ApplyCharacterBrief(brief); return true; });
+                        WriteJson(ctx, 200, CharacterBriefJson(brief));
                     }
+                    break;
+                }
+
+                case "/api/frame/revise":
+                {
+                    var r = ParseReviseRequest(body);
+                    var brief = RunOnMainThreadAsync(() =>
+                        FrameCompiler != null
+                            ? FrameCompiler.ReviseCharacterAsync(r.summary, r.objective, r.obstacle, r.stance, r.change)
+                            : Task.FromResult<CNCFrameCompiler.DramaturgyBrief>(null));
+                    RunOnMainThread(() => { ApplyCharacterBrief(brief); return true; });
+                    WriteJson(ctx, 200, CharacterBriefJson(brief));
                     break;
                 }
 
@@ -348,6 +348,45 @@ namespace CNCDemo
 
         private static bool IsSceneType(string type) =>
             !string.IsNullOrEmpty(type) && type.IndexOf("scene", StringComparison.OrdinalIgnoreCase) >= 0;
+
+        [Serializable]
+        private sealed class ReviseRequest
+        {
+            public string summary;
+            public string objective;
+            public string obstacle;
+            public string stance;
+            public string change;
+        }
+
+        private static ReviseRequest ParseReviseRequest(string body)
+        {
+            if (string.IsNullOrWhiteSpace(body)) return new ReviseRequest();
+            try { return JsonUtility.FromJson<ReviseRequest>(body) ?? new ReviseRequest(); }
+            catch { return new ReviseRequest(); }
+        }
+
+        /// <summary>Applies a compiled/revised character to the performer, folding the obstacle into the summary so the model always sees it.</summary>
+        private void ApplyCharacterBrief(CNCFrameCompiler.DramaturgyBrief brief)
+        {
+            if (brief == null || Performer == null) return;
+
+            var summary = (brief.summary ?? string.Empty).Trim();
+            if (!string.IsNullOrWhiteSpace(brief.obstacle))
+                summary = (summary + "\nWhat stands in the way: " + brief.obstacle.Trim()).Trim();
+
+            if (!string.IsNullOrWhiteSpace(summary)) Performer.CurrentCharacterSummary = summary;
+            if (!string.IsNullOrWhiteSpace(brief.objective)) Performer.CurrentObjective = brief.objective;
+            if (!string.IsNullOrWhiteSpace(brief.stance)) Performer.CurrentStance = brief.stance;
+        }
+
+        private static string CharacterBriefJson(CNCFrameCompiler.DramaturgyBrief b)
+        {
+            return "{\"summary\":\"" + Escape(b != null ? b.summary : string.Empty) + "\"," +
+                   "\"objective\":\"" + Escape(b != null ? b.objective : string.Empty) + "\"," +
+                   "\"obstacle\":\"" + Escape(b != null ? b.obstacle : string.Empty) + "\"," +
+                   "\"stance\":\"" + Escape(b != null ? b.stance : string.Empty) + "\"}";
+        }
 
         // --- State snapshot ---------------------------------------------------
 

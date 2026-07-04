@@ -40,7 +40,7 @@ namespace CNCDemo
                 question = "What do I want?",
                 answer   = "To be noticed and kept company, without demanding it." },
             new FrameQuestion {
-                question = "What's in the way?",
+                question = "What's in the way of what I want?",
                 answer   = "I cannot move or speak — only change my light." },
         };
 
