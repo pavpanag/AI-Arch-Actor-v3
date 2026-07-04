@@ -61,6 +61,11 @@ namespace CNCDemo
 
         private void Start()
         {
+            // Keep Unity's update loop ticking while the browser has focus. Without this the
+            // main-thread queue never drains when the editor is in the background, and every
+            // API call times out. Set in code so it works without touching Player settings.
+            Application.runInBackground = true;
+
             if (LoadDefaultSceneOnStart && DefaultScene != null)
                 ApplyPreset(DefaultScene);
 
