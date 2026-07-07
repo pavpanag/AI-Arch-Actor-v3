@@ -40,9 +40,9 @@ namespace CNCDemo
     /// so the label -> trigger seam is unchanged and the Python rig remains a drop-in alternative
     /// (run the Python apps instead and disable the listeners here).
     ///
-    /// Renders a behavior to: the virtual lamp Light in the scene, an optional physical Hue bulb
-    /// (HTTP, like lights controller v15), and an AudioSource for the single speaker. Pulse is a
-    /// sinusoidal brightness breathe, mirroring the Python implementation.
+    /// Renders a behavior to: the virtual lamp Light in the scene (the source of truth — the
+    /// physical rig is mirrored from it by CNCHueProjector) and an AudioSource for the single
+    /// speaker. Pulse is a sinusoidal brightness breathe, mirroring the Python implementation.
     /// </summary>
     public sealed class CNCLampActuator : MonoBehaviour
     {
@@ -58,14 +58,8 @@ namespace CNCDemo
         [Tooltip("Port for 'sound N' triggers (sound controller uses 5555).")]
         public int SoundPort = 5555;
 
-        [Header("Physical Hue (optional)")]
-        public bool EnablePhysicalHue = false;
-        public string BridgeIP = "192.168.1.106";
-        [Tooltip("Hue bridge API username (same one lights controller v15.py uses).")]
-        public string UserApi = "0fLeSuFEFbk1UV2ehHFZKAyOBDL7dlSbE2szNqwR";
-        [Tooltip("\"auto\" = ask the bridge for its lights and drive ALL of them (one lamp works whatever its ID). Or a fixed list like \"1,3\".")]
-        public string BulbIds = "auto";
-        [TextArea(1, 2)] public string HueStatus;
+        // Physical output happens one layer down: CNCHueProjector watches the VirtualLamp Light
+        // (the source of truth) and mirrors it to the bulbs. This component drives virtual only.
 
         [Header("Behaviors (runtime; loaded from the preset by the bridge)")]
         public List<CNCBehaviorSpec> Behaviors = new List<CNCBehaviorSpec>();
@@ -85,7 +79,6 @@ namespace CNCDemo
         private volatile bool _running;
         private Coroutine _pulseRoutine;
         private readonly Dictionary<int, AudioClip> _clips = new Dictionary<int, AudioClip>();
-        private float _lastHueSendTime;
 
         public static string SoundsDirectory => Path.Combine(Application.streamingAssetsPath, "demo-sounds");
 
@@ -97,13 +90,10 @@ namespace CNCDemo
             _audio.spatialBlend = 0f; // one speaker, plain stereo out
         }
 
-        private readonly List<int> _discoveredBulbs = new List<int>();
-
         private void Start()
         {
             Directory.CreateDirectory(SoundsDirectory);
             if (EnableOscListeners) StartListeners();
-            if (EnablePhysicalHue && !string.IsNullOrWhiteSpace(UserApi)) StartCoroutine(DiscoverBulbs());
             _ = ReloadAllClipsAsync();
         }
 
@@ -152,7 +142,7 @@ namespace CNCDemo
             }
             else
             {
-                ApplyLightState(color, Mathf.Clamp01(b.brightness), 0.4f);
+                ApplyLightState(color, Mathf.Clamp01(b.brightness));
             }
 
             LastApplied = "behavior " + (index + 1) + " (" + (b.label ?? "?") + ")";
@@ -341,139 +331,21 @@ namespace CNCDemo
                 var phase = (Time.time - t0) / period * 2f * Mathf.PI;
                 var normalized = (Mathf.Sin(phase) + 1f) * 0.5f;
                 var level = floor + normalized * (brightness - floor);
-                ApplyLightState(color, level, 0.35f, throttlePhysical: true);
+                ApplyLightState(color, level);
                 yield return null;
             }
 
-            ApplyLightState(color, brightness, 0.4f); // settle steady after the pulses
+            ApplyLightState(color, brightness); // settle steady after the pulses
             _pulseRoutine = null;
         }
 
-        private void ApplyLightState(Color color, float brightness01, float hueTransitionSeconds, bool throttlePhysical = false)
+        /// <summary>Drives the virtual lamp only — the Light is the source of truth; CNCHueProjector mirrors it to the physical rig.</summary>
+        private void ApplyLightState(Color color, float brightness01)
         {
-            if (VirtualLamp != null)
-            {
-                VirtualLamp.color = color;
-                VirtualLamp.intensity = brightness01 * MaxIntensity;
-                VirtualLamp.enabled = brightness01 > 0.005f;
-            }
-
-            if (EnablePhysicalHue && !string.IsNullOrWhiteSpace(UserApi))
-            {
-                // Hue bridge HTTP is rate-limited; during a pulse only send a few times per second.
-                if (throttlePhysical && Time.time - _lastHueSendTime < 0.35f) return;
-                _lastHueSendTime = Time.time;
-                StartCoroutine(SendHueState(color, brightness01, hueTransitionSeconds));
-            }
-        }
-
-        private System.Collections.IEnumerator SendHueState(Color color, float brightness01, float transitionSeconds)
-        {
-            Color.RGBToHSV(color, out var h, out var s, out var v);
-            var bri = Mathf.RoundToInt(Mathf.Clamp01(brightness01) * 254f);
-            string body = bri > 0
-                ? "{\"on\":true,\"bri\":" + Mathf.Max(1, bri) +
-                  ",\"hue\":" + Mathf.RoundToInt(h * 65535f) +
-                  ",\"sat\":" + Mathf.RoundToInt(s * 254f) +
-                  ",\"transitiontime\":" + Mathf.RoundToInt(transitionSeconds * 10f) + "}"
-                : "{\"on\":false}";
-
-            // One lamp, whatever its ID: broadcast the state to every resolved bulb.
-            foreach (var id in ResolveBulbIds())
-            {
-                var url = "http://" + BridgeIP + "/api/" + UserApi + "/lights/" + id + "/state";
-                using (var req = UnityWebRequest.Put(url, body))
-                {
-                    req.SetRequestHeader("Content-Type", "application/json");
-                    yield return req.SendWebRequest();
-                }
-            }
-        }
-
-        private List<int> ResolveBulbIds()
-        {
-            var csv = (BulbIds ?? "auto").Trim();
-            if (!string.Equals(csv, "auto", StringComparison.OrdinalIgnoreCase))
-            {
-                var manual = new List<int>();
-                foreach (var part in csv.Split(','))
-                    if (int.TryParse(part.Trim(), out var id) && id > 0) manual.Add(id);
-                if (manual.Count > 0) return manual;
-            }
-
-            if (_discoveredBulbs.Count > 0) return _discoveredBulbs;
-
-            // Discovery hasn't answered (yet): fall back to broadcasting IDs 1-8,
-            // matching the lights controller's slot range.
-            return new List<int> { 1, 2, 3, 4, 5, 6, 7, 8 };
-        }
-
-        /// <summary>Asks the bridge for its lights (same as lights controller v15's mapping step) and drives all of them.</summary>
-        private System.Collections.IEnumerator DiscoverBulbs()
-        {
-            var url = "http://" + BridgeIP + "/api/" + UserApi + "/lights";
-            using (var req = UnityWebRequest.Get(url))
-            {
-                req.timeout = 5;
-                yield return req.SendWebRequest();
-                if (req.result != UnityWebRequest.Result.Success)
-                {
-                    HueStatus = "Bridge not reachable (" + req.error + ") — broadcasting to IDs 1-8.";
-                    yield break;
-                }
-
-                _discoveredBulbs.Clear();
-                foreach (var key in TopLevelJsonKeys(req.downloadHandler.text))
-                    if (int.TryParse(key, out var id)) _discoveredBulbs.Add(id);
-                _discoveredBulbs.Sort();
-
-                HueStatus = _discoveredBulbs.Count > 0
-                    ? "Driving bridge light IDs: " + string.Join(", ", _discoveredBulbs)
-                    : "Bridge answered but reported no lights — broadcasting to IDs 1-8.";
-                Debug.Log("[CNCLampActuator] " + HueStatus);
-            }
-        }
-
-        /// <summary>Extracts the top-level object keys of a JSON object like {"1":{...},"4":{...}}.</summary>
-        private static List<string> TopLevelJsonKeys(string json)
-        {
-            var keys = new List<string>();
-            if (string.IsNullOrWhiteSpace(json)) return keys;
-
-            int depth = 0;
-            bool inString = false, escaped = false;
-            var current = new StringBuilder();
-            bool capturing = false;
-
-            for (int i = 0; i < json.Length; i++)
-            {
-                var c = json[i];
-                if (inString)
-                {
-                    if (escaped) { escaped = false; if (capturing) current.Append(c); }
-                    else if (c == '\\') { escaped = true; }
-                    else if (c == '"')
-                    {
-                        inString = false;
-                        if (capturing)
-                        {
-                            // It's a key only if the next non-space char is ':'.
-                            int j = i + 1;
-                            while (j < json.Length && char.IsWhiteSpace(json[j])) j++;
-                            if (j < json.Length && json[j] == ':') keys.Add(current.ToString());
-                            capturing = false;
-                        }
-                    }
-                    else if (capturing) current.Append(c);
-                    continue;
-                }
-
-                if (c == '"') { inString = true; if (depth == 1) { capturing = true; current.Length = 0; } }
-                else if (c == '{' || c == '[') depth++;
-                else if (c == '}' || c == ']') depth--;
-            }
-
-            return keys;
+            if (VirtualLamp == null) return;
+            VirtualLamp.color = color;
+            VirtualLamp.intensity = brightness01 * MaxIntensity;
+            VirtualLamp.enabled = brightness01 > 0.005f;
         }
 
         // --- Clip loading / WAV ------------------------------------------------
