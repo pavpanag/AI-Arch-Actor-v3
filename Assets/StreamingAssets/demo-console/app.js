@@ -126,7 +126,8 @@
 
     function refresh() {
       api("/api/expression/list").then(function (r) {
-        if (r && r.behaviors) setBehaviors(r.behaviors);
+        // Don't wipe local edits if the server hands back nothing (e.g. Actuator not assigned).
+        if (r && r.behaviors && r.behaviors.length) setBehaviors(r.behaviors);
       });
     }
     useEffect(function () {
@@ -143,8 +144,14 @@
     function applyAll() {
       setBusy(true); setStatus("Applying…");
       api("/api/expression/apply", { behaviors: behaviors }).then(function (r) {
-        if (r && r.behaviors) setBehaviors(r.behaviors);
-        setStatus("Applied. The lamp can use these now."); setBusy(false);
+        if (r && r.behaviors && r.behaviors.length) {
+          setBehaviors(r.behaviors);
+          setStatus("Applied. The lamp can use these now.");
+        } else {
+          // Keep the user's rows; the server had nowhere to store them.
+          setStatus("Couldn't save — assign the CNCLampActuator to the bridge's Actuator slot, then re-enter Play.");
+        }
+        setBusy(false);
       });
     }
 
