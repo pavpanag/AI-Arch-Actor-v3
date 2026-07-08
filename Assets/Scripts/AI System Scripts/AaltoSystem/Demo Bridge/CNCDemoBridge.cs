@@ -74,6 +74,14 @@ namespace CNCDemo
                 // Labels come live from the registry (which the bridge keeps in sync with the
                 // behavior list), so the manual pulled-snapshot workflow is bypassed.
                 Performer.UsePulledActionLabelsSnapshot = false;
+
+                // Force the performer to read the SAME registry the bridge writes to — otherwise
+                // Apply syncs a vocabulary the performer never sees ("no executable action labels").
+                if (Registry != null)
+                {
+                    Performer.ActionMemoryRegistryDual = Registry;
+                    Performer.ActionRegistrySource = AaltoDirectedRoomPerformerController.ActionRegistrySourceMode.AutoPreferDual;
+                }
             }
 
             if (LoadDefaultSceneOnStart && DefaultScene != null)
@@ -635,6 +643,15 @@ namespace CNCDemo
             sb.Append("\"objective\":\"").Append(Escape(objective)).Append("\",");
             sb.Append("\"stance\":\"").Append(Escape(stance)).Append("\",");
             sb.Append("\"guidance\":\"").Append(Escape(guidance)).Append("\",");
+            sb.Append("\"sceneFrame\":\"").Append(Escape(_sceneFrame ?? string.Empty)).Append("\",");
+
+            // The executable vocabulary exactly as the model will see it (registry snapshot).
+            var labels = new List<string>();
+            if (Registry != null)
+                foreach (var route in Registry.BuildExecutableMappingSnapshot())
+                    if (route != null && !string.IsNullOrWhiteSpace(route.actionLabel)) labels.Add(route.actionLabel);
+            sb.Append("\"behaviorLabels\":").Append(BuildJsonStringArrayLocal(labels.ToArray())).Append(",");
+
             sb.Append("\"performerStatus\":\"").Append(Escape(performerStatus)).Append("\",");
             sb.Append("\"executionStatus\":\"").Append(Escape(executionStatus)).Append("\",");
             sb.Append("\"lastAction\":\"").Append(Escape(lastAction)).Append("\",");

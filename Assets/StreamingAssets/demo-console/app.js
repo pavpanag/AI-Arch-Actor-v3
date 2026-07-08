@@ -311,6 +311,20 @@
         h("div", { className: "status", title: "What the performer is doing (or why the last turn failed)" },
           state.performerStatus || "")
       ),
+      h("div", { className: "card carry" },
+        h("div", { className: "carry-row" },
+          h("span", { className: "carry-k" }, "Character"),
+          h("span", { className: "carry-v" }, state.summary || "—")),
+        h("div", { className: "carry-row" },
+          h("span", { className: "carry-k" }, "Scene"),
+          h("span", { className: "carry-v" }, state.sceneFrame || "—")),
+        h("div", { className: "carry-row" },
+          h("span", { className: "carry-k" }, "Can do"),
+          (state.behaviorLabels && state.behaviorLabels.length)
+            ? h("span", { className: "chips" },
+                state.behaviorLabels.map(function (l, i) { return h("span", { className: "chip", key: i }, l); }))
+            : h("span", { className: "carry-v warn" }, "no behaviors — set them in Expression and press Apply"))
+      ),
       h("div", { className: "card" },
         h("h2", null, "The Scene, Unfolding"),
         h("p", { className: "lead" }, "Everything the lamp does — and why it chose it."),
