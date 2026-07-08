@@ -136,9 +136,12 @@
 
   /* Expression vocabulary */
   .exp-head, .exp-row {
-    display: grid; grid-template-columns: 1.6fr 52px 1fr 190px 150px 54px;
+    display: grid; grid-template-columns: 1.6fr 52px 1fr 190px 150px 88px;
     gap: 10px; align-items: center; margin-bottom: 10px;
   }
+  .row-actions { display: flex; gap: 6px; }
+  button.mini.danger { color: var(--faint); font-size: 15px; line-height: 1; padding: 5px 9px; }
+  button.mini.danger:hover { color: #e5675a; border-color: rgba(229,103,90,.5); }
   .exp-head { color: var(--faint); font-size: 11px; letter-spacing: .8px; text-transform: uppercase; margin-bottom: 6px; }
   .exp-row input[type=text] { min-width: 0; }
   .exp-row input[type=color] {

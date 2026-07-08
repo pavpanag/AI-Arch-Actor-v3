@@ -48,8 +48,17 @@ namespace CNCDemo
         {
             if (TargetLight == null)
                 Debug.LogWarning("[CNCHueProjector] No TargetLight assigned — nothing to project.");
-            if (EnableProjection && !string.IsNullOrWhiteSpace(UserApi))
+            if (!string.IsNullOrWhiteSpace(UserApi))
                 StartCoroutine(DiscoverBulbs());
+        }
+
+        /// <summary>The bulb IDs the bridge reports (for the Technical tab to display).</summary>
+        public List<int> DiscoveredBulbs() => new List<int>(_discoveredBulbs);
+
+        /// <summary>Re-query the bridge for its lights (e.g. after plugging one in).</summary>
+        public void Rediscover()
+        {
+            if (!string.IsNullOrWhiteSpace(UserApi)) StartCoroutine(DiscoverBulbs());
         }
 
         private void Update()

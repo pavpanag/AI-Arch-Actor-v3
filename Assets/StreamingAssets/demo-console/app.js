@@ -174,21 +174,24 @@
       setBehaviors(next);
     }
 
-    function applyAll() {
+    function applyList(list) {
       setBusy(true); setStatus("Applying…");
-      api("/api/expression/apply", {
-        behaviors: behaviors,
+      return api("/api/expression/apply", {
+        behaviors: list,
         mode: mode, holdSeconds: holdSecs, neutralColorHex: nColor, neutralBrightness: nBri
       }).then(function (r) {
-        if (r && r.behaviors && r.behaviors.length) {
-          setBehaviors(r.behaviors);
-          setStatus("Applied. The lamp can use these now.");
-        } else {
-          // Keep the user's rows; the server had nowhere to store them.
-          setStatus("Couldn't save — assign the CNCLampActuator to the bridge's Actuator slot, then re-enter Play.");
-        }
+        // Only overwrite from the server when it returned rows; an empty reply means the
+        // Actuator isn't assigned (keep the local list, which may legitimately be empty too).
+        if (r && r.behaviors && r.behaviors.length) { setBehaviors(r.behaviors); setStatus("Applied. The lamp can use these now."); }
+        else setStatus("Applied. (If nothing shows, assign the CNCLampActuator to the bridge's Actuator slot.)");
         setBusy(false);
       });
+    }
+    function applyAll() { applyList(behaviors); }
+    function removeRow(i) {
+      var next = behaviors.slice(); next.splice(i, 1);
+      setBehaviors(next);      // reflect immediately
+      applyList(next);         // and commit the removal
     }
 
     function test(i) {
@@ -258,6 +261,7 @@
         : null,
       h("div", { className: "exp-head" },
         h("span", null, "behavior"), h("span", null, "light"), h("span", null, "brightness"), h("span", null, "pulse"), h("span", null, "sound"), h("span", null, "")),
+      behaviors.length === 0 ? h("p", { className: "hint" }, "No behaviors yet — add one, or Suggest.") : null,
       behaviors.map(function (b, i) {
         return h("div", { className: "exp-row", key: i },
           h("input", { type: "text", value: b.label || "", placeholder: "i …", name: "beh-label-" + i,
@@ -282,7 +286,9 @@
             h("span", { className: "sound-dot" + (b.hasSound ? " on" : "") }),
             h("button", { className: "mini", onClick: function () { pickFile(i); }, disabled: busy }, "Load"),
             h("button", { className: "mini", onClick: function () { record(i); }, disabled: busy }, "Rec")),
-          h("button", { className: "mini", onClick: function () { test(i); }, }, "Try"));
+          h("div", { className: "row-actions" },
+            h("button", { className: "mini", onClick: function () { test(i); } }, "Try"),
+            h("button", { className: "mini danger", title: "remove this behavior", onClick: function () { removeRow(i); }, disabled: busy }, "×")));
       }),
       h("div", { className: "mode-box" },
         h("div", { className: "mode-title" }, "After each response"),
@@ -557,9 +563,19 @@
 
     function payload() {
       var p = (tech && tech.prompts) || {};
-      var out = { model: (tech && tech.model) || "" };
+      var out = { model: (tech && tech.model) || "", hueTarget: (tech && tech.hueTarget) || "" };
       TECH_PROMPTS.forEach(function (row) { out[row.k] = p[row.k] || ""; });
       return out;
+    }
+
+    function rediscover() {
+      setBusy(true); setStatus("Asking the bridge for its lights…");
+      api("/api/tech/hue-rediscover", {}).then(function () {
+        // Discovery is async on the bridge; give it a moment, then refetch the ID list.
+        setTimeout(function () {
+          api("/api/tech").then(function (r) { if (r) setTech(r); setStatus("Bulb list refreshed."); setBusy(false); });
+        }, 1500);
+      });
     }
 
     function apply() {
@@ -601,6 +617,20 @@
         h("div", { className: "mode-row" },
           h("button", { className: "mode-btn" + (tech.model === "light" ? " active" : ""), onClick: function () { setTech(Object.assign({}, tech, { model: "light" })); } }, "Lightweight — GPT-4o mini"),
           h("button", { className: "mode-btn" + (tech.model === "heavy" ? " active" : ""), onClick: function () { setTech(Object.assign({}, tech, { model: "heavy" })); } }, "Heavyweight — GPT-5.4"))),
+      h("div", { className: "mode-box", style: { marginTop: "16px" } },
+        h("div", { className: "mode-title" }, "Physical lamp — Hue bulb IDs"),
+        h("p", { className: "hint", style: { margin: "0 0 10px" } },
+          (tech.hueIds && tech.hueIds.length)
+            ? "Bridge sees: " + tech.hueIds.join(", ")
+            : (tech.hueEnabled ? "No bulbs found yet — check the bridge, then Rediscover." : "Physical Hue is off on the projector (virtual lamp only).")),
+        h("div", { className: "mode-row" },
+          h("span", { className: "pulse-sep" }, "project to:"),
+          h("input", { type: "text", value: (tech.hueTarget || "auto"), name: "hue-target", style: { width: "160px" },
+            title: "auto = every discovered bulb, or a list like 1,4",
+            onInput: function (e) { setTech(Object.assign({}, tech, { hueTarget: e.target.value })); } }),
+          h("button", { className: "mini", onClick: rediscover, disabled: busy }, "Rediscover")),
+        h("p", { className: "hint", style: { marginTop: "8px" } },
+          "\"auto\" drives every bulb the bridge reports; or type specific IDs like 1,4. Takes effect on Apply below.")),
       TECH_PROMPTS.map(function (row) {
         return h("div", { className: "q", key: row.k, style: { marginTop: "18px" } },
           h("label", null, row.label),

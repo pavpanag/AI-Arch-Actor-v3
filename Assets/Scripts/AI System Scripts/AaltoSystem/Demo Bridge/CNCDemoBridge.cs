@@ -38,6 +38,7 @@ namespace CNCDemo
         public AaltoActionMemoryRegistryDual Registry;
         public CNCFrameCompiler FrameCompiler;
         public CNCLampActuator Actuator;
+        public CNCHueProjector Projector;
 
         [Header("Default Scene")]
         [Tooltip("Preset loaded on Start so a visitor can walk up to a working directed lamp with no setup.")]
@@ -405,6 +406,10 @@ namespace CNCDemo
                     }));
                     break;
 
+                case "/api/tech/hue-rediscover":
+                    WriteJson(ctx, 200, RunOnMainThread(() => { Projector?.Rediscover(); return BuildTechJson(); }));
+                    break;
+
                 case "/api/session/save":
                     WriteJson(ctx, 200, RunOnMainThread(() =>
                         "{\"status\":\"" + (SaveSession() ? "Setup saved" : "save failed") + "\"}"));
@@ -442,27 +447,19 @@ namespace CNCDemo
 
                         if (Actuator != null && req.behaviors != null)
                         {
-                            for (int i = 0; i < req.behaviors.Count; i++)
+                            // Rebuild the list from the console so add / edit / REMOVE / reorder all apply.
+                            var rebuilt = new List<CNCBehaviorSpec>();
+                            foreach (var incoming in req.behaviors)
                             {
-                                var incoming = req.behaviors[i];
                                 if (incoming == null) continue;
-                                if (i < Actuator.Behaviors.Count)
+                                rebuilt.Add(new CNCBehaviorSpec
                                 {
-                                    var existing = Actuator.Behaviors[i];
-                                    existing.label = incoming.label;
-                                    existing.colorHex = incoming.colorHex;
-                                    existing.brightness = incoming.brightness;
-                                    existing.pulse = incoming.pulse;
-                                    existing.pulseCount = incoming.pulseCount;
-                                    existing.pulseSeconds = incoming.pulseSeconds;
-                                    // soundFile is managed by record/upload, not the apply payload.
-                                }
-                                else
-                                {
-                                    incoming.soundFile = "";
-                                    Actuator.Behaviors.Add(incoming);
-                                }
+                                    label = incoming.label, colorHex = incoming.colorHex, brightness = incoming.brightness,
+                                    pulse = incoming.pulse, pulseCount = incoming.pulseCount, pulseSeconds = incoming.pulseSeconds,
+                                    soundFile = incoming.soundFile ?? ""
+                                });
                             }
+                            Actuator.SetBehaviors(rebuilt);
                             SyncRegistryFromBehaviors();
                         }
                         return BuildExpressionListJson();
@@ -678,6 +675,7 @@ namespace CNCDemo
             public string sceneEnrich = "";
             public string sceneRevise = "";
             public string suggest = "";
+            public string hueTarget = "";
         }
 
         private static TechRequest ParseTechRequest(string body)
@@ -700,6 +698,8 @@ namespace CNCDemo
                     FrameCompiler.Model = heavy ? "gpt-5.4" : "gpt-4o-mini";
             }
 
+            if (!string.IsNullOrEmpty(req.hueTarget) && Projector != null) Projector.BulbIds = req.hueTarget.Trim();
+
             if (!string.IsNullOrEmpty(req.performer)) { PerformerCoaching = req.performer; ApplyPerformerPrompt(); }
             if (FrameCompiler != null)
             {
@@ -720,8 +720,18 @@ namespace CNCDemo
             var model = FrameCompiler != null && (FrameCompiler.Model ?? "").StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase)
                 ? "heavy" : "light";
 
+            var hueTarget = Projector != null ? (Projector.BulbIds ?? "auto") : "auto";
+            var hueIds = new List<string>();
+            if (Projector != null)
+                foreach (var id in Projector.DiscoveredBulbs()) hueIds.Add(id.ToString());
+            var hueEnabled = Projector != null && Projector.EnableProjection;
+
             var sb = new StringBuilder();
-            sb.Append("{\"model\":\"").Append(model).Append("\",\"keyStatus\":\"").Append(Escape(_apiKeyStatus)).Append("\",\"prompts\":{");
+            sb.Append("{\"model\":\"").Append(model).Append("\",\"keyStatus\":\"").Append(Escape(_apiKeyStatus)).Append("\"");
+            sb.Append(",\"hueTarget\":\"").Append(Escape(hueTarget)).Append("\"");
+            sb.Append(",\"hueEnabled\":").Append(hueEnabled ? "true" : "false");
+            sb.Append(",\"hueIds\":").Append(BuildJsonStringArrayLocal(hueIds.ToArray()));
+            sb.Append(",\"prompts\":{");
             sb.Append("\"performer\":\"").Append(Escape(PerformerCoaching)).Append("\"");
             if (FrameCompiler != null)
             {
