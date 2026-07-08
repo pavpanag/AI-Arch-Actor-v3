@@ -37,3 +37,6 @@ Recordings/
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Vosk speech models — large third-party downloads, kept out of git
+Assets/Scripts/AI System Scripts/AaltoSystem/vosk-model-*
