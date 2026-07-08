@@ -307,7 +307,9 @@
         h("div", { className: "meta" },
           h("span", null, "Objective: ", h("b", null, state.objective || "—")),
           h("span", null, "Stance: ", h("b", null, state.stance || "—"))
-        )
+        ),
+        h("div", { className: "status", title: "What the performer is doing (or why the last turn failed)" },
+          state.performerStatus || "")
       ),
       h("div", { className: "card" },
         h("h2", null, "The Scene, Unfolding"),
@@ -445,6 +447,7 @@
     var sceneState = useState([]); var scene = sceneState[0], setScene = sceneState[1];
     var exprState = useState([]); var expr = exprState[0], setExpr = exprState[1];
     var readyState = useState(false); var ready = readyState[0], setReady = readyState[1];
+    var resetState = useState(0); var resetCount = resetState[0], setResetCount = resetState[1];
 
     useEffect(function () {
       api("/api/frames").then(function (f) {
@@ -462,16 +465,25 @@
         return api("/api/frames");
       }).then(function (f) {
         if (f) { setDrama(f.dramaturgy || []); setScene(f.scene || []); setExpr(f.expressions || []); }
+        setResetCount(resetCount + 1); // remount all tabs with fresh state
         setStep("dramaturgy");
       });
     }
 
+    // All tabs stay mounted (hidden with display:none) so switching tabs never
+    // loses in-progress answers or edits. resetCount keys force a true remount
+    // only when "Reset the character" is pressed.
     var body;
     if (!ready) body = h("div", { className: "empty" }, "Lighting the lamp…");
-    else if (step === "dramaturgy") body = h(CharacterChat, { questions: drama, goToStage: function () { setStep("stage"); } });
-    else if (step === "scene")      body = h(FrameStep, { kind: "scene", items: scene, setItems: setScene });
-    else if (step === "expression") body = h(ExpressionStep, null);
-    else                             body = h(Stage, null);
+    else body = h(Fragment, null,
+      h("div", { style: { display: step === "dramaturgy" ? "" : "none" } },
+        h(CharacterChat, { key: "chat" + resetCount, questions: drama, goToStage: function () { setStep("stage"); } })),
+      h("div", { style: { display: step === "scene" ? "" : "none" } },
+        h(FrameStep, { key: "scene" + resetCount, kind: "scene", items: scene, setItems: setScene })),
+      h("div", { style: { display: step === "expression" ? "" : "none" } },
+        h(ExpressionStep, { key: "expr" + resetCount })),
+      h("div", { style: { display: step === "stage" ? "" : "none" } },
+        h(Stage, { key: "stage" + resetCount })));
 
     return h("div", { className: "wrap" },
       h("div", { className: "brand" },

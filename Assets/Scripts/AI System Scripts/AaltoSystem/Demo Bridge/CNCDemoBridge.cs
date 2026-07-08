@@ -626,12 +626,17 @@ namespace CNCDemo
             var lastAction = Performer != null ? Performer.SelectedActionText : string.Empty;
             var lastWhy = Performer != null ? Performer.ActionJustificationText : string.Empty;
 
+            var performerStatus = Performer != null ? Performer.LastStatus : "performer not assigned";
+            var executionStatus = Performer != null ? Performer.ExecutionModeStatus : string.Empty;
+
             var sb = new StringBuilder();
             sb.Append("{");
             sb.Append("\"summary\":\"").Append(Escape(summary)).Append("\",");
             sb.Append("\"objective\":\"").Append(Escape(objective)).Append("\",");
             sb.Append("\"stance\":\"").Append(Escape(stance)).Append("\",");
             sb.Append("\"guidance\":\"").Append(Escape(guidance)).Append("\",");
+            sb.Append("\"performerStatus\":\"").Append(Escape(performerStatus)).Append("\",");
+            sb.Append("\"executionStatus\":\"").Append(Escape(executionStatus)).Append("\",");
             sb.Append("\"lastAction\":\"").Append(Escape(lastAction)).Append("\",");
             sb.Append("\"lastJustification\":\"").Append(Escape(lastWhy)).Append("\",");
 
@@ -727,23 +732,30 @@ namespace CNCDemo
             _directingLines.Clear();
             ComposeGuidance();
 
+            var specs = new List<CNCBehaviorSpec>();
+            if (preset.Behaviors != null)
+            {
+                foreach (var b in preset.Behaviors)
+                {
+                    if (b == null) continue;
+                    specs.Add(new CNCBehaviorSpec
+                    {
+                        label = b.label, colorHex = b.colorHex, brightness = b.brightness,
+                        pulse = b.pulse, pulseCount = b.pulseCount, pulseSeconds = b.pulseSeconds,
+                        soundFile = b.soundFile
+                    });
+                }
+            }
+
             if (Actuator != null)
             {
-                var specs = new List<CNCBehaviorSpec>();
-                if (preset.Behaviors != null)
-                {
-                    foreach (var b in preset.Behaviors)
-                    {
-                        if (b == null) continue;
-                        specs.Add(new CNCBehaviorSpec
-                        {
-                            label = b.label, colorHex = b.colorHex, brightness = b.brightness,
-                            pulse = b.pulse, pulseSeconds = b.pulseSeconds, soundFile = b.soundFile
-                        });
-                    }
-                }
                 Actuator.SetBehaviors(specs);
                 SyncRegistryFromBehaviors();
+            }
+            else
+            {
+                // No actuator wired (e.g. Python rig only): the model still needs its vocabulary.
+                SyncRegistryFromList(specs);
             }
 
             Debug.Log("[CNCDemoBridge] Loaded preset: " + preset.name);
@@ -755,12 +767,17 @@ namespace CNCDemo
         /// </summary>
         private void SyncRegistryFromBehaviors()
         {
-            if (Registry == null || Actuator == null || Actuator.Behaviors == null) return;
+            if (Actuator != null) SyncRegistryFromList(Actuator.Behaviors);
+        }
+
+        private void SyncRegistryFromList(List<CNCBehaviorSpec> behaviors)
+        {
+            if (Registry == null || behaviors == null) return;
 
             Registry.mappings.Clear();
-            for (int i = 0; i < Actuator.Behaviors.Count; i++)
+            for (int i = 0; i < behaviors.Count; i++)
             {
-                var b = Actuator.Behaviors[i];
+                var b = behaviors[i];
                 if (b == null || string.IsNullOrWhiteSpace(b.label)) continue;
 
                 var hasSound = !string.IsNullOrWhiteSpace(b.soundFile);
