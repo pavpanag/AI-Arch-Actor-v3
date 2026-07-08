@@ -63,6 +63,11 @@ namespace CNCDemo
             "(for example, if the character is a ship, the scene is the ship's own situation, not a person standing on a ship). " +
             "Use ONLY what the author actually wrote for the scene. Tidy messy or terse phrasing, but do NOT invent people, atmosphere, or events they did not mention — if they gave little, keep it spare and plain.";
 
+        private const string DefaultSceneRevise =
+            "You are revising the given circumstances of a scene for a scenic performer. You are given the current scene brief and a change the author wants. " +
+            "Rewrite the scene so the change is fully incorporated, keeping everything else faithful. " +
+            "The character is described in the input; keep the scene consistent with what the character actually is. Keep it concrete and directive.";
+
         private const string DefaultSuggestBehavior =
             "You are helping an author build the expressive vocabulary of a scenic character that acts only through light and sound. " +
             "Given the character, the scene, and the behaviors it already has, propose exactly ONE new behavior. " +
@@ -106,6 +111,9 @@ namespace CNCDemo
         [Tooltip("How the model ENRICHES a scene (optional, on demand). Bounded and executable. The JSON return shape is fixed by the system.")]
         [TextArea(3, 8)] public string SceneEnrichPrompt = DefaultSceneEnrich;
 
+        [Tooltip("How the model rewrites a scene from a plain-language change request. The JSON return shape is fixed by the system.")]
+        [TextArea(3, 8)] public string SceneRevisePrompt = DefaultSceneRevise;
+
         [Header("Coaching — Behavior Suggestion (return format is added automatically)")]
         [Tooltip("How the model proposes ONE new expressive behavior from character + scene. The JSON return shape is fixed by the system.")]
         [TextArea(3, 8)] public string SuggestBehaviorPrompt = DefaultSuggestBehavior;
@@ -143,6 +151,7 @@ namespace CNCDemo
             SceneFollowUpPrompt = DefaultSceneFollowUp;
             SceneCompilePrompt = DefaultSceneCompile;
             SceneEnrichPrompt = DefaultSceneEnrich;
+            SceneRevisePrompt = DefaultSceneRevise;
             SuggestBehaviorPrompt = DefaultSuggestBehavior;
             LastStatus = "Prompts reset to defaults.";
         }
@@ -224,6 +233,21 @@ namespace CNCDemo
             var brief = ParseCharacterBrief(response);
             LastCompiled = FormatBrief("enriched", brief);
             LastStatus = "Character enriched.";
+            return brief;
+        }
+
+        public async Task<SceneBrief> ReviseSceneAsync(string sceneFrame, string change, string characterContext = null)
+        {
+            var user = string.Empty;
+            if (!string.IsNullOrWhiteSpace(characterContext))
+                user += "The character in this scene:\n" + characterContext.Trim() + "\n\n";
+            user += "Current scene:\n" + (sceneFrame ?? string.Empty) + "\n\nThe author wants to change this:\n" + (change ?? string.Empty);
+
+            var response = await Ask(WithFormat(SceneRevisePrompt, SceneReturnFormat), user, "CNC:FrameReviseScene");
+            var parsed = SafeParse<SceneResponse>(response);
+            var brief = new SceneBrief { sceneFrame = parsed?.scene_frame?.Trim() ?? string.Empty };
+            LastCompiled = "scene_frame (revised): " + brief.sceneFrame;
+            LastStatus = "Scene revised.";
             return brief;
         }
 

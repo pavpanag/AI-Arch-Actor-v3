@@ -44,11 +44,20 @@
     var compiledState = useState(null); var compiled = compiledState[0], setCompiled = compiledState[1];
     var statusState = useState(""); var status = statusState[0], setStatus = statusState[1];
     var busyState = useState(false); var busy = busyState[0], setBusy = busyState[1];
+    var reviseRef = useRef(null);
 
     function edit(i, val) {
       var next = items.slice();
       next[i] = { question: next[i].question, answer: val };
       setItems(next);
+    }
+
+    function reviseScene() {
+      var val = (reviseRef.current ? reviseRef.current.value : "").trim(); if (!val) return;
+      if (reviseRef.current) reviseRef.current.value = "";
+      setBusy(true); setStatus("Adjusting…");
+      api("/api/frame/revise-scene", { sceneFrame: (compiled && compiled.sceneFrame) || "", change: val })
+        .then(function (r) { setCompiled(r || compiled); setStatus("Adjusted."); setBusy(false); });
     }
 
     function compileNow() {
@@ -109,8 +118,21 @@
                     h("div", { className: "k" }, "Summary"),   h("div", { className: "v" }, compiled.summary || "—"),
                     h("div", { className: "k" }, "Objective"), h("div", { className: "v" }, compiled.objective || "—"),
                     h("div", { className: "k" }, "Stance"),    h("div", { className: "v" }, compiled.stance || "—"))),
-            h("div", { className: "row", style: { marginTop: "12px" } },
-              h("button", { className: "ghost", onClick: enrich, disabled: busy }, "Enrich with imagination")))
+            isScene
+              ? h("div", null,
+                  h("div", { className: "followup", style: { marginTop: "14px" } },
+                    h("div", { className: "fq" }, "Want to change something about the scene?")),
+                  h("div", { className: "stage-bar", style: { marginTop: "10px" } },
+                    h("input", { type: "text", placeholder: "e.g. make it night; add a second person…",
+                      key: "scene-revise", ref: reviseRef, name: "scene-revise",
+                      onKeyDown: function (e) { if (e.key === "Enter") reviseScene(); } }),
+                    h("button", { className: "ghost", onClick: reviseScene, disabled: busy }, "Adjust")))
+              : null,
+            h("div", { className: "row", style: { marginTop: "14px" } },
+              h("button", { className: "ghost", onClick: enrich, disabled: busy }, "Enrich with imagination"),
+              (isScene && props.onNext)
+                ? h("button", { className: "act", onClick: props.onNext }, "Continue to Expression")
+                : null))
         : null
     );
   }
@@ -485,7 +507,7 @@
               h("button", { className: "ghost", onClick: revise }, "Adjust")),
             h("div", { className: "row", style: { marginTop: "14px" } },
               h("button", { className: "ghost", onClick: enrich }, "Enrich with imagination"),
-              h("button", { className: "act", onClick: props.goToStage }, "Enter the scene")))
+              h("button", { className: "act", onClick: props.goToStage }, "Continue to Scene")))
         : null
     );
   }
@@ -500,6 +522,7 @@
     { k: "sceneFollowup", label: "Scene — when and how to ask a follow-up" },
     { k: "sceneCompile",  label: "Scene — how the answers are compiled" },
     { k: "sceneEnrich",   label: "Scene — how enrichment works" },
+    { k: "sceneRevise",   label: "Scene — how an adjustment is applied" },
     { k: "suggest",       label: "Expression — how a behavior is suggested" }
   ];
 
@@ -601,6 +624,7 @@
     var exprState = useState([]); var expr = exprState[0], setExpr = exprState[1];
     var readyState = useState(false); var ready = readyState[0], setReady = readyState[1];
     var resetState = useState(0); var resetCount = resetState[0], setResetCount = resetState[1];
+    var appMsgState = useState(""); var appMsg = appMsgState[0], setAppMsg = appMsgState[1];
 
     useEffect(function () {
       api("/api/frames").then(function (f) {
@@ -623,6 +647,18 @@
       });
     }
 
+    function saveSetup() {
+      setAppMsg("Saving…");
+      api("/api/session/save", {}).then(function (r) { setAppMsg((r && r.status) || "Saved."); });
+    }
+    function loadSetup() {
+      setAppMsg("Loading…");
+      api("/api/session/load", {}).then(function (r) {
+        if (r && r.loaded) location.reload();
+        else setAppMsg("No saved setup found yet.");
+      });
+    }
+
     // All tabs stay mounted (hidden with display:none) so switching tabs never
     // loses in-progress answers or edits. resetCount keys force a true remount
     // only when "Reset the character" is pressed.
@@ -630,9 +666,9 @@
     if (!ready) body = h("div", { className: "empty" }, "Lighting the lamp…");
     else body = h(Fragment, null,
       h("div", { style: { display: step === "dramaturgy" ? "" : "none" } },
-        h(CharacterChat, { key: "chat" + resetCount, questions: drama, goToStage: function () { setStep("stage"); } })),
+        h(CharacterChat, { key: "chat" + resetCount, questions: drama, goToStage: function () { setStep("scene"); } })),
       h("div", { style: { display: step === "scene" ? "" : "none" } },
-        h(FrameStep, { key: "scene" + resetCount, kind: "scene", items: scene, setItems: setScene })),
+        h(FrameStep, { key: "scene" + resetCount, kind: "scene", items: scene, setItems: setScene, onNext: function () { setStep("expression"); } })),
       h("div", { style: { display: step === "expression" ? "" : "none" } },
         h(ExpressionStep, { key: "expr" + resetCount })),
       h("div", { style: { display: step === "stage" ? "" : "none" } },
@@ -657,6 +693,9 @@
       ),
       body,
       h("div", { className: "footer" },
+        appMsg ? h("span", { className: "app-msg" }, appMsg) : null,
+        h("button", { className: "ghost", onClick: saveSetup }, "Save setup"),
+        h("button", { className: "ghost", onClick: loadSetup }, "Load setup"),
         h("button", { className: "ghost", onClick: resetVisitor }, "Reset the character")
       )
     );

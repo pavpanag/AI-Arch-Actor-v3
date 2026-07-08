@@ -124,6 +124,9 @@ namespace CNCDemo
 
             LoadAndApplyApiKey();
 
+            // Restore the last saved setup over the preset defaults (so you don't re-author each run).
+            LoadSessionFromFile();
+
             StartServer();
         }
 
@@ -325,6 +328,19 @@ namespace CNCDemo
                     break;
                 }
 
+                case "/api/frame/revise-scene":
+                {
+                    var sceneFrame = GetField(body, "sceneFrame");
+                    var change = GetField(body, "change");
+                    var brief = RunOnMainThreadAsync(() =>
+                        FrameCompiler != null
+                            ? FrameCompiler.ReviseSceneAsync(sceneFrame, change, Performer != null ? Performer.CurrentCharacterSummary : null)
+                            : Task.FromResult<CNCFrameCompiler.SceneBrief>(null));
+                    RunOnMainThread(() => { ApplySceneFrame(brief); return true; });
+                    WriteJson(ctx, 200, SceneBriefJson(brief));
+                    break;
+                }
+
                 case "/api/frame/enrich":
                 {
                     var e = ParseEnrichRequest(body);
@@ -387,6 +403,16 @@ namespace CNCDemo
                         ApplyPerformerPrompt();
                         return BuildTechJson();
                     }));
+                    break;
+
+                case "/api/session/save":
+                    WriteJson(ctx, 200, RunOnMainThread(() =>
+                        "{\"status\":\"" + (SaveSession() ? "Setup saved" : "save failed") + "\"}"));
+                    break;
+
+                case "/api/session/load":
+                    WriteJson(ctx, 200, RunOnMainThread(() =>
+                        "{\"loaded\":" + (LoadSessionFromFile() ? "true" : "false") + "}"));
                     break;
 
                 case "/api/expression/list":
@@ -650,6 +676,7 @@ namespace CNCDemo
             public string sceneFollowup = "";
             public string sceneCompile = "";
             public string sceneEnrich = "";
+            public string sceneRevise = "";
             public string suggest = "";
         }
 
@@ -683,6 +710,7 @@ namespace CNCDemo
                 if (!string.IsNullOrEmpty(req.sceneFollowup)) FrameCompiler.SceneFollowUpPrompt = req.sceneFollowup;
                 if (!string.IsNullOrEmpty(req.sceneCompile)) FrameCompiler.SceneCompilePrompt = req.sceneCompile;
                 if (!string.IsNullOrEmpty(req.sceneEnrich)) FrameCompiler.SceneEnrichPrompt = req.sceneEnrich;
+                if (!string.IsNullOrEmpty(req.sceneRevise)) FrameCompiler.SceneRevisePrompt = req.sceneRevise;
                 if (!string.IsNullOrEmpty(req.suggest)) FrameCompiler.SuggestBehaviorPrompt = req.suggest;
             }
         }
@@ -704,6 +732,7 @@ namespace CNCDemo
                 sb.Append(",\"sceneFollowup\":\"").Append(Escape(FrameCompiler.SceneFollowUpPrompt)).Append("\"");
                 sb.Append(",\"sceneCompile\":\"").Append(Escape(FrameCompiler.SceneCompilePrompt)).Append("\"");
                 sb.Append(",\"sceneEnrich\":\"").Append(Escape(FrameCompiler.SceneEnrichPrompt)).Append("\"");
+                sb.Append(",\"sceneRevise\":\"").Append(Escape(FrameCompiler.SceneRevisePrompt)).Append("\"");
                 sb.Append(",\"suggest\":\"").Append(Escape(FrameCompiler.SuggestBehaviorPrompt)).Append("\"");
             }
             sb.Append("}}");
@@ -986,6 +1015,116 @@ namespace CNCDemo
                     lightMemoryTrigger = "memory " + (i + 1),
                     soundMemoryTrigger = hasSound ? "sound " + (i + 1) : ""
                 });
+            }
+        }
+
+        // --- Session save / load (whole setup, stored outside the project) --------------------
+
+        private string SessionFilePath => Path.Combine(Application.persistentDataPath, "cnc_session.json");
+
+        [Serializable]
+        private sealed class SessionState
+        {
+            public string summary, objective, stance, sceneFrame;
+            public List<CNCBehaviorSpec> behaviors = new List<CNCBehaviorSpec>();
+            public string mode; public float holdSeconds; public string neutralColorHex; public float neutralBrightness;
+            public string model, performerCoaching;
+            public string charFollowup, charCompile, charEnrich, charRevise;
+            public string sceneFollowup, sceneCompile, sceneEnrich, sceneRevise, suggest;
+        }
+
+        private SessionState BuildSessionState()
+        {
+            var s = new SessionState();
+            if (Performer != null)
+            {
+                s.summary = Performer.CurrentCharacterSummary;
+                s.objective = Performer.CurrentObjective;
+                s.stance = Performer.CurrentStance;
+            }
+            s.sceneFrame = _sceneFrame;
+            if (Actuator != null)
+            {
+                s.behaviors = Actuator.Behaviors;
+                s.mode = Actuator.ActionStateMode == CNCActionStateMode.ActAndReturnToNeutral ? "return" : "keep";
+                s.holdSeconds = Actuator.HoldSeconds;
+                s.neutralColorHex = Actuator.NeutralColorHex;
+                s.neutralBrightness = Actuator.NeutralBrightness;
+            }
+            s.model = FrameCompiler != null && (FrameCompiler.Model ?? "").StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase) ? "heavy" : "light";
+            s.performerCoaching = PerformerCoaching;
+            if (FrameCompiler != null)
+            {
+                s.charFollowup = FrameCompiler.CharacterFollowUpPrompt; s.charCompile = FrameCompiler.CharacterCompilePrompt;
+                s.charEnrich = FrameCompiler.CharacterEnrichPrompt; s.charRevise = FrameCompiler.CharacterRevisePrompt;
+                s.sceneFollowup = FrameCompiler.SceneFollowUpPrompt; s.sceneCompile = FrameCompiler.SceneCompilePrompt;
+                s.sceneEnrich = FrameCompiler.SceneEnrichPrompt; s.sceneRevise = FrameCompiler.SceneRevisePrompt;
+                s.suggest = FrameCompiler.SuggestBehaviorPrompt;
+            }
+            return s;
+        }
+
+        private bool SaveSession()
+        {
+            try { File.WriteAllText(SessionFilePath, JsonUtility.ToJson(BuildSessionState(), true)); return true; }
+            catch (Exception ex) { Debug.LogError("[CNCDemoBridge] session save failed: " + ex.Message); return false; }
+        }
+
+        private bool LoadSessionFromFile()
+        {
+            if (!File.Exists(SessionFilePath)) return false;
+            try
+            {
+                var s = JsonUtility.FromJson<SessionState>(File.ReadAllText(SessionFilePath));
+                if (s == null) return false;
+                ApplySessionState(s);
+                return true;
+            }
+            catch (Exception ex) { Debug.LogError("[CNCDemoBridge] session load failed: " + ex.Message); return false; }
+        }
+
+        private void ApplySessionState(SessionState s)
+        {
+            if (Performer != null)
+            {
+                if (!string.IsNullOrWhiteSpace(s.summary)) Performer.CurrentCharacterSummary = s.summary;
+                if (!string.IsNullOrWhiteSpace(s.objective)) Performer.CurrentObjective = s.objective;
+                if (!string.IsNullOrWhiteSpace(s.stance)) Performer.CurrentStance = s.stance;
+            }
+            if (s.sceneFrame != null) { _sceneFrame = s.sceneFrame; ComposeGuidance(); }
+
+            if (Actuator != null && s.behaviors != null)
+            {
+                Actuator.SetBehaviors(s.behaviors);
+                Actuator.ActionStateMode = s.mode == "return" ? CNCActionStateMode.ActAndReturnToNeutral : CNCActionStateMode.ChooseAndKeep;
+                if (s.holdSeconds > 0f) Actuator.HoldSeconds = s.holdSeconds;
+                if (!string.IsNullOrWhiteSpace(s.neutralColorHex)) Actuator.NeutralColorHex = s.neutralColorHex;
+                if (s.neutralBrightness > 0f) Actuator.NeutralBrightness = s.neutralBrightness;
+                SyncRegistryFromBehaviors();
+            }
+            else if (s.behaviors != null) SyncRegistryFromList(s.behaviors);
+
+            if (!string.IsNullOrEmpty(s.model))
+            {
+                var heavy = s.model == "heavy";
+                if (Performer != null) Performer.Model = heavy
+                    ? AaltoDirectedRoomPerformerController.OpenAIModelPreset.Gpt54
+                    : AaltoDirectedRoomPerformerController.OpenAIModelPreset.Gpt4oMini;
+                if (FrameCompiler != null) FrameCompiler.Model = heavy ? "gpt-5.4" : "gpt-4o-mini";
+            }
+
+            if (!string.IsNullOrEmpty(s.performerCoaching)) { PerformerCoaching = s.performerCoaching; ApplyPerformerPrompt(); }
+            if (FrameCompiler != null)
+            {
+                if (!string.IsNullOrEmpty(s.charFollowup)) FrameCompiler.CharacterFollowUpPrompt = s.charFollowup;
+                if (!string.IsNullOrEmpty(s.charCompile)) FrameCompiler.CharacterCompilePrompt = s.charCompile;
+                if (!string.IsNullOrEmpty(s.charEnrich)) FrameCompiler.CharacterEnrichPrompt = s.charEnrich;
+                if (!string.IsNullOrEmpty(s.charRevise)) FrameCompiler.CharacterRevisePrompt = s.charRevise;
+                if (!string.IsNullOrEmpty(s.sceneFollowup)) FrameCompiler.SceneFollowUpPrompt = s.sceneFollowup;
+                if (!string.IsNullOrEmpty(s.sceneCompile)) FrameCompiler.SceneCompilePrompt = s.sceneCompile;
+                if (!string.IsNullOrEmpty(s.sceneEnrich)) FrameCompiler.SceneEnrichPrompt = s.sceneEnrich;
+                if (!string.IsNullOrEmpty(s.sceneRevise)) FrameCompiler.SceneRevisePrompt = s.sceneRevise;
+                if (!string.IsNullOrEmpty(s.suggest)) FrameCompiler.SuggestBehaviorPrompt = s.suggest;
             }
         }
 
