@@ -82,6 +82,10 @@ namespace CNCDemo
                     Performer.ActionMemoryRegistryDual = Registry;
                     Performer.ActionRegistrySource = AaltoDirectedRoomPerformerController.ActionRegistrySourceMode.AutoPreferDual;
                 }
+
+                // Hold/return-to-neutral is handled by the actuator (Expression tab mode), so the
+                // performer must not also fire its own neutral trigger.
+                Performer.SelectedActionStateMode = AaltoDirectedRoomPerformerController.ActionStateMode.HoldResponseState;
             }
 
             if (LoadDefaultSceneOnStart && DefaultScene != null)
@@ -326,6 +330,17 @@ namespace CNCDemo
                     var req = ParseBehaviorApply(body);
                     var json = RunOnMainThread(() =>
                     {
+                        if (Actuator != null)
+                        {
+                            if (!string.IsNullOrEmpty(req.mode))
+                                Actuator.ActionStateMode = req.mode == "return"
+                                    ? CNCActionStateMode.ActAndReturnToNeutral
+                                    : CNCActionStateMode.ChooseAndKeep;
+                            if (req.holdSeconds >= 0f) Actuator.HoldSeconds = req.holdSeconds;
+                            if (!string.IsNullOrEmpty(req.neutralColorHex)) Actuator.NeutralColorHex = req.neutralColorHex;
+                            if (req.neutralBrightness >= 0f) Actuator.NeutralBrightness = req.neutralBrightness;
+                        }
+
                         if (Actuator != null && req.behaviors != null)
                         {
                             for (int i = 0; i < req.behaviors.Count; i++)
@@ -551,7 +566,14 @@ namespace CNCDemo
         // --- Expression endpoint helpers ---------------------------------------
 
         [Serializable]
-        private sealed class BehaviorApplyRequest { public List<CNCBehaviorSpec> behaviors = new List<CNCBehaviorSpec>(); }
+        private sealed class BehaviorApplyRequest
+        {
+            public List<CNCBehaviorSpec> behaviors = new List<CNCBehaviorSpec>();
+            public string mode = "";               // "keep" | "return" | "" = leave unchanged
+            public float holdSeconds = -1f;        // -1 = leave unchanged
+            public string neutralColorHex = "";    // "" = leave unchanged
+            public float neutralBrightness = -1f;  // -1 = leave unchanged
+        }
 
         [Serializable]
         private sealed class IndexRequest { public int index; public float seconds; public string mic; }
@@ -600,7 +622,15 @@ namespace CNCDemo
         private string BuildExpressionListJson()
         {
             var sb = new StringBuilder();
-            sb.Append("{\"behaviors\":[");
+            sb.Append("{");
+            if (Actuator != null)
+            {
+                sb.Append("\"mode\":\"").Append(Actuator.ActionStateMode == CNCActionStateMode.ActAndReturnToNeutral ? "return" : "keep").Append("\",");
+                sb.Append("\"holdSeconds\":").Append(Actuator.HoldSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append(",");
+                sb.Append("\"neutralColorHex\":\"").Append(Escape(Actuator.NeutralColorHex ?? "#FFB45A")).Append("\",");
+                sb.Append("\"neutralBrightness\":").Append(Actuator.NeutralBrightness.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append(",");
+            }
+            sb.Append("\"behaviors\":[");
             var list = Actuator != null ? Actuator.Behaviors : null;
             if (list != null)
             {
@@ -767,6 +797,10 @@ namespace CNCDemo
             if (Actuator != null)
             {
                 Actuator.SetBehaviors(specs);
+                Actuator.ActionStateMode = preset.ActionStateMode;
+                Actuator.HoldSeconds = preset.HoldSeconds;
+                Actuator.NeutralColorHex = preset.NeutralColorHex;
+                Actuator.NeutralBrightness = preset.NeutralBrightness;
                 SyncRegistryFromBehaviors();
             }
             else

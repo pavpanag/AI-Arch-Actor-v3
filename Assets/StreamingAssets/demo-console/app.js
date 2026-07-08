@@ -121,6 +121,10 @@
     var busyState = useState(false); var busy = busyState[0], setBusy = busyState[1];
     var micsState = useState([]); var mics = micsState[0], setMics = micsState[1];
     var micState = useState(""); var mic = micState[0], setMic = micState[1];
+    var modeState = useState("keep"); var mode = modeState[0], setMode = modeState[1];
+    var holdState = useState(4); var holdSecs = holdState[0], setHoldSecs = holdState[1];
+    var nColorState = useState("#FFB45A"); var nColor = nColorState[0], setNColor = nColorState[1];
+    var nBriState = useState(0.12); var nBri = nBriState[0], setNBri = nBriState[1];
     var fileRef = useRef(null);
     var fileIndexRef = useRef(0);
 
@@ -128,6 +132,12 @@
       api("/api/expression/list").then(function (r) {
         // Don't wipe local edits if the server hands back nothing (e.g. Actuator not assigned).
         if (r && r.behaviors && r.behaviors.length) setBehaviors(r.behaviors);
+        if (r && r.mode) {
+          setMode(r.mode);
+          if (typeof r.holdSeconds === "number") setHoldSecs(r.holdSeconds);
+          if (r.neutralColorHex) setNColor(r.neutralColorHex);
+          if (typeof r.neutralBrightness === "number") setNBri(r.neutralBrightness);
+        }
       });
     }
     useEffect(function () {
@@ -143,7 +153,10 @@
 
     function applyAll() {
       setBusy(true); setStatus("Applying…");
-      api("/api/expression/apply", { behaviors: behaviors }).then(function (r) {
+      api("/api/expression/apply", {
+        behaviors: behaviors,
+        mode: mode, holdSeconds: holdSecs, neutralColorHex: nColor, neutralBrightness: nBri
+      }).then(function (r) {
         if (r && r.behaviors && r.behaviors.length) {
           setBehaviors(r.behaviors);
           setStatus("Applied. The lamp can use these now.");
@@ -248,6 +261,28 @@
             h("button", { className: "mini", onClick: function () { record(i); }, disabled: busy }, "Rec")),
           h("button", { className: "mini", onClick: function () { test(i); }, }, "Try"));
       }),
+      h("div", { className: "mode-box" },
+        h("div", { className: "mode-title" }, "After each response"),
+        h("div", { className: "mode-row" },
+          h("button", { className: "mode-btn" + (mode === "keep" ? " active" : ""), onClick: function () { setMode("keep"); } }, "Choose & keep"),
+          h("button", { className: "mode-btn" + (mode === "return" ? " active" : ""), onClick: function () { setMode("return"); } }, "Act & return to neutral")),
+        mode === "return"
+          ? h("div", { className: "mode-row", style: { marginTop: "10px" } },
+              h("span", { className: "pulse-sep" }, "hold steady responses for"),
+              h("input", { type: "number", min: 0.5, max: 60, step: 0.5, value: holdSecs, className: "pulse-secs", name: "hold-secs",
+                onInput: function (e) { setHoldSecs(parseFloat(e.target.value) || 4); } }),
+              h("span", { className: "pulse-sep" }, "s, then return to neutral:"),
+              h("input", { type: "color", value: nColor, name: "neutral-color",
+                onInput: function (e) { setNColor(e.target.value); } }),
+              h("input", { type: "range", min: 0, max: 1, step: 0.05, value: nBri, name: "neutral-bri", style: { width: "110px" },
+                title: "neutral brightness",
+                onInput: function (e) { setNBri(parseFloat(e.target.value)); } }))
+          : h("p", { className: "hint", style: { marginTop: "8px" } },
+              "Each response stays until the next one. A finite pulse settles at its full colour when done."),
+        mode === "return"
+          ? h("p", { className: "hint", style: { marginTop: "8px" } },
+              "Pulsing responses return to neutral after their last pulse; steady ones after the hold time.")
+          : null),
       h("div", { className: "row", style: { marginTop: "16px" } },
         h("button", { className: "ghost", onClick: suggest, disabled: busy }, "Suggest one more behavior"),
         h("button", { className: "ghost", onClick: addRow, disabled: busy }, "+ Add"),

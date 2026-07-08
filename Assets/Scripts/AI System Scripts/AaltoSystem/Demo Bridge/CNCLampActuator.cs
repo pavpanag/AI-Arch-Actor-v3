@@ -12,6 +12,15 @@ using UnityEngine.Networking;
 
 namespace CNCDemo
 {
+    /// <summary>What happens after a behavior is performed.</summary>
+    public enum CNCActionStateMode
+    {
+        [InspectorName("Choose & Keep")]
+        ChooseAndKeep = 0,
+        [InspectorName("Act & Return To Neutral")]
+        ActAndReturnToNeutral = 1
+    }
+
     /// <summary>
     /// One behavior of the lamp's expressive vocabulary: a label the model can choose,
     /// a light condition (colour/brightness/pulse), and an optional sound.
@@ -67,6 +76,16 @@ namespace CNCDemo
         [Header("Pulse")]
         [Range(0f, 1f)] [Tooltip("Brightness floor of the pulse, as a fraction of the behavior brightness.")]
         public float PulseFloor = 0.15f;
+
+        [Header("Action State Mode (settable from the Expression tab)")]
+        [Tooltip("Choose & Keep: the response stays. Act & Return To Neutral: steady responses hold for HoldSeconds then fade to neutral; finite pulses return to neutral after the last pulse.")]
+        public CNCActionStateMode ActionStateMode = CNCActionStateMode.ChooseAndKeep;
+        [Tooltip("How long a NON-pulsing response is held before returning to neutral.")]
+        public float HoldSeconds = 4f;
+        [Tooltip("The neutral light: colour...")]
+        public string NeutralColorHex = "#FFB45A";
+        [Range(0f, 1f)] [Tooltip("...and brightness.")]
+        public float NeutralBrightness = 0.12f;
 
         [Header("Status (read-only)")]
         [TextArea(1, 3)] public string LastApplied;
@@ -134,18 +153,59 @@ namespace CNCDemo
             if (b == null) return;
 
             if (_pulseRoutine != null) { StopCoroutine(_pulseRoutine); _pulseRoutine = null; }
+            _pulseRoutine = StartCoroutine(RunBehaviorLight(b));
 
+            LastApplied = "behavior " + (index + 1) + " (" + (b.label ?? "?") + ")";
+        }
+
+        /// <summary>
+        /// Performs a behavior's light under the current mode.
+        /// Keep: steady holds; a finite pulse settles at its full colour/brightness.
+        /// Return: steady holds HoldSeconds then goes neutral; a finite pulse goes neutral after
+        /// the last pulse. An endless pulse (count 0) runs until the next behavior either way.
+        /// </summary>
+        private System.Collections.IEnumerator RunBehaviorLight(CNCBehaviorSpec b)
+        {
             var color = ParseColor(b.colorHex);
+            var brightness = Mathf.Clamp01(b.brightness);
+            var returnToNeutral = ActionStateMode == CNCActionStateMode.ActAndReturnToNeutral;
+
             if (b.pulse)
             {
-                _pulseRoutine = StartCoroutine(PulseLoop(color, Mathf.Clamp01(b.brightness), b.pulseCount, Mathf.Max(0.3f, b.pulseSeconds)));
+                var seconds = Mathf.Max(0.3f, b.pulseSeconds);
+                var floor = brightness * Mathf.Clamp01(PulseFloor);
+                var period = b.pulseCount > 0 ? seconds / b.pulseCount : seconds;
+                var total = b.pulseCount > 0 ? seconds : float.PositiveInfinity;
+                var t0 = Time.time;
+
+                while (Time.time - t0 < total)
+                {
+                    var phase = (Time.time - t0) / period * 2f * Mathf.PI;
+                    var normalized = (Mathf.Sin(phase) + 1f) * 0.5f;
+                    ApplyLightState(color, floor + normalized * (brightness - floor));
+                    yield return null;
+                }
+
+                // Finite pulse finished: settle at full value, or hand over to neutral.
+                if (returnToNeutral) ApplyNeutral();
+                else ApplyLightState(color, brightness);
             }
             else
             {
-                ApplyLightState(color, Mathf.Clamp01(b.brightness));
+                ApplyLightState(color, brightness);
+                if (returnToNeutral)
+                {
+                    yield return new WaitForSeconds(Mathf.Max(0.1f, HoldSeconds));
+                    ApplyNeutral();
+                }
             }
 
-            LastApplied = "behavior " + (index + 1) + " (" + (b.label ?? "?") + ")";
+            _pulseRoutine = null;
+        }
+
+        private void ApplyNeutral()
+        {
+            ApplyLightState(ParseColor(NeutralColorHex), Mathf.Clamp01(NeutralBrightness));
         }
 
         public void PlayBehaviorSound(int index)
@@ -314,30 +374,6 @@ namespace CNCDemo
         }
 
         // --- Light rendering ----------------------------------------------------
-
-        /// <summary>
-        /// Pulses `count` times over `seconds` total, then settles at the steady brightness.
-        /// count 0 = pulse forever with `seconds` per cycle (until another behavior takes over).
-        /// </summary>
-        private System.Collections.IEnumerator PulseLoop(Color color, float brightness, int count, float seconds)
-        {
-            var floor = brightness * Mathf.Clamp01(PulseFloor);
-            var period = count > 0 ? seconds / count : seconds;
-            var total = count > 0 ? seconds : float.PositiveInfinity;
-            var t0 = Time.time;
-
-            while (Time.time - t0 < total)
-            {
-                var phase = (Time.time - t0) / period * 2f * Mathf.PI;
-                var normalized = (Mathf.Sin(phase) + 1f) * 0.5f;
-                var level = floor + normalized * (brightness - floor);
-                ApplyLightState(color, level);
-                yield return null;
-            }
-
-            ApplyLightState(color, brightness); // settle steady after the pulses
-            _pulseRoutine = null;
-        }
 
         /// <summary>Drives the virtual lamp only — the Light is the source of truth; CNCHueProjector mirrors it to the physical rig.</summary>
         private void ApplyLightState(Color color, float brightness01)

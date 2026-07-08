@@ -93,6 +93,14 @@ namespace CNCDemo
             new CNCBehaviorSpec { label = "",          colorHex = "#FFFFFF", brightness = 0.6f, pulse = true,  pulseSeconds = 3f },
         };
 
+        [Header("Action State Mode (defaults; editable live in the Expression tab)")]
+        [Tooltip("Choose & Keep: a response stays until the next one. Act & Return To Neutral: responses play, then the lamp returns to its neutral light.")]
+        public CNCActionStateMode ActionStateMode = CNCActionStateMode.ChooseAndKeep;
+        [Tooltip("How long a non-pulsing response is held before returning to neutral.")]
+        public float HoldSeconds = 4f;
+        public string NeutralColorHex = "#FFB45A";
+        [Range(0f, 1f)] public float NeutralBrightness = 0.12f;
+
         [Header("Pre-directed Rule (optional first 'wow' beat)")]
         [Tooltip("One position-driven behaviour authored up front, so the lamp visibly reacts to the body before the visitor changes anything. Wired in a later layer.")]
         [TextArea(1, 3)] public string PreDirectedRule =

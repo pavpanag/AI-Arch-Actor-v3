@@ -158,6 +158,29 @@
     border-radius: 8px; padding: 7px 10px; max-width: 320px;
   }
   .mic-row select:focus { outline: none; border-color: rgba(232,160,74,0.5); }
+
+  /* Action state mode */
+  .mode-box {
+    margin-top: 18px; padding: 15px 16px; background: var(--surface-2);
+    border: 1px solid var(--line-soft); border-radius: 10px;
+  }
+  .mode-title { font-size: 11px; letter-spacing: .8px; text-transform: uppercase; color: var(--faint); margin-bottom: 10px; }
+  .mode-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .mode-btn {
+    font-family: var(--sans); font-size: 13px; color: var(--muted);
+    background: transparent; border: 1px solid var(--line); border-radius: 999px;
+    padding: 8px 16px; cursor: pointer; transition: all .2s ease;
+  }
+  .mode-btn:hover { color: var(--text); }
+  .mode-btn.active {
+    color: #1a1109; background: linear-gradient(180deg, var(--ember-hi), var(--ember));
+    border-color: transparent; font-weight: 600;
+  }
+  .mode-row input[type=color] {
+    width: 40px; height: 30px; padding: 2px; border: 1px solid var(--line-soft);
+    border-radius: 8px; background: var(--surface-2); cursor: pointer;
+  }
+  .mode-row input[type=range] { accent-color: var(--ember); }
   .sound-cell { display: flex; align-items: center; gap: 6px; }
   .sound-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); flex: none; }
   .sound-dot.on { background: var(--ember-hi); box-shadow: 0 0 8px rgba(244,189,110,.6); }
