@@ -507,10 +507,23 @@
     var techState = useState(null); var tech = techState[0], setTech = techState[1];
     var statusState = useState(""); var status = statusState[0], setStatus = statusState[1];
     var busyState = useState(false); var busy = busyState[0], setBusy = busyState[1];
+    var keyStatusState = useState(""); var keyStatus = keyStatusState[0], setKeyStatus = keyStatusState[1];
+    var keyRef = useRef(null);
 
     useEffect(function () {
-      api("/api/tech").then(function (r) { if (r && r.prompts) setTech(r); });
+      api("/api/tech").then(function (r) { if (r) { if (r.prompts) setTech(r); setKeyStatus(r.keyStatus || ""); } });
     }, []);
+
+    function saveKey() {
+      var k = (keyRef.current ? keyRef.current.value : "").trim();
+      if (!k) { setStatus("Paste a key first."); return; }
+      if (keyRef.current) keyRef.current.value = "";
+      setBusy(true); setStatus("Saving key…");
+      api("/api/tech/key", { key: k }).then(function (r) {
+        setKeyStatus((r && r.keyStatus) || "");
+        setStatus((r && r.status) || "Key saved."); setBusy(false);
+      });
+    }
 
     function editPrompt(k, v) {
       var next = Object.assign({}, tech);
@@ -546,8 +559,21 @@
 
     return h("div", { className: "card" },
       h("h2", null, "Under the Hood"),
-      h("p", { className: "lead" }, "The model, and the coaching each model call receives. The parts that keep the machinery running (the JSON the system parses) are fixed and appended automatically — everything here is safe to rewrite."),
+      h("p", { className: "lead" }, "The model, the key, and the coaching each model call receives. The parts that keep the machinery running (the JSON the system parses) are fixed and appended automatically — everything here is safe to rewrite."),
       h("div", { className: "mode-box" },
+        h("div", { className: "mode-title" }, "OpenAI API key"),
+        h("div", { className: "mode-row" },
+          h("input", {
+            type: "password", placeholder: "sk-…  (stored outside the project, never committed)",
+            ref: keyRef, name: "openai-key", style: { flex: "1", minWidth: "260px" },
+            onKeyDown: function (e) { if (e.key === "Enter") saveKey(); }
+          }),
+          h("button", { className: "act", onClick: saveKey, disabled: busy }, "Save key")),
+        h("p", { className: "hint", style: { marginTop: "8px" } },
+          (keyStatus && keyStatus.indexOf("not set") < 0)
+            ? "Current: " + keyStatus + ". Saved to a local file outside git; paste a new key to replace it."
+            : "No key set — the lamp can't reach OpenAI until you save one. It's stored locally, never in the scene or git.")),
+      h("div", { className: "mode-box", style: { marginTop: "16px" } },
         h("div", { className: "mode-title" }, "Model — used for everything"),
         h("div", { className: "mode-row" },
           h("button", { className: "mode-btn" + (tech.model === "light" ? " active" : ""), onClick: function () { setTech(Object.assign({}, tech, { model: "light" })); } }, "Lightweight — GPT-4o mini"),

@@ -122,6 +122,8 @@ namespace CNCDemo
             if (LoadDefaultSceneOnStart && DefaultScene != null)
                 ApplyPreset(DefaultScene);
 
+            LoadAndApplyApiKey();
+
             StartServer();
         }
 
@@ -355,6 +357,25 @@ namespace CNCDemo
                 {
                     var req = ParseTechRequest(body);
                     WriteJson(ctx, 200, RunOnMainThread(() => { ApplyTechRequest(req); return BuildTechJson(); }));
+                    break;
+                }
+
+                case "/api/tech/key":
+                {
+                    var key = GetField(body, "key");
+                    WriteJson(ctx, 200, RunOnMainThread(() =>
+                    {
+                        if (!string.IsNullOrWhiteSpace(key))
+                        {
+                            try { File.WriteAllText(ApiKeyFilePath, key.Trim()); }
+                            catch (Exception ex) { return "{\"status\":\"save failed: " + Escape(ex.Message) + "\",\"keyStatus\":\"" + Escape(_apiKeyStatus) + "\"}"; }
+                            ApplyApiKeyToClients(key.Trim());
+                            _apiKeyStatus = "set (saved) ••••" + Last4(key.Trim());
+                        }
+                        var env = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+                        var note = !string.IsNullOrWhiteSpace(env) ? " — note: OPENAI_API_KEY env var is set and overrides this on restart" : "";
+                        return "{\"status\":\"Key saved" + Escape(note) + "\",\"keyStatus\":\"" + Escape(_apiKeyStatus) + "\"}";
+                    }));
                     break;
                 }
 
@@ -672,7 +693,7 @@ namespace CNCDemo
                 ? "heavy" : "light";
 
             var sb = new StringBuilder();
-            sb.Append("{\"model\":\"").Append(model).Append("\",\"prompts\":{");
+            sb.Append("{\"model\":\"").Append(model).Append("\",\"keyStatus\":\"").Append(Escape(_apiKeyStatus)).Append("\",\"prompts\":{");
             sb.Append("\"performer\":\"").Append(Escape(PerformerCoaching)).Append("\"");
             if (FrameCompiler != null)
             {
@@ -967,6 +988,40 @@ namespace CNCDemo
                 });
             }
         }
+
+        // --- OpenAI API key (kept OUT of git: env var, else an untracked local file) ----------
+
+        private string _apiKeyStatus = "not set";
+
+        // Outside the project entirely (Application.persistentDataPath) — never committed.
+        private string ApiKeyFilePath => Path.Combine(Application.persistentDataPath, "cnc_openai_key.txt");
+
+        /// <summary>On boot: env var wins, else the saved file; applies to the OpenAI client(s).</summary>
+        private void LoadAndApplyApiKey()
+        {
+            string key = null, source = null;
+            var env = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+            if (!string.IsNullOrWhiteSpace(env)) { key = env.Trim(); source = "env var"; }
+            else if (File.Exists(ApiKeyFilePath))
+            {
+                try { key = File.ReadAllText(ApiKeyFilePath).Trim(); source = "saved"; } catch { }
+            }
+
+            if (!string.IsNullOrWhiteSpace(key))
+            {
+                ApplyApiKeyToClients(key);
+                _apiKeyStatus = "set (" + source + ") ••••" + Last4(key);
+            }
+            else _apiKeyStatus = "not set";
+        }
+
+        private void ApplyApiKeyToClients(string key)
+        {
+            if (Performer != null && Performer.OpenAI != null) Performer.OpenAI.ApiKey = key;
+            if (FrameCompiler != null && FrameCompiler.OpenAI != null) FrameCompiler.OpenAI.ApiKey = key;
+        }
+
+        private static string Last4(string k) => string.IsNullOrEmpty(k) || k.Length < 4 ? "" : k.Substring(k.Length - 4);
 
         /// <summary>Writes coaching + fixed JSON schema into the performer's system prompt.</summary>
         private void ApplyPerformerPrompt()
