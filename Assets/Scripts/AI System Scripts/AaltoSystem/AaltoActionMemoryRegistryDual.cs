@@ -92,18 +92,18 @@ namespace AaltoSystemV3
         private void Awake()
         {
             EnsureSendersReady(allowCreate: true);
-            ApplySenderEndpointSettings();
+            ApplySenderEndpointSettings(allowCreate: true);
         }
 
         private void OnValidate()
         {
             EnsureSendersReady(allowCreate: false);
-            ApplySenderEndpointSettings();
+            ApplySenderEndpointSettings(allowCreate: false);
         }
 
-        private void ApplySenderEndpointSettings()
+        private void ApplySenderEndpointSettings(bool allowCreate)
         {
-            EnsureSendersReady(allowCreate: Application.isPlaying);
+            EnsureSendersReady(allowCreate: allowCreate);
 
             if (!AutoConfigureSenderEndpoints)
                 return;
