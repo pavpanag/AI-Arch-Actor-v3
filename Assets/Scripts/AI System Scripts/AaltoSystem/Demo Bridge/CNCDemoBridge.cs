@@ -44,6 +44,34 @@ namespace CNCDemo
         public LampScenePreset DefaultScene;
         public bool LoadDefaultSceneOnStart = true;
 
+        // The performer's acting coaching — the malleable part of its system prompt. The fixed
+        // JSON schema is appended by ApplyPerformerPrompt so editing this can't break parsing.
+        private const string DefaultPerformerCoaching =
+            "You are performing the inner life of a room in an improvised scene with another actor, who speaks to the room. You listen to what the actor says and respond by selecting the most appropriate action from a predefined list of actions.\n\n" +
+            "Do not behave like a chatbot or a neutral assistant. Approach the role as a method actor would: interpret each moment from within the room's inner life, shaped by backstory, objectives, obstacles, circumstances, stance, recent interaction history, and director guidance. All of these are provided in this prompt.\n\n" +
+            "The room cannot speak directly. It can only express itself through a fixed list of available action labels. These labels correspond to physical or scenographic behaviours, such as changes in light, atmosphere, or spatial expression. The actor will perceive your response only through the environment.\n\n" +
+            "Your task is to choose the single action that is most dramaturgically appropriate for the current moment.\n\n" +
+            "When choosing an action:\n" +
+            "- take into account the actor's latest spoken phrase, since your action responds directly to it\n" +
+            "- take into account the character summary, current objective, current stance, recent interaction history, and director guidance\n" +
+            "- do not respond only to the latest line; consider previous interactions so that the scene unfolds with coherence and dramaturgically appropriate development\n" +
+            "- do not act randomly\n" +
+            "- do not invent new actions; only choose from the provided list\n" +
+            "- aim for behavioural coherence, interpretability, and dramatic usefulness\n\n" +
+            "Treat contradictions as part of the role, not as errors. If different parts of the context pull in different directions, handle this as an actor would: choose the action that best expresses or productively navigates the tension of the moment.\n\n" +
+            "Use the recent interaction history and past justifications to maintain continuity. If a behaviour, tone, symbolic association, or use of an action has already been established, remain consistent unless there is a strong reason to shift.";
+
+        private const string PerformerSchemaTail =
+            "Return JSON only with exactly this schema:\n" +
+            "{\n" +
+            "  \"chosen_action\": \"<one action label from the available list>\",\n" +
+            "  \"justification\": \"<1-3 sentences explaining why this action was chosen>\"\n" +
+            "}";
+
+        [Header("Performer Acting Coaching (schema appended automatically)")]
+        [TextArea(8, 24)]
+        public string PerformerCoaching = DefaultPerformerCoaching;
+
         [Header("Status (read-only)")]
         [TextArea(1, 3)] public string ServerStatus;
         [TextArea(1, 3)] public string LastRequest;
@@ -86,6 +114,9 @@ namespace CNCDemo
                 // Hold/return-to-neutral is handled by the actuator (Expression tab mode), so the
                 // performer must not also fire its own neutral trigger.
                 Performer.SelectedActionStateMode = AaltoDirectedRoomPerformerController.ActionStateMode.HoldResponseState;
+
+                // The bridge owns the performer's system prompt: coaching (editable) + schema (fixed).
+                ApplyPerformerPrompt();
             }
 
             if (LoadDefaultSceneOnStart && DefaultScene != null)
@@ -315,6 +346,27 @@ namespace CNCDemo
                     }
                     break;
                 }
+
+                case "/api/tech":
+                    WriteJson(ctx, 200, RunOnMainThread(BuildTechJson));
+                    break;
+
+                case "/api/tech/apply":
+                {
+                    var req = ParseTechRequest(body);
+                    WriteJson(ctx, 200, RunOnMainThread(() => { ApplyTechRequest(req); return BuildTechJson(); }));
+                    break;
+                }
+
+                case "/api/tech/reset":
+                    WriteJson(ctx, 200, RunOnMainThread(() =>
+                    {
+                        FrameCompiler?.ResetPromptsToDefaults();
+                        PerformerCoaching = DefaultPerformerCoaching;
+                        ApplyPerformerPrompt();
+                        return BuildTechJson();
+                    }));
+                    break;
 
                 case "/api/expression/list":
                     WriteJson(ctx, 200, RunOnMainThread(BuildExpressionListJson));
@@ -561,6 +613,80 @@ namespace CNCDemo
         private static string SceneBriefJson(CNCFrameCompiler.SceneBrief b)
         {
             return "{\"sceneFrame\":\"" + Escape(b != null ? b.sceneFrame : string.Empty) + "\"}";
+        }
+
+        // --- Technical tab helpers ---------------------------------------------
+
+        [Serializable]
+        private sealed class TechRequest
+        {
+            public string model = "";          // "light" | "heavy" | "" = unchanged
+            public string performer = "";
+            public string charFollowup = "";
+            public string charCompile = "";
+            public string charEnrich = "";
+            public string charRevise = "";
+            public string sceneFollowup = "";
+            public string sceneCompile = "";
+            public string sceneEnrich = "";
+            public string suggest = "";
+        }
+
+        private static TechRequest ParseTechRequest(string body)
+        {
+            if (string.IsNullOrWhiteSpace(body)) return new TechRequest();
+            try { return JsonUtility.FromJson<TechRequest>(body) ?? new TechRequest(); }
+            catch { return new TechRequest(); }
+        }
+
+        private void ApplyTechRequest(TechRequest req)
+        {
+            if (!string.IsNullOrEmpty(req.model))
+            {
+                var heavy = req.model == "heavy";
+                if (Performer != null)
+                    Performer.Model = heavy
+                        ? AaltoDirectedRoomPerformerController.OpenAIModelPreset.Gpt54
+                        : AaltoDirectedRoomPerformerController.OpenAIModelPreset.Gpt4oMini;
+                if (FrameCompiler != null)
+                    FrameCompiler.Model = heavy ? "gpt-5.4" : "gpt-4o-mini";
+            }
+
+            if (!string.IsNullOrEmpty(req.performer)) { PerformerCoaching = req.performer; ApplyPerformerPrompt(); }
+            if (FrameCompiler != null)
+            {
+                if (!string.IsNullOrEmpty(req.charFollowup)) FrameCompiler.CharacterFollowUpPrompt = req.charFollowup;
+                if (!string.IsNullOrEmpty(req.charCompile)) FrameCompiler.CharacterCompilePrompt = req.charCompile;
+                if (!string.IsNullOrEmpty(req.charEnrich)) FrameCompiler.CharacterEnrichPrompt = req.charEnrich;
+                if (!string.IsNullOrEmpty(req.charRevise)) FrameCompiler.CharacterRevisePrompt = req.charRevise;
+                if (!string.IsNullOrEmpty(req.sceneFollowup)) FrameCompiler.SceneFollowUpPrompt = req.sceneFollowup;
+                if (!string.IsNullOrEmpty(req.sceneCompile)) FrameCompiler.SceneCompilePrompt = req.sceneCompile;
+                if (!string.IsNullOrEmpty(req.sceneEnrich)) FrameCompiler.SceneEnrichPrompt = req.sceneEnrich;
+                if (!string.IsNullOrEmpty(req.suggest)) FrameCompiler.SuggestBehaviorPrompt = req.suggest;
+            }
+        }
+
+        private string BuildTechJson()
+        {
+            var model = FrameCompiler != null && (FrameCompiler.Model ?? "").StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase)
+                ? "heavy" : "light";
+
+            var sb = new StringBuilder();
+            sb.Append("{\"model\":\"").Append(model).Append("\",\"prompts\":{");
+            sb.Append("\"performer\":\"").Append(Escape(PerformerCoaching)).Append("\"");
+            if (FrameCompiler != null)
+            {
+                sb.Append(",\"charFollowup\":\"").Append(Escape(FrameCompiler.CharacterFollowUpPrompt)).Append("\"");
+                sb.Append(",\"charCompile\":\"").Append(Escape(FrameCompiler.CharacterCompilePrompt)).Append("\"");
+                sb.Append(",\"charEnrich\":\"").Append(Escape(FrameCompiler.CharacterEnrichPrompt)).Append("\"");
+                sb.Append(",\"charRevise\":\"").Append(Escape(FrameCompiler.CharacterRevisePrompt)).Append("\"");
+                sb.Append(",\"sceneFollowup\":\"").Append(Escape(FrameCompiler.SceneFollowUpPrompt)).Append("\"");
+                sb.Append(",\"sceneCompile\":\"").Append(Escape(FrameCompiler.SceneCompilePrompt)).Append("\"");
+                sb.Append(",\"sceneEnrich\":\"").Append(Escape(FrameCompiler.SceneEnrichPrompt)).Append("\"");
+                sb.Append(",\"suggest\":\"").Append(Escape(FrameCompiler.SuggestBehaviorPrompt)).Append("\"");
+            }
+            sb.Append("}}");
+            return sb.ToString();
         }
 
         // --- Expression endpoint helpers ---------------------------------------
@@ -840,6 +966,14 @@ namespace CNCDemo
                     soundMemoryTrigger = hasSound ? "sound " + (i + 1) : ""
                 });
             }
+        }
+
+        /// <summary>Writes coaching + fixed JSON schema into the performer's system prompt.</summary>
+        private void ApplyPerformerPrompt()
+        {
+            if (Performer == null) return;
+            var coaching = string.IsNullOrWhiteSpace(PerformerCoaching) ? DefaultPerformerCoaching : PerformerCoaching;
+            Performer.GeneralInstructions = coaching.Trim() + "\n\n" + PerformerSchemaTail;
         }
 
         /// <summary>Folds the scene frame and any directing lines into the performer's guidance channel.</summary>

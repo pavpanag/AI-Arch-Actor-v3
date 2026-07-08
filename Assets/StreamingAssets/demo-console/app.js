@@ -18,7 +18,8 @@
     { key: "dramaturgy", label: "Character" },
     { key: "scene",      label: "Scene" },
     { key: "expression", label: "Expression" },
-    { key: "stage",      label: "Stage" }
+    { key: "stage",      label: "Stage" },
+    { key: "tech",       label: "Technical" }
   ];
 
   // --- a single editable question ---------------------------------------
@@ -489,6 +490,83 @@
     );
   }
 
+  // --- technical: model choice + the malleable coaching prompts ---------
+  var TECH_PROMPTS = [
+    { k: "performer",     label: "Acting — how the lamp performs each turn" },
+    { k: "charFollowup",  label: "Character — when and how to ask a follow-up" },
+    { k: "charCompile",   label: "Character — how the answers are compiled" },
+    { k: "charEnrich",    label: "Character — how enrichment works" },
+    { k: "charRevise",    label: "Character — how an adjustment is applied" },
+    { k: "sceneFollowup", label: "Scene — when and how to ask a follow-up" },
+    { k: "sceneCompile",  label: "Scene — how the answers are compiled" },
+    { k: "sceneEnrich",   label: "Scene — how enrichment works" },
+    { k: "suggest",       label: "Expression — how a behavior is suggested" }
+  ];
+
+  function TechStep() {
+    var techState = useState(null); var tech = techState[0], setTech = techState[1];
+    var statusState = useState(""); var status = statusState[0], setStatus = statusState[1];
+    var busyState = useState(false); var busy = busyState[0], setBusy = busyState[1];
+
+    useEffect(function () {
+      api("/api/tech").then(function (r) { if (r && r.prompts) setTech(r); });
+    }, []);
+
+    function editPrompt(k, v) {
+      var next = Object.assign({}, tech);
+      next.prompts = Object.assign({}, tech.prompts);
+      next.prompts[k] = v;
+      setTech(next);
+    }
+
+    function payload() {
+      var p = (tech && tech.prompts) || {};
+      var out = { model: (tech && tech.model) || "" };
+      TECH_PROMPTS.forEach(function (row) { out[row.k] = p[row.k] || ""; });
+      return out;
+    }
+
+    function apply() {
+      setBusy(true); setStatus("Applying…");
+      api("/api/tech/apply", payload()).then(function (r) {
+        if (r && r.prompts) setTech(r);
+        setStatus("Applied."); setBusy(false);
+      });
+    }
+
+    function resetAll() {
+      setBusy(true); setStatus("Resetting to defaults…");
+      api("/api/tech/reset", {}).then(function (r) {
+        if (r && r.prompts) setTech(r);
+        setStatus("Back to defaults."); setBusy(false);
+      });
+    }
+
+    if (!tech) return h("div", { className: "card" }, h("div", { className: "empty" }, "Reading the machinery…"));
+
+    return h("div", { className: "card" },
+      h("h2", null, "Under the Hood"),
+      h("p", { className: "lead" }, "The model, and the coaching each model call receives. The parts that keep the machinery running (the JSON the system parses) are fixed and appended automatically — everything here is safe to rewrite."),
+      h("div", { className: "mode-box" },
+        h("div", { className: "mode-title" }, "Model — used for everything"),
+        h("div", { className: "mode-row" },
+          h("button", { className: "mode-btn" + (tech.model === "light" ? " active" : ""), onClick: function () { setTech(Object.assign({}, tech, { model: "light" })); } }, "Lightweight — GPT-4o mini"),
+          h("button", { className: "mode-btn" + (tech.model === "heavy" ? " active" : ""), onClick: function () { setTech(Object.assign({}, tech, { model: "heavy" })); } }, "Heavyweight — GPT-5.4"))),
+      TECH_PROMPTS.map(function (row) {
+        return h("div", { className: "q", key: row.k, style: { marginTop: "18px" } },
+          h("label", null, row.label),
+          h("textarea", {
+            value: (tech.prompts && tech.prompts[row.k]) || "", rows: 4, name: "tech-" + row.k,
+            onInput: function (e) { editPrompt(row.k, e.target.value); }
+          }));
+      }),
+      h("div", { className: "row", style: { marginTop: "16px" } },
+        h("button", { className: "ghost", onClick: resetAll, disabled: busy }, "Reset to defaults"),
+        h("button", { className: "act", onClick: apply, disabled: busy }, "Apply")),
+      h("div", { className: "status" }, status)
+    );
+  }
+
   // --- app shell --------------------------------------------------------
   function App() {
     var stepState = useState("stage"); var step = stepState[0], setStep = stepState[1];
@@ -532,7 +610,9 @@
       h("div", { style: { display: step === "expression" ? "" : "none" } },
         h(ExpressionStep, { key: "expr" + resetCount })),
       h("div", { style: { display: step === "stage" ? "" : "none" } },
-        h(Stage, { key: "stage" + resetCount })));
+        h(Stage, { key: "stage" + resetCount })),
+      h("div", { style: { display: step === "tech" ? "" : "none" } },
+        h(TechStep, { key: "tech" + resetCount })));
 
     return h("div", { className: "wrap" },
       h("div", { className: "brand" },
