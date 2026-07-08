@@ -32,8 +32,8 @@ namespace CNCDemo
         public string BulbIds = "auto";
 
         [Header("Rate Limiting")]
-        [Tooltip("Minimum seconds between sends (Hue bridges tolerate roughly 10 commands/second total).")]
-        [Range(0.1f, 2f)] public float MinSendInterval = 0.3f;
+        [Tooltip("Seconds between sends. ~0.1 (10/sec) is the Hue max for ONE bulb and gives the smoothest pulse. If you drive several bulbs at once, raise this (total commands/sec across all bulbs should stay near 10).")]
+        [Range(0.08f, 2f)] public float MinSendInterval = 0.1f;
 
         [Header("Status (read-only)")]
         [TextArea(1, 2)] public string HueStatus;
@@ -42,6 +42,7 @@ namespace CNCDemo
         private Color _lastColor = Color.clear;
         private float _lastBrightness = -1f;
         private float _lastSendTime = -999f;
+        private bool _sending;
 
         private void Start()
         {
@@ -54,6 +55,7 @@ namespace CNCDemo
         private void Update()
         {
             if (!EnableProjection || TargetLight == null) return;
+            if (_sending) return;                                   // never overlap sends (bridge floods = clunky)
             if (Time.time - _lastSendTime < MinSendInterval) return;
 
             var color = TargetLight.color;
@@ -61,9 +63,9 @@ namespace CNCDemo
                 ? Mathf.Clamp01(TargetLight.intensity / Mathf.Max(0.01f, IntensityForFullBrightness))
                 : 0f;
 
-            // Only send when the light meaningfully changed since the last send.
+            // Send whenever the light moved at all — small threshold so pulses aren't flattened.
             var colorDelta = Mathf.Abs(color.r - _lastColor.r) + Mathf.Abs(color.g - _lastColor.g) + Mathf.Abs(color.b - _lastColor.b);
-            if (colorDelta < 0.02f && Mathf.Abs(brightness - _lastBrightness) < 0.02f) return;
+            if (colorDelta < 0.008f && Mathf.Abs(brightness - _lastBrightness) < 0.008f) return;
 
             _lastColor = color;
             _lastBrightness = brightness;
@@ -73,14 +75,19 @@ namespace CNCDemo
 
         private System.Collections.IEnumerator SendHueState(Color color, float brightness01)
         {
+            _sending = true;
+
             Color.RGBToHSV(color, out var h, out var s, out _);
             var bri = Mathf.RoundToInt(brightness01 * 254f);
+            // Transition ≈ the send interval, so the bulb ramps smoothly from one sample to the next
+            // and arrives just as the next command comes — continuous motion, no stair-step, minimal lag.
+            var tt = Mathf.Max(1, Mathf.RoundToInt(MinSendInterval * 10f));
             string body = bri > 0
                 ? "{\"on\":true,\"bri\":" + Mathf.Max(1, bri) +
                   ",\"hue\":" + Mathf.RoundToInt(h * 65535f) +
                   ",\"sat\":" + Mathf.RoundToInt(s * 254f) +
-                  ",\"transitiontime\":" + Mathf.RoundToInt(MinSendInterval * 10f) + "}"
-                : "{\"on\":false}";
+                  ",\"transitiontime\":" + tt + "}"
+                : "{\"on\":false,\"transitiontime\":" + tt + "}";
 
             // One lamp, whatever its ID: broadcast the state to every resolved bulb.
             foreach (var id in ResolveBulbIds())
@@ -92,6 +99,8 @@ namespace CNCDemo
                     yield return req.SendWebRequest();
                 }
             }
+
+            _sending = false;
         }
 
         private List<int> ResolveBulbIds()
