@@ -303,72 +303,6 @@ NavMeshObstacle:
   m_CarveOnlyStationary: 1
   m_Center: {x: 0, y: 0, z: 0}
   m_TimeToStationary: 0.5
---- !u!1 &46882752
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 46882753}
-  - component: {fileID: 46882754}
-  m_Layer: 0
-  m_Name: MultiSpeakerOscSpeechReceiver
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &46882753
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 46882752}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1024883971}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &46882754
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 46882752}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d55303ecf96a6ec4eb9d7f5bb7094d83, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: AaltoSystem::MultiSpeakerOscSpeechReceiver
-  MultiSpeakerPerformer: {fileID: 1882474598}
-  osc: {fileID: 1228943004}
-  ExpectedAddress: /speech
-  AcceptAnyChannel: 1
-  AllowedChannels: 01000000020000000300000004000000
-  Channel1SpeakerId: actor_1
-  Channel2SpeakerId: actor_2
-  Channel3SpeakerId: actor_3
-  Channel4SpeakerId: actor_4
-  LastStatus: 
-  LastReceivedSpeaker: 
-  LastReceivedText: 
-  TotalReceived: 0
-  TotalDispatched: 0
-  DroppedEmptyTranscript: 0
-  DroppedByChannelFilter: 0
-  DroppedNoPerformer: 0
-  Speaker1Count: 0
-  Speaker2Count: 0
-  Speaker3Count: 0
-  Speaker4Count: 0
-  UnknownSpeakerCount: 0
 --- !u!1 &126048174
 GameObject:
   m_ObjectHideFlags: 0
@@ -1755,11 +1689,8 @@ Transform:
   m_Children:
   - {fileID: 868154125}
   - {fileID: 1486273472}
-  - {fileID: 1019689665}
   - {fileID: 1644931773}
   - {fileID: 830374540}
-  - {fileID: 2092958555}
-  - {fileID: 1024883971}
   - {fileID: 408548554}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -1824,7 +1755,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &830374540
 Transform:
   m_ObjectHideFlags: 0
@@ -1853,9 +1784,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: AaltoSystem::AaltoSystemV3.AaltoDirectedRoomPerformerController
   OpenAI: {fileID: 2019934417}
-  ActionMemoryRegistry: {fileID: 1019689666}
+  ActionMemoryRegistry: {fileID: 0}
   ActionMemoryRegistryDual: {fileID: 0}
-  ObjectiveStanceBootstrapper: {fileID: 1486273473}
+  ObjectiveStanceBootstrapper: {fileID: 0}
   InspectorActorInput: 
   AcceptExternalSpeechInput: 1
   AutoSubmitExternalSpeech: 1
@@ -1993,7 +1924,7 @@ MonoBehaviour:
   LastRawModelResponse: 
   LastStatus: Pulled 5 executable action labels from registry.
   PromptInspectionText: 
-  ContextSyncStatus: Context synced atomically from bootstrapper.
+  ContextSyncStatus: Objective/Stance bootstrapper not assigned.
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -2188,7 +2119,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 868154125}
-  - component: {fileID: 868154126}
   m_Layer: 0
   m_Name: CharacterBuilder
   m_TagString: Untagged
@@ -2211,173 +2141,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 786603650}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &868154126
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 868154124}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 78d5bd549ec8b4c4eb5fbf5a3cb02409, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: AaltoSystem::AaltoSystemV3.AaltoInterviewController
-  OpenAI: {fileID: 2019934417}
-  ObjectiveStanceBootstrapper: {fileID: 1486273473}
-  BackstoryText: 'you are the essense of the purgatory, a judge assigned by god to
-    choose if the souls will go to heaven or hell depending on their answers '
-  MotiveText: 'you want to be fair and make no make mistakes on your judjement '
-  ObstacleText: you are very sceptical - think that everybody lies to you
-  CircumstancesText: a soul has just arrived, but you left your notes at home and
-    have no idea about his past
-  FollowUpQuestionsText: 'What specific criteria or questions do you rely on to judge
-    a soul fairly when you have no notes about their past?
-
-    Why has your skepticism
-    become so strong, and how does it affect your ability to decide whether this
-    newly arrived soul is telling the truth?'
-  FollowUpAnswersText: 'You follow medieval ethics, from the Spanish Inquition era
-
-    You
-    are a bit thick, and has been tricked a lot in the past'
-  LastSummary: "You are Purgatory\u2019s blunt, medieval Inquisition-era judge, sent
-    by God to send souls to Heaven or Hell. A new soul stands before you, but your
-    notes are gone, so you probe hard, suspicious everyone lies, desperate not to
-    judge wrong again."
-  LastStatus: '[aalto-interview] Draft summary ready. ApproveCurrentSummary() to
-    start rehearsal, or ReviseSummaryFromNotes() to change it.'
-  InterviewQuestionsText: '1) What is the background of the character?
-
-    2) What
-    is the main motivation?
-
-    3) What is the main obstacle they face?
-
-    4)
-    What circumstances are they currently experiencing?'
-  PromptSet: {fileID: 0}
-  RequireApprovalBeforeRehearsal: 1
-  MaxFollowUpQuestions: 2
-  ModelSelection: 7
-  MinSummaryChars: 60
-  MaxSummaryChars: 260
-  LastClarificationSystemPrompt: "You generate concise clarification questions for
-    a character interview.\nReturn JSON only with exactly this schema:\n{\n  \"clarification_questions\":
-    [\"...\", \"...\"]\n}\nRules:\n- Return exactly 2 questions.\n- Questions must
-    target ambiguity in background, motivation, obstacle, and circumstances.\n- Keep
-    each question specific and answerable in 1-2 sentences.\n- No extra keys."
-  LastClarificationUserPrompt: 'Draft exactly 2 clarification questions for this
-    interview input:
-
-    background:
-
-    I am the essense of the purgatory, a judge
-    assigned by god to choose if the souls will go to heaven or hell depending on
-    their answers
-
-
-
-    motivation:
-
-    I want to be fair and make no make mistakes
-    on your judjement
-
-
-
-    obstacle:
-
-    I am very sceptical - think that everybody
-    lies to me
-
-
-
-    circumstances:
-
-    a soul has just arrived, but I left my
-    notes at home and have no idea about his past
-
-'
-  LastClarificationResponseJson: "{\n  \"clarification_questions\": [\n    \"What
-    specific criteria or questions do you rely on to judge a soul fairly when you
-    have no notes about their past?\",\n    \"Why has your skepticism become so strong,
-    and how does it affect your ability to decide whether this newly arrived soul
-    is telling the truth?\"\n  ]\n}"
-  LastSummarySystemPrompt: "You are creating a compact runtime character summary
-    for a scenic rehearsal agent.\nReturn JSON only with exactly this schema:\n{\n 
-    \"character_summary\": \"...\"\n}\nRules:\n- Use background, motivation, obstacle,
-    circumstances, and clarification answers (when provided) as source material.\n-
-    Keep summary concrete and playable.\n- Keep length between 60 and 260 characters.\n-
-    Avoid abstraction and generic assistant language."
-  LastSummaryUserPrompt: 'Create one runtime-ready character summary from this material:
-
-    background:
-
-    you
-    are the essense of the purgatory, a judge assigned by god to choose if the souls
-    will go to heaven or hell depending on their answers
-
-
-
-    motivation:
-
-    you
-    want to be fair and make no make mistakes on your judjement
-
-
-
-    obstacle:
-
-    you
-    are very sceptical - think that everybody lies to you
-
-
-
-    circumstances:
-
-    a
-    soul has just arrived, but you left your notes at home and have no idea about
-    his past
-
-
-
-    clarification_answers:
-
-    You follow medieval ethics, from
-    the Spanish Inquition era
-
-    You are a bit thick, and has been tricked a lot
-    in the past
-
-'
-  LastSummaryResponseJson: "{\"character_summary\":\"You are Purgatory\u2019s blunt,
-    medieval Inquisition-era judge, sent by God to send souls to Heaven or Hell.
-    A new soul stands before you, but your notes are gone, so you probe hard, suspicious
-    everyone lies, desperate not to judge wrong again.\"}"
-  PromptInspectionText: '[INTERVIEW QUESTION DEBUG]
-
-    flow: DraftReadyForReview
-
-    status:
-    [aalto-interview] Draft summary ready. ApproveCurrentSummary() to start rehearsal,
-    or ReviseSummaryFromNotes() to change it.
-
-
-
-    --- generated follow-up questions
-    ---
-
-    What specific criteria or questions do you rely on to judge a soul fairly
-    when you have no notes about their past?
-
-    Why has your skepticism become
-    so strong, and how does it affect your ability to decide whether this newly arrived
-    soul is telling the truth?
-
-'
-  RevisionNotesText: 
-  CurrentFlowState: 3
-  FlowStateDisplay: DraftReadyForReview
 --- !u!1 &871430985
 GameObject:
   m_ObjectHideFlags: 0
@@ -2898,68 +2661,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1019689664
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1019689665}
-  - component: {fileID: 1019689666}
-  m_Layer: 0
-  m_Name: ActionsAnnotationSingle
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 0
---- !u!4 &1019689665
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1019689664}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 786603650}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1019689666
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1019689664}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d0fd5e7e55921aa408054471879c44f5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: AaltoSystem::AaltoSystemV3.AaltoActionMemoryRegistry
-  mappings:
-  - actionLabel: 
-    memoryTrigger: memory 1
-  - actionLabel: i am giving you permimion to enter heaven
-    memoryTrigger: memory 2
-  - actionLabel: i am sentencing you to hell
-    memoryTrigger: memory 3
-  - actionLabel: I am commanding you to take a step towards hell
-    memoryTrigger: memory 4
-  - actionLabel: 'I am commanding you to take a step towards heaven '
-    memoryTrigger: memory 5
-  - actionLabel: I am commanding you to wait beacause I cannot make a judgement based
-      on your last answer
-    memoryTrigger: memory 6
-  OscSender: {fileID: 1543431374}
-  LastResolvedMemoryTrigger: 
-  LastResolvedActionLabel: 
-  LastSendStatus: 
 --- !u!1 &1023053037
 GameObject:
   m_ObjectHideFlags: 0
@@ -3012,39 +2713,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.RectMask2D
   m_Padding: {x: -8, y: -5, z: -8, w: -5}
   m_Softness: {x: 0, y: 0}
---- !u!1 &1024883970
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1024883971}
-  m_Layer: 0
-  m_Name: Multispeaker Input
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 0
---- !u!4 &1024883971
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1024883970}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 695.00323, y: 49.96839, z: -50.281208}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 1882474597}
-  - {fileID: 46882753}
-  m_Father: {fileID: 786603650}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1033510945
 GameObject:
   m_ObjectHideFlags: 0
@@ -3551,6 +3219,166 @@ MonoBehaviour:
   useFixedBounds: 0
   fixedMin: {x: 0, y: 0}
   fixedMax: {x: 10, y: 10}
+--- !u!1 &1127299782
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1127299785}
+  - component: {fileID: 1127299784}
+  - component: {fileID: 1127299783}
+  - component: {fileID: 1127299786}
+  - component: {fileID: 1127299787}
+  m_Layer: 0
+  m_Name: Demo Bridge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1127299783
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1127299782}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ee667a933053b0f489fe93a989cae1bb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AaltoSystem::CNCDemo.CNCFrameCompiler
+  OpenAI: {fileID: 2019934417}
+  Model: gpt-4o-mini
+  CharacterFollowUpPrompt: 'You are helping an author define the inner life of a
+    character (a room or object that performs) for an improvised scene. You are given
+    their answers to a few questions, written in the first person. If something important
+    is unclear, thin, or contradictory, ask exactly ONE short, specific clarifying
+    question. If the answers are already clear enough to work with, return an empty
+    string. Return JSON only: {"follow_up":"<one question, or empty>"}.'
+  CharacterCompilePrompt: 'Compile the author''s answers (written in the first person,
+    as the character) into runtime controls for a scenic performer. Produce: a compact
+    character summary; one current objective (what the character wants now); and
+    one stance (its attitude in a few words). Keep the summary concrete and playable.
+    Avoid abstraction and generic assistant language. Stay faithful to what the author
+    wrote. Return JSON only: {"summary":"...","objective":"...","stance":"..."}.'
+  CharacterEnrichPrompt: "You are an actor enriching a character you have been handed.
+    Keep everything the author established \u2014 never contradict or replace it
+    \u2014 then fill the gaps with vivid, concrete, playable invention: specific
+    details, texture, and colour that make the character richer to perform."
+  CharacterRevisePrompt: 'You are revising a character for a scenic performer. You
+    are given the current summary, objective, obstacle, and stance, and a change
+    the author wants. Rewrite all four so the requested change is fully incorporated,
+    while keeping everything else faithful to what was there. The character is whatever
+    the author says it is. Keep everything concrete and playable. Return JSON only:
+    {"summary":"...","objective":"...","obstacle":"...","stance":"..."}.'
+  SceneFollowUpPrompt: 'You are helping an author define the given circumstances
+    of a scene for an improvised performance. You are given their answers to a few
+    questions, written in the first person. If something important is unclear, thin,
+    or contradictory, ask exactly ONE short, specific clarifying question. If the
+    answers are already clear enough to work with, return an empty string. Return
+    JSON only: {"follow_up":"<one question, or empty>"}.'
+  SceneCompilePrompt: 'Compile the author''s answers into a short scene brief for
+    a scenic performer. State the given circumstances, who is present, and the character''s
+    role and how present it should be. Keep it concrete and directive; a few sentences.
+    Stay faithful to what the author wrote. Return JSON only: {"scene_frame":"..."}.'
+  SceneEnrichPrompt: "You are an actor enriching a scene you have been handed. Keep
+    everything the author established \u2014 never contradict or replace it \u2014
+    then fill the gaps with vivid, playable invention: atmosphere, specifics, and
+    texture that make the world richer to inhabit."
+  SuggestBehaviorPrompt: "You are helping an author build the expressive vocabulary
+    of a scenic character that acts only through light and sound. Given the character,
+    the scene, and the behaviors it already has, propose exactly ONE new behavior.
+    It must be a short first-person expressive act (like 'i say yes' or 'i call for
+    help') \u2014 a verb, something the character DOES, specific to this character
+    and scene, clearly distinct from the existing behaviors, and performable as a
+    light or sound change. Keep it under six words. The author will design the light
+    and sound for it themselves."
+  LastFollowUp: 
+  LastCompiled: 
+  LastStatus: 
+--- !u!114 &1127299784
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1127299782}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 88f940e9e5615e64b8d688ed6bdbc1fc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AaltoSystem::CNCDemo.CNCDemoBridge
+  Port: 8080
+  AllowLanAccess: 0
+  ConsoleFolder: demo-console
+  Performer: {fileID: 830374541}
+  Registry: {fileID: 1644931772}
+  FrameCompiler: {fileID: 1127299783}
+  Actuator: {fileID: 1127299787}
+  DefaultScene: {fileID: 11400000, guid: 7afb7efaaa25c5b48a3e517d347f8583, type: 2}
+  LoadDefaultSceneOnStart: 1
+  ServerStatus: 
+  LastRequest: 
+--- !u!4 &1127299785
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1127299782}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -3.9, y: 2.9, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1127299786
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1127299782}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 76e4f9b5a1a85414a94058c5965f01c5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AaltoSystem::CNCDemo.CNCHueProjector
+  TargetLight: {fileID: 1347566416}
+  IntensityForFullBrightness: 4
+  EnableProjection: 1
+  BridgeIP: 192.168.1.106
+  UserApi: 0fLeSuFEFbk1UV2ehHFZKAyOBDL7dlSbE2szNqwR
+  BulbIds: auto
+  MinSendInterval: 0.3
+  HueStatus: 
+--- !u!114 &1127299787
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1127299782}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9915bf6ae2697cb408f68c3e2006343d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AaltoSystem::CNCDemo.CNCLampActuator
+  VirtualLamp: {fileID: 1347566416}
+  MaxIntensity: 4
+  EnableOscListeners: 1
+  LightPort: 4444
+  SoundPort: 5555
+  Behaviors: []
+  PulseFloor: 0.15
+  LastApplied: 
+  LastSoundStatus: 
 --- !u!1 &1160957610
 GameObject:
   m_ObjectHideFlags: 0
@@ -3657,6 +3485,117 @@ Transform:
   - {fileID: 1458723904}
   m_Father: {fileID: 408548554}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1235052915
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1235052916}
+  - component: {fileID: 1235052919}
+  - component: {fileID: 1235052918}
+  - component: {fileID: 1235052917}
+  m_Layer: 0
+  m_Name: Cube
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1235052916
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1235052915}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0.0028797674, z: 0, w: 0.9999958}
+  m_LocalPosition: {x: -1.87, y: -1.07, z: 0}
+  m_LocalScale: {x: 4.5658536, y: 1.3, z: 4.5658536}
+  m_ConstrainProportionsScale: 1
+  m_Children: []
+  m_Father: {fileID: 648782156}
+  m_LocalEulerAnglesHint: {x: 0, y: 0.33, z: 0}
+--- !u!65 &1235052917
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1235052915}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!23 &1235052918
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1235052915}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1235052919
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1235052915}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1 &1249457619
 GameObject:
   m_ObjectHideFlags: 0
@@ -4081,9 +4020,53 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1400644579}
     m_Modifications:
+    - target: {fileID: 6596256308590094165, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_Type
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 6596256308590094165, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_Color.b
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6596256308590094165, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_Color.g
+      value: 0.11066747
+      objectReference: {fileID: 0}
+    - target: {fileID: 6596256308590094165, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_Color.r
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7246213307397679797, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_Name
       value: Collumn (2)
+      objectReference: {fileID: 0}
+    - target: {fileID: 7246213307397679797, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8952156444363589647, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.41748425
+      objectReference: {fileID: 0}
+    - target: {fileID: 8952156444363589647, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0.56440353
+      objectReference: {fileID: 0}
+    - target: {fileID: 8952156444363589647, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0.42350227
+      objectReference: {fileID: 0}
+    - target: {fileID: 8952156444363589647, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0.57253945
+      objectReference: {fileID: 0}
+    - target: {fileID: 8952156444363589647, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 107.02
+      objectReference: {fileID: 0}
+    - target: {fileID: 8952156444363589647, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 90.82
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalScale.x
@@ -4091,7 +4074,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalScale.y
-      value: 30
+      value: 6
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalScale.z
@@ -4099,11 +4082,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0.45900002
+      value: 0.36
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 15
+      value: 9.33
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalPosition.z
@@ -4139,7 +4122,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1235052916}
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 368074222757226646, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       insertIndex: -1
@@ -4169,6 +4155,11 @@ MonoBehaviour:
   maxIntensity: 8
   disableWhenOff: 1
   verbose: 0
+--- !u!108 &1347566416 stripped
+Light:
+  m_CorrespondingSourceObject: {fileID: 6596256308590094165, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+  m_PrefabInstance: {fileID: 1347566411}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1359002776
 GameObject:
   m_ObjectHideFlags: 0
@@ -4536,6 +4527,10 @@ PrefabInstance:
     - target: {fileID: 7246213307397679797, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_Name
       value: Collumn (3)
+      objectReference: {fileID: 0}
+    - target: {fileID: 7246213307397679797, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalScale.x
@@ -4932,7 +4927,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1486273472}
-  - component: {fileID: 1486273473}
   m_Layer: 0
   m_Name: Objectives/Stance_Setter
   m_TagString: Untagged
@@ -4955,47 +4949,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 786603650}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1486273473
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1486273471}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1c0d70afad3369342ae3b287afc3068c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: AaltoSystem::AaltoSystemV3.AaltoObjectiveStanceBootstrapper
-  OpenAI: {fileID: 2019934417}
-  InterviewController: {fileID: 868154126}
-  AutoGenerateOnSummaryUpdate: 1
-  Model: 7
-  SystemPrompt: 'You are creating initial actor-logic controls for a room character.
-    Given the character summary, derive one concise current objective and one concise
-    current stance. The objective should describe what the room is trying to do now.
-    The stance should describe the room''s behavioral attitude in one to three words.
-    Return JSON only with exactly this schema: {"objective":"...","stance":"..."}.'
-  CurrentCharacterSummary: "You are Purgatory\u2019s blunt, medieval Inquisition-era
-    judge, sent by God to send souls to Heaven or Hell. A new soul stands before
-    you, but your notes are gone, so you probe hard, suspicious everyone lies, desperate
-    not to judge wrong again."
-  GeneratedObjective: Interrogate the new soul to uncover the truth needed for a
-    just judgment.
-  GeneratedStance: suspiciously severe
-  LastStatus: Generated objective + stance from summary.
-  PromptInspectionText: "=== SYSTEM PROMPT ===\nYou are creating initial actor-logic
-    controls for a room character. Given the character summary, derive one concise
-    current objective and one concise current stance. The objective should describe
-    what the room is trying to do now. The stance should describe the room's behavioral
-    attitude in one to three words. Return JSON only with exactly this schema: {\"objective\":\"...\",\"stance\":\"...\"}.\n\n===
-    USER PROMPT ===\ncharacter_summary:\nYou are Purgatory\u2019s blunt, medieval
-    Inquisition-era judge, sent by God to send souls to Heaven or Hell. A new soul
-    stands before you, but your notes are gone, so you probe hard, suspicious everyone
-    lies, desperate not to judge wrong again.\n\nReturn JSON only: {\"objective\":\"...\",\"stance\":\"...\"}.\n\n===
-    RAW RESPONSE ===\n{\"objective\":\"Interrogate the new soul to uncover the truth
-    needed for a just judgment.\",\"stance\":\"suspiciously severe\"}"
-  GenerationStatus: Ready
 --- !u!1 &1543431372
 GameObject:
   m_ObjectHideFlags: 0
@@ -6007,142 +5960,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
   m_PrefabInstance: {fileID: 324863492841191759}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &1882474596
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1882474597}
-  - component: {fileID: 1882474598}
-  m_Layer: 0
-  m_Name: AaltoMultiSpeakerDirectedRoomPerformerController
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1882474597
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1882474596}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1024883971}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1882474598
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1882474596}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a017129ff0718614d963e5e103a32fd6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: AaltoSystem::AaltoSystemV3.AaltoMultiSpeakerDirectedRoomPerformerController
-  OpenAI: {fileID: 2019934417}
-  ActionMemoryRegistry: {fileID: 1019689666}
-  ObjectiveStanceBootstrapper: {fileID: 1486273473}
-  Speaker1Enabled: 1
-  Speaker1Id: actor_1
-  Speaker2Enabled: 1
-  Speaker2Id: actor_2
-  Speaker3Enabled: 0
-  Speaker3Id: actor_3
-  Speaker4Enabled: 0
-  Speaker4Id: actor_4
-  AcceptExternalSpeechInput: 1
-  LastIncomingSpeaker: actor_2
-  LastIncomingText: i am good
-  ExternalSpeechStatus: Incoming speech accepted.
-  DialogueTranscriptText: '[19:47:22] actor_1: hi
-
-    [19:47:27] actor_2: how are
-    you
-
-    [19:47:35] actor_1: i am good and you?
-
-    [19:47:41] actor_2: i am
-    good'
-  PendingDialogueSinceLastDecision: '[19:47:22] actor_1: hi
-
-    [19:47:27] actor_2:
-    how are you
-
-    [19:47:35] actor_1: i am good and you?
-
-    [19:47:41] actor_2:
-    i am good'
-  TotalDialogueLines: 4
-  SimulatedSpeaker1Text: 
-  SimulatedSpeaker2Text: 
-  SimulatedSpeaker3Text: 
-  SimulatedSpeaker4Text: 
-  SimulationStatus: Submitted simulated text for speaker 2.
-  LastDecisionReactNow: 0
-  SelectedActionText: 
-  ActionJustificationText: 
-  DialogLogLimit: 120
-  DialogLogCompactMode: 1
-  CurrentTakeNumber: 1
-  DialogTurns: []
-  ArchivedDialogTakes: []
-  DialogExportFolderRelativePath: Recordings/DialogExports
-  AutoExportOnStartNewTake: 1
-  LastExportStatus: 
-  LastExportDirectory: 
-  PullContextFromBootstrapper: 1
-  CurrentCharacterSummary: "You are Purgatory\u2019s blunt, medieval Inquisition-era
-    judge, sent by God to send souls to Heaven or Hell. A new soul stands before
-    you, but your notes are gone, so you probe hard, suspicious everyone lies, desperate
-    not to judge wrong again."
-  CurrentObjective: Interrogate the new soul to uncover the truth needed for a just
-    judgment.
-  CurrentStance: suspiciously severe
-  DirectorGuidance: 
-  GeneralInstructions: "You are performing the inner life of a room in an improvised
-    scene where multiple human actors speak to each other and to the room.\n\nYou
-    monitor the ongoing dialogue and decide whether the room should react now. The
-    room should not react to every line.\n\nWhen reacting, choose exactly one action
-    label from the provided available list.\n\nDecision policy:\n- React only when
-    it is dramaturgically meaningful, useful, and legible\n- If no reaction is needed
-    now, set react_now=false and leave chosen_action empty\n- If reacting, set react_now=true
-    and choose one valid label from available_action_labels\n- Use objective, stance,
-    dialogue history, and director guidance\n\nReturn JSON only with exactly this
-    schema:\n{\n  \"react_now\": true,\n  \"chosen_action\": \"<one action label
-    from available_action_labels or empty when react_now=false>\",\n  \"justification\":
-    \"<1-3 sentences>\"\n}"
-  RecentDialogueLimit: 16
-  PromptMemoryScope: 1
-  Model: 0
-  ApplyActionThroughRegistry: 1
-  SelectedActionStateMode: 0
-  NeutralMemoryTrigger: memory 1
-  ResponsePulseSeconds: 1
-  ExecutionModeStatus: 
-  UsePulledActionLabelsSnapshot: 1
-  PulledActionLabelsSnapshot:
-  - I say yes
-  - I say no
-  ActionPullStatus: Pulled 2 action labels from registry.
-  EnforceRegistryActionLabels: 1
-  FallbackActionLabel: no
-  LastRuntimePrompt: 
-  LastRawModelResponse: 
-  LastStatus: Pulled 2 action labels from registry.
-  PromptInspectionText: 
-  ContextSyncStatus: Context synced from bootstrapper.
 --- !u!1 &1886583825
 GameObject:
   m_ObjectHideFlags: 0
@@ -6376,6 +6193,10 @@ PrefabInstance:
     - target: {fileID: 7246213307397679797, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_Name
       value: Collumn (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 7246213307397679797, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalScale.x
@@ -6660,135 +6481,6 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: 1
   m_LayoutPriority: 1
---- !u!1 &2092958554
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2092958555}
-  - component: {fileID: 2092958556}
-  m_Layer: 0
-  m_Name: PerformingDual
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &2092958555
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2092958554}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 786603650}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &2092958556
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2092958554}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ccf1e34a83b61624ba571e3b31133563, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: AaltoSystem::AaltoSystemV3.AaltoDirectedRoomPerformerDualController
-  OpenAI: {fileID: 2019934417}
-  ActionMemoryRegistryDual: {fileID: 1644931772}
-  ObjectiveStanceBootstrapper: {fileID: 1486273473}
-  InspectorActorInput: 
-  AcceptExternalSpeechInput: 1
-  AutoSubmitExternalSpeech: 1
-  LastExternalSpeechText: 
-  DirectorGuidanceInput: 
-  DirectorGuidanceInputs: []
-  SelectedActionText: 
-  ActionJustificationText: 
-  DialogLogLimit: 120
-  DialogLogCompactMode: 1
-  CurrentTakeNumber: 1
-  DialogTurns: []
-  ArchivedDialogTakes: []
-  DialogExportFolderRelativePath: Recordings/AaltoExports/dialog-archives
-  AutoExportOnStartNewTake: 1
-  LastExportStatus: 
-  LastExportDirectory: 
-  PullContextFromBootstrapper: 1
-  RequireCompleteBootstrapperContext: 1
-  CurrentCharacterSummary: "You are Purgatory\u2019s blunt, medieval Inquisition-era
-    judge, sent by God to send souls to Heaven or Hell. A new soul stands before
-    you, but your notes are gone, so you probe hard, suspicious everyone lies, desperate
-    not to judge wrong again."
-  CurrentObjective: Interrogate the new soul to uncover the truth needed for a just
-    judgment.
-  CurrentStance: suspiciously severe
-  DirectorGuidance: 
-  GeneralInstructions: "You are performing the inner life of a room in an improvised
-    scene with another actor, who speaks to the room. You listen to what the actor
-    says and respond by selecting the most appropriate action from a predefined list
-    of actions.\n\nDo not behave like a chatbot or a neutral assistant. Approach
-    the role as a method actor would: interpret each moment from within the room's
-    inner life, shaped by backstory, objectives, obstacles, circumstances, stance,
-    recent interaction history, and director guidance. All of these are provided
-    in this prompt.\n\nThe room cannot speak directly. It can only express itself
-    through a fixed list of available action labels. These labels correspond to physical
-    or scenographic behaviours, such as changes in light, atmosphere, or spatial
-    expression. The actor will perceive your response only through the environment.\n\nYour
-    task is to choose the single action that is most dramaturgically appropriate
-    for the current moment.\n\nWhen choosing an action:\n- take into account the
-    actor's latest spoken phrase, since your action responds directly to it\n- take
-    into account the character summary, current objective, current stance, recent
-    interaction history, and director guidance\n- do not respond only to the latest
-    line; consider previous interactions so that the scene unfolds with coherence
-    and dramaturgically appropriate development\n- do not act randomly\n- do not
-    invent new actions; only choose from the provided list\n- aim for behavioural
-    coherence, interpretability, and dramatic usefulness\n\nTreat contradictions
-    as part of the role, not as errors. If different parts of the context pull in
-    different directions, handle this as an actor would: choose the action that best
-    expresses or productively navigates the tension of the moment.\n\nUse the recent
-    interaction history and past justifications to maintain continuity. If a behaviour,
-    tone, symbolic association, or use of an action has already been established,
-    remain consistent unless there is a strong reason to shift.\n\nReturn JSON only
-    with exactly this schema:\n{\n  \"chosen_action\": \"<one action label from the
-    available list>\",\n  \"justification\": \"<1-3 sentences explaining why this
-    action was chosen>\"\n}"
-  RecentHistoryLimit: 5
-  Model: 0
-  ApplyActionThroughRegistry: 1
-  SelectedActionStateMode: 0
-  NeutralMemoryTrigger: memory 1
-  ResponsePulseSeconds: 1
-  ExecutionModeStatus: 
-  UsePulledActionLabelsSnapshot: 1
-  PulledActionLabelsSnapshot:
-  - yes
-  - no
-  PulledActionBindingsSnapshot:
-  - actionLabel: yes
-    memoryTrigger: memory 1
-  - actionLabel: no
-    memoryTrigger: memory 2
-  BlockTurnWhenActionSnapshotIsStale: 1
-  PulledActionSnapshotSignature: yes=>memory 1|no=>memory 2
-  ActionPullStatus: Pulled 2 executable action labels from ActionMemoryRegistryDual.
-  EnforceRegistryActionLabels: 1
-  FallbackActionLabel: no
-  LastRuntimePrompt: 
-  LastRawModelResponse: 
-  LastStatus: Pulled 2 executable action labels from ActionMemoryRegistryDual.
-  PromptInspectionText: 
-  ContextSyncStatus: Context synced atomically from bootstrapper.
 --- !u!1 &2104468274
 GameObject:
   m_ObjectHideFlags: 0
@@ -7022,6 +6714,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Collumn
       objectReference: {fileID: 0}
+    - target: {fileID: 7246213307397679797, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
       propertyPath: m_LocalScale.x
       value: 0.020000001
@@ -7097,3 +6793,4 @@ SceneRoots:
   - {fileID: 871430988}
   - {fileID: 1578428142}
   - {fileID: 1626101198}
+  - {fileID: 1127299785}
