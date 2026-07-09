@@ -46,6 +46,14 @@
     var busyState = useState(false); var busy = busyState[0], setBusy = busyState[1];
     var reviseRef = useRef(null);
 
+    // Loaded setup: the answers are already in `items`; also show the compiled scene.
+    useEffect(function () {
+      if (!props.loaded) return;
+      api("/api/state").then(function (s) {
+        if (s && s.sceneFrame) { setCompiled({ sceneFrame: s.sceneFrame }); setChecked(true); setStatus("Loaded — the lamp is playing this."); }
+      });
+    }, []);
+
     function edit(i, val) {
       var next = items.slice();
       next[i] = { question: next[i].question, answer: val };
@@ -427,6 +435,17 @@
     var compiledState = useState(null); var compiled = compiledState[0], setCompiled = compiledState[1];
     var errState = useState(""); var err = errState[0], setErr = errState[1];
 
+    // Loaded setup: show the saved answers and the compiled character straight away.
+    useEffect(function () {
+      if (!props.loaded) return;
+      var qs = props.questions || [];
+      setAnswers(qs.map(function (q) { return q.answer || ""; }));
+      api("/api/state").then(function (s) {
+        setCompiled({ summary: (s && s.summary) || "", objective: (s && s.objective) || "", obstacle: "", stance: (s && s.stance) || "" });
+        setPhase("done");
+      });
+    }, []);
+
     function itemsFrom(ans) {
       return questions.map(function (q, i) { return { question: q.question, answer: ans[i] || "" }; });
     }
@@ -712,6 +731,8 @@
     var resetState = useState({ chat: 0, scene: 0, expr: 0, stage: 0 });
     var resetCount = resetState[0], setResetCount = resetState[1];
     var appMsgState = useState(""); var appMsg = appMsgState[0], setAppMsg = appMsgState[1];
+    var charLoadedState = useState(false); var charLoaded = charLoadedState[0], setCharLoaded = charLoadedState[1];
+    var sceneLoadedState = useState(false); var sceneLoaded = sceneLoadedState[0], setSceneLoaded = sceneLoadedState[1];
 
     useEffect(function () {
       api("/api/frames").then(function (f) {
@@ -719,6 +740,8 @@
           setDrama(f.dramaturgy || []);
           setScene(f.scene || []);
           setExpr(f.expressions || []);
+          setCharLoaded(!!f.savedCharacter);
+          setSceneLoaded(!!f.savedScene);
         }
         setReady(true);
       });
@@ -730,14 +753,14 @@
       if (step === "dramaturgy") {
         setAppMsg("Resetting character…");
         api("/api/reset/character", {}).then(function () { return api("/api/frames"); }).then(function (f) {
-          if (f) setDrama(f.dramaturgy || []);
+          if (f) { setDrama(f.dramaturgy || []); setCharLoaded(!!f.savedCharacter); }
           setResetCount(Object.assign({}, resetCount, { chat: resetCount.chat + 1 }));
           setAppMsg("Character reset.");
         });
       } else if (step === "scene") {
         setAppMsg("Resetting scene…");
         api("/api/reset/scene", {}).then(function () { return api("/api/frames"); }).then(function (f) {
-          if (f) setScene(f.scene || []);
+          if (f) { setScene(f.scene || []); setSceneLoaded(!!f.savedScene); }
           setResetCount(Object.assign({}, resetCount, { scene: resetCount.scene + 1 }));
           setAppMsg("Scene reset.");
         });
@@ -782,9 +805,9 @@
     if (!ready) body = h("div", { className: "empty" }, "Lighting the lamp…");
     else body = h(Fragment, null,
       h("div", { style: { display: step === "dramaturgy" ? "" : "none" } },
-        h(CharacterChat, { key: "chat" + resetCount.chat, questions: drama, goToStage: function () { setStep("scene"); } })),
+        h(CharacterChat, { key: "chat" + resetCount.chat, questions: drama, loaded: charLoaded, goToStage: function () { setStep("scene"); } })),
       h("div", { style: { display: step === "scene" ? "" : "none" } },
-        h(FrameStep, { key: "scene" + resetCount.scene, kind: "scene", items: scene, setItems: setScene, onNext: function () { setStep("expression"); } })),
+        h(FrameStep, { key: "scene" + resetCount.scene, kind: "scene", items: scene, setItems: setScene, loaded: sceneLoaded, onNext: function () { setStep("expression"); } })),
       h("div", { style: { display: step === "expression" ? "" : "none" } },
         h(ExpressionStep, { key: "expr" + resetCount.expr })),
       h("div", { style: { display: step === "stage" ? "" : "none" } },

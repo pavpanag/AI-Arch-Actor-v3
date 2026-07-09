@@ -87,6 +87,11 @@ namespace CNCDemo
         private string _sceneFrame = string.Empty;
         private readonly List<string> _directingLines = new List<string>();
 
+        // The raw question/answer the author last submitted, kept so Save/Load can show the
+        // answers back in the Character and Scene tabs (not just the compiled result).
+        private List<FrameQuestion> _lastCharacterItems;
+        private List<FrameQuestion> _lastSceneItems;
+
         private void Start()
         {
             // Keep Unity's update loop ticking while the browser has focus. Without this the
@@ -292,6 +297,9 @@ namespace CNCDemo
                 case "/api/frame/compile":
                 {
                     var req = ParseFrameRequest(body);
+                    // Keep the raw answers so Save/Load can show them back in the tabs.
+                    if (IsSceneType(req.type)) _lastSceneItems = req.items;
+                    else _lastCharacterItems = req.items;
                     if (IsSceneType(req.type))
                     {
                         var brief = RunOnMainThreadAsync(() =>
@@ -961,16 +969,23 @@ namespace CNCDemo
         /// <summary>Exposes the preset's editable question lists + expression vocabulary to the console.</summary>
         private string BuildFramesJson()
         {
+            var savedChar = _lastCharacterItems != null && _lastCharacterItems.Count > 0;
+            var savedScene = _lastSceneItems != null && _lastSceneItems.Count > 0;
+
             var sb = new StringBuilder();
             sb.Append("{");
 
+            // Saved answers (from Load) take precedence over the preset's default questions.
             sb.Append("\"dramaturgy\":");
-            AppendFrameQuestions(sb, DefaultScene != null ? DefaultScene.DramaturgyQuestions : null);
+            AppendFrameQuestions(sb, savedChar ? _lastCharacterItems : (DefaultScene != null ? DefaultScene.DramaturgyQuestions : null));
             sb.Append(",");
 
             sb.Append("\"scene\":");
-            AppendFrameQuestions(sb, DefaultScene != null ? DefaultScene.SceneQuestions : null);
+            AppendFrameQuestions(sb, savedScene ? _lastSceneItems : (DefaultScene != null ? DefaultScene.SceneQuestions : null));
             sb.Append(",");
+
+            sb.Append("\"savedCharacter\":").Append(savedChar ? "true" : "false").Append(",");
+            sb.Append("\"savedScene\":").Append(savedScene ? "true" : "false").Append(",");
 
             sb.Append("\"expressions\":[");
             var ex = Actuator != null ? Actuator.Behaviors : (DefaultScene != null ? DefaultScene.Behaviors : null);
@@ -1032,6 +1047,7 @@ namespace CNCDemo
 
         private void ResetCharacterFromPreset()
         {
+            _lastCharacterItems = null;   // back to the preset questions, blank answers
             if (DefaultScene == null || Performer == null) return;
             Performer.CurrentCharacterSummary = DefaultScene.CharacterSummary;
             Performer.CurrentObjective = DefaultScene.Objective;
@@ -1040,6 +1056,7 @@ namespace CNCDemo
 
         private void ResetSceneFromPreset()
         {
+            _lastSceneItems = null;
             if (DefaultScene == null) return;
             _sceneFrame = DefaultScene.SceneFrame;
             ComposeGuidance();
@@ -1125,6 +1142,8 @@ namespace CNCDemo
             public string sceneFollowup, sceneCompile, sceneEnrich, sceneRevise, suggest;
             public string hueTarget;
             public List<CNCLightMap> hueMappings;
+            public List<FrameQuestion> charItems;
+            public List<FrameQuestion> sceneItems;
         }
 
         private SessionState BuildSessionState()
@@ -1156,6 +1175,8 @@ namespace CNCDemo
                 s.suggest = FrameCompiler.SuggestBehaviorPrompt;
             }
             if (Projector != null) { s.hueTarget = Projector.BulbIds; s.hueMappings = Projector.Mappings; }
+            s.charItems = _lastCharacterItems;
+            s.sceneItems = _lastSceneItems;
             return s;
         }
 
@@ -1226,6 +1247,8 @@ namespace CNCDemo
                 if (!string.IsNullOrEmpty(s.hueTarget)) Projector.BulbIds = s.hueTarget;
                 if (s.hueMappings != null) Projector.SetMappings(s.hueMappings);
             }
+            if (s.charItems != null && s.charItems.Count > 0) _lastCharacterItems = s.charItems;
+            if (s.sceneItems != null && s.sceneItems.Count > 0) _lastSceneItems = s.sceneItems;
         }
 
         // --- OpenAI API key (kept OUT of git: env var, else an untracked local file) ----------
