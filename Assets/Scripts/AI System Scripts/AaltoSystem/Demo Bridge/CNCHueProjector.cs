@@ -6,6 +6,14 @@ using UnityEngine.Networking;
 
 namespace CNCDemo
 {
+    /// <summary>One correspondence: a Unity Light (by GameObject name) mirrored to a Hue bulb ID.</summary>
+    [Serializable]
+    public sealed class CNCLightMap
+    {
+        public string lightName;
+        public int bulbId;
+    }
+
     /// <summary>
     /// Projects a Unity Light onto the physical Hue rig: the light is the source of truth, and
     /// whatever changes it — the actuator, an animation, a shader, a manual tweak — is mirrored
@@ -28,8 +36,12 @@ namespace CNCDemo
         public string BridgeIP = "192.168.1.106";
         [Tooltip("Hue bridge API username (same one lights controller v15.py uses).")]
         public string UserApi = "0fLeSuFEFbk1UV2ehHFZKAyOBDL7dlSbE2szNqwR";
-        [Tooltip("\"auto\" = discover every light on the bridge and drive them all. Or a fixed list like \"1,3\".")]
+        [Tooltip("\"auto\" = discover every light on the bridge and drive them all. Or a fixed list like \"1,3\". Ignored when Mappings are set.")]
         public string BulbIds = "auto";
+
+        [Header("Light → Bulb mapping (optional; overrides the broadcast above)")]
+        [Tooltip("Map specific Unity lights (by name) to specific bridge bulb IDs. When any mapping is set, ONLY these are driven — each Unity light mirrored to its bulb. Empty = broadcast TargetLight to BulbIds.")]
+        public List<CNCLightMap> Mappings = new List<CNCLightMap>();
 
         [Header("Rate Limiting")]
         [Tooltip("Seconds between sends. ~0.1 (10/sec) is the Hue max for ONE bulb and gives the smoothest pulse. If you drive several bulbs at once, raise this (total commands/sec across all bulbs should stay near 10).")]
@@ -39,15 +51,19 @@ namespace CNCDemo
         [TextArea(1, 2)] public string HueStatus;
 
         private readonly List<int> _discoveredBulbs = new List<int>();
-        private Color _lastColor = Color.clear;
-        private float _lastBrightness = -1f;
+        private readonly Dictionary<int, Color> _lastColorByBulb = new Dictionary<int, Color>();
+        private readonly Dictionary<int, float> _lastBriByBulb = new Dictionary<int, float>();
+        private readonly Dictionary<string, Light> _lightsByName = new Dictionary<string, Light>();
         private float _lastSendTime = -999f;
         private bool _sending;
 
+        private struct BulbState { public int bulbId; public Color color; public float bri; }
+
         private void Start()
         {
-            if (TargetLight == null)
-                Debug.LogWarning("[CNCHueProjector] No TargetLight assigned — nothing to project.");
+            RefreshSceneLights();
+            if (TargetLight == null && (Mappings == null || Mappings.Count == 0))
+                Debug.LogWarning("[CNCHueProjector] No TargetLight and no Mappings — nothing to project.");
             if (!string.IsNullOrWhiteSpace(UserApi))
                 StartCoroutine(DiscoverBulbs());
         }
@@ -55,62 +71,106 @@ namespace CNCDemo
         /// <summary>The bulb IDs the bridge reports (for the Technical tab to display).</summary>
         public List<int> DiscoveredBulbs() => new List<int>(_discoveredBulbs);
 
+        /// <summary>Names of the Unity Lights in the scene (for the Technical tab's mapping dropdowns).</summary>
+        public List<string> GetSceneLightNames()
+        {
+            RefreshSceneLights();
+            var names = new List<string>(_lightsByName.Keys);
+            names.Sort(StringComparer.OrdinalIgnoreCase);
+            return names;
+        }
+
+        public void SetMappings(List<CNCLightMap> maps)
+        {
+            Mappings = maps ?? new List<CNCLightMap>();
+            RefreshSceneLights();
+        }
+
         /// <summary>Re-query the bridge for its lights (e.g. after plugging one in).</summary>
         public void Rediscover()
         {
+            RefreshSceneLights();
             if (!string.IsNullOrWhiteSpace(UserApi)) StartCoroutine(DiscoverBulbs());
+        }
+
+        private void RefreshSceneLights()
+        {
+            _lightsByName.Clear();
+            foreach (var l in FindObjectsByType<Light>(FindObjectsSortMode.None))
+                if (l != null && !string.IsNullOrEmpty(l.name)) _lightsByName[l.name] = l;
         }
 
         private void Update()
         {
-            if (!EnableProjection || TargetLight == null) return;
+            if (!EnableProjection) return;
             if (_sending) return;                                   // never overlap sends (bridge floods = clunky)
             if (Time.time - _lastSendTime < MinSendInterval) return;
 
-            var color = TargetLight.color;
-            var brightness = TargetLight.enabled
-                ? Mathf.Clamp01(TargetLight.intensity / Mathf.Max(0.01f, IntensityForFullBrightness))
-                : 0f;
+            var batch = new List<BulbState>();
 
-            // Send whenever the light moved at all — small threshold so pulses aren't flattened.
-            var colorDelta = Mathf.Abs(color.r - _lastColor.r) + Mathf.Abs(color.g - _lastColor.g) + Mathf.Abs(color.b - _lastColor.b);
-            if (colorDelta < 0.008f && Mathf.Abs(brightness - _lastBrightness) < 0.008f) return;
+            if (Mappings != null && Mappings.Count > 0)
+            {
+                // Explicit mapping: each Unity light mirrored to its own bulb.
+                foreach (var m in Mappings)
+                {
+                    if (m == null || string.IsNullOrEmpty(m.lightName)) continue;
+                    if (!_lightsByName.TryGetValue(m.lightName, out var light) || light == null) continue;
+                    AddIfChanged(batch, m.bulbId, light);
+                }
+            }
+            else if (TargetLight != null)
+            {
+                // Fallback: broadcast the one TargetLight to every resolved bulb.
+                foreach (var id in ResolveBulbIds())
+                    AddIfChanged(batch, id, TargetLight);
+            }
 
-            _lastColor = color;
-            _lastBrightness = brightness;
+            if (batch.Count == 0) return;
             _lastSendTime = Time.time;
-            StartCoroutine(SendHueState(color, brightness));
+            StartCoroutine(SendBatch(batch));
         }
 
-        private System.Collections.IEnumerator SendHueState(Color color, float brightness01)
+        private void AddIfChanged(List<BulbState> batch, int bulbId, Light light)
+        {
+            var color = light.color;
+            var bri = light.enabled ? Mathf.Clamp01(light.intensity / Mathf.Max(0.01f, IntensityForFullBrightness)) : 0f;
+
+            _lastColorByBulb.TryGetValue(bulbId, out var lc);
+            _lastBriByBulb.TryGetValue(bulbId, out var lb);
+            var delta = Mathf.Abs(color.r - lc.r) + Mathf.Abs(color.g - lc.g) + Mathf.Abs(color.b - lc.b);
+            if (delta < 0.008f && Mathf.Abs(bri - lb) < 0.008f) return;
+
+            _lastColorByBulb[bulbId] = color;
+            _lastBriByBulb[bulbId] = bri;
+            batch.Add(new BulbState { bulbId = bulbId, color = color, bri = bri });
+        }
+
+        private System.Collections.IEnumerator SendBatch(List<BulbState> batch)
         {
             _sending = true;
 
-            Color.RGBToHSV(color, out var h, out var s, out _);
-            var bri = Mathf.RoundToInt(brightness01 * 254f);
-            // Transition ≈ the send interval, so the bulb ramps smoothly from one sample to the next
-            // and arrives just as the next command comes — continuous motion, no stair-step, minimal lag.
+            // Transition ≈ the send interval, so the bulb ramps smoothly between samples.
             var tt = Mathf.Max(1, Mathf.RoundToInt(MinSendInterval * 10f));
-            string body = bri > 0
-                ? "{\"on\":true,\"bri\":" + Mathf.Max(1, bri) +
-                  ",\"hue\":" + Mathf.RoundToInt(h * 65535f) +
-                  ",\"sat\":" + Mathf.RoundToInt(s * 254f) +
-                  ",\"transitiontime\":" + tt + "}"
-                : "{\"on\":false,\"transitiontime\":" + tt + "}";
-
-            // One lamp, whatever its ID: broadcast to every resolved bulb IN PARALLEL.
-            // Sequential sends made the cycle time grow with the bulb count (each HTTP round
-            // trip ~100ms), which showed up as a visible stall mid-pulse.
             var requests = new List<UnityWebRequest>();
-            foreach (var id in ResolveBulbIds())
+            foreach (var st in batch)
             {
-                var url = "http://" + BridgeIP + "/api/" + UserApi + "/lights/" + id + "/state";
+                Color.RGBToHSV(st.color, out var h, out var s, out _);
+                var bri = Mathf.RoundToInt(st.bri * 254f);
+                string body = bri > 0
+                    ? "{\"on\":true,\"bri\":" + Mathf.Max(1, bri) +
+                      ",\"hue\":" + Mathf.RoundToInt(h * 65535f) +
+                      ",\"sat\":" + Mathf.RoundToInt(s * 254f) +
+                      ",\"transitiontime\":" + tt + "}"
+                    : "{\"on\":false,\"transitiontime\":" + tt + "}";
+
+                var url = "http://" + BridgeIP + "/api/" + UserApi + "/lights/" + st.bulbId + "/state";
                 var req = UnityWebRequest.Put(url, body);
                 req.SetRequestHeader("Content-Type", "application/json");
                 req.SendWebRequest();
                 requests.Add(req);
             }
 
+            // Wait for all in parallel (sequential round trips stalled the pulse).
             bool allDone = false;
             while (!allDone)
             {

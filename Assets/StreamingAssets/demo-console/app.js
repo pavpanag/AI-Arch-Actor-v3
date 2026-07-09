@@ -585,9 +585,25 @@
 
     function payload() {
       var p = (tech && tech.prompts) || {};
-      var out = { model: (tech && tech.model) || "", hueTarget: (tech && tech.hueTarget) || "" };
+      var out = { model: (tech && tech.model) || "", hueTarget: (tech && tech.hueTarget) || "", hueMappings: (tech && tech.hueMappings) || [] };
       TECH_PROMPTS.forEach(function (row) { out[row.k] = p[row.k] || ""; });
       return out;
+    }
+
+    function editMap(i, field, val) {
+      var maps = ((tech && tech.hueMappings) || []).slice();
+      var row = Object.assign({}, maps[i]); row[field] = val; maps[i] = row;
+      setTech(Object.assign({}, tech, { hueMappings: maps }));
+    }
+    function addMap() {
+      var maps = ((tech && tech.hueMappings) || []).slice();
+      var firstId = (tech.hueIds && tech.hueIds.length) ? parseInt(tech.hueIds[0], 10) : 1;
+      maps.push({ lightName: (tech.hueLights && tech.hueLights[0]) || "", bulbId: firstId });
+      setTech(Object.assign({}, tech, { hueMappings: maps }));
+    }
+    function removeMap(i) {
+      var maps = ((tech && tech.hueMappings) || []).slice(); maps.splice(i, 1);
+      setTech(Object.assign({}, tech, { hueMappings: maps }));
     }
 
     function rediscover() {
@@ -653,6 +669,22 @@
           h("button", { className: "mini", onClick: rediscover, disabled: busy }, "Rediscover")),
         h("p", { className: "hint", style: { marginTop: "8px" } },
           "\"auto\" drives every bulb the bridge reports; or type specific IDs like 1,4. Takes effect on Apply below.")),
+      h("div", { className: "mode-box", style: { marginTop: "16px" } },
+        h("div", { className: "mode-title" }, "Light → bulb mapping"),
+        h("p", { className: "hint", style: { margin: "0 0 10px" } },
+          "Map a Unity light to a specific bridge bulb. When any mapping is set, only these are driven and \"project to\" above is ignored."),
+        ((tech.hueMappings) || []).map(function (m, i) {
+          return h("div", { className: "mode-row", key: i, style: { marginBottom: "8px" } },
+            h("select", { value: m.lightName || "", name: "map-light-" + i, onChange: function (e) { editMap(i, "lightName", e.target.value); } },
+              h("option", { value: "" }, "— Unity light —"),
+              (tech.hueLights || []).map(function (n) { return h("option", { value: n, key: n }, n); })),
+            h("span", { className: "pulse-sep" }, "→ bulb"),
+            h("select", { value: String(m.bulbId), name: "map-bulb-" + i, onChange: function (e) { editMap(i, "bulbId", parseInt(e.target.value, 10) || 0); } },
+              (tech.hueIds && tech.hueIds.length ? tech.hueIds : ["1"]).map(function (id) { return h("option", { value: id, key: id }, id); })),
+            h("button", { className: "mini danger", title: "remove mapping", onClick: function () { removeMap(i); } }, "×"));
+        }),
+        h("button", { className: "ghost", onClick: addMap, style: { marginTop: "6px" } }, "+ Add mapping"),
+        h("p", { className: "hint", style: { marginTop: "8px" } }, "Applied with the button below. Use Rediscover above to refresh both lists.")),
       TECH_PROMPTS.map(function (row) {
         return h("div", { className: "q", key: row.k, style: { marginTop: "18px" } },
           h("label", null, row.label),

@@ -698,6 +698,7 @@ namespace CNCDemo
             public string sceneRevise = "";
             public string suggest = "";
             public string hueTarget = "";
+            public List<CNCLightMap> hueMappings;   // null = leave unchanged
         }
 
         private static TechRequest ParseTechRequest(string body)
@@ -721,6 +722,7 @@ namespace CNCDemo
             }
 
             if (!string.IsNullOrEmpty(req.hueTarget) && Projector != null) Projector.BulbIds = req.hueTarget.Trim();
+            if (req.hueMappings != null && Projector != null) Projector.SetMappings(req.hueMappings);
 
             if (!string.IsNullOrEmpty(req.performer)) { PerformerCoaching = req.performer; ApplyPerformerPrompt(); }
             if (FrameCompiler != null)
@@ -744,8 +746,12 @@ namespace CNCDemo
 
             var hueTarget = Projector != null ? (Projector.BulbIds ?? "auto") : "auto";
             var hueIds = new List<string>();
+            var hueLights = new List<string>();
             if (Projector != null)
+            {
                 foreach (var id in Projector.DiscoveredBulbs()) hueIds.Add(id.ToString());
+                hueLights = Projector.GetSceneLightNames();
+            }
             var hueEnabled = Projector != null && Projector.EnableProjection;
 
             var sb = new StringBuilder();
@@ -753,6 +759,20 @@ namespace CNCDemo
             sb.Append(",\"hueTarget\":\"").Append(Escape(hueTarget)).Append("\"");
             sb.Append(",\"hueEnabled\":").Append(hueEnabled ? "true" : "false");
             sb.Append(",\"hueIds\":").Append(BuildJsonStringArrayLocal(hueIds.ToArray()));
+            sb.Append(",\"hueLights\":").Append(BuildJsonStringArrayLocal(hueLights.ToArray()));
+            sb.Append(",\"hueMappings\":[");
+            if (Projector != null && Projector.Mappings != null)
+            {
+                var first = true;
+                foreach (var m in Projector.Mappings)
+                {
+                    if (m == null) continue;
+                    if (!first) sb.Append(",");
+                    first = false;
+                    sb.Append("{\"lightName\":\"").Append(Escape(m.lightName)).Append("\",\"bulbId\":").Append(m.bulbId).Append("}");
+                }
+            }
+            sb.Append("]");
             sb.Append(",\"prompts\":{");
             sb.Append("\"performer\":\"").Append(Escape(PerformerCoaching)).Append("\"");
             if (FrameCompiler != null)
@@ -1083,6 +1103,8 @@ namespace CNCDemo
             public string model, performerCoaching;
             public string charFollowup, charCompile, charEnrich, charRevise;
             public string sceneFollowup, sceneCompile, sceneEnrich, sceneRevise, suggest;
+            public string hueTarget;
+            public List<CNCLightMap> hueMappings;
         }
 
         private SessionState BuildSessionState()
@@ -1113,6 +1135,7 @@ namespace CNCDemo
                 s.sceneEnrich = FrameCompiler.SceneEnrichPrompt; s.sceneRevise = FrameCompiler.SceneRevisePrompt;
                 s.suggest = FrameCompiler.SuggestBehaviorPrompt;
             }
+            if (Projector != null) { s.hueTarget = Projector.BulbIds; s.hueMappings = Projector.Mappings; }
             return s;
         }
 
@@ -1177,6 +1200,11 @@ namespace CNCDemo
                 if (!string.IsNullOrEmpty(s.sceneEnrich)) FrameCompiler.SceneEnrichPrompt = s.sceneEnrich;
                 if (!string.IsNullOrEmpty(s.sceneRevise)) FrameCompiler.SceneRevisePrompt = s.sceneRevise;
                 if (!string.IsNullOrEmpty(s.suggest)) FrameCompiler.SuggestBehaviorPrompt = s.suggest;
+            }
+            if (Projector != null)
+            {
+                if (!string.IsNullOrEmpty(s.hueTarget)) Projector.BulbIds = s.hueTarget;
+                if (s.hueMappings != null) Projector.SetMappings(s.hueMappings);
             }
         }
 

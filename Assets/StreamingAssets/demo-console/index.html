@@ -184,6 +184,12 @@
     border-radius: 8px; background: var(--surface-2); cursor: pointer;
   }
   .mode-row input[type=range] { accent-color: var(--ember); }
+  .mode-row select {
+    font-family: var(--sans); font-size: 13px; color: var(--text);
+    background: var(--surface-2); border: 1px solid var(--line-soft);
+    border-radius: 8px; padding: 7px 10px; max-width: 240px;
+  }
+  .mode-row select:focus { outline: none; border-color: rgba(232,160,74,0.5); }
   .sound-cell { display: flex; align-items: center; gap: 6px; }
   .sound-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); flex: none; }
   .sound-dot.on { background: var(--ember-hi); box-shadow: 0 0 8px rgba(244,189,110,.6); }
