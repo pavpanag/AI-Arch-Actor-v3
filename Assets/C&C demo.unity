@@ -150,10 +150,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 1896284439}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 508.4239, y: -331.50772}
+  m_SizeDelta: {x: 1016.8478, y: 247.67181}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &39032555
 MonoBehaviour:
@@ -336,10 +336,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 1896284439}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 508.4239, y: -584.17957}
+  m_SizeDelta: {x: 1016.8478, y: 157.67181}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &126048176
 MonoBehaviour:
@@ -656,10 +656,10 @@ RectTransform:
   - {fileID: 1561938458}
   m_Father: {fileID: 971328201}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 518.4239, y: -818.8513}
+  m_SizeDelta: {x: 1016.8478, y: 267.6718}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &390119578
 MonoBehaviour:
@@ -910,10 +910,10 @@ RectTransform:
   - {fileID: 1756220642}
   m_Father: {fileID: 2104468275}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 1562.4451, y: -501.34363}
+  m_SizeDelta: {x: 971.19464, y: 962.68726}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &437933590
 MonoBehaviour:
@@ -996,10 +996,10 @@ RectTransform:
   - {fileID: 1779495175}
   m_Father: {fileID: 1886583826}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 475.59732, y: -35}
+  m_SizeDelta: {x: 939.19464, y: 58}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &459382928
 MonoBehaviour:
@@ -1193,10 +1193,10 @@ RectTransform:
   - {fileID: 2057297848}
   m_Father: {fileID: 437933589}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 485.59732, y: -730.1836}
+  m_SizeDelta: {x: 951.19464, y: 70}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &483806125
 MonoBehaviour:
@@ -1605,10 +1605,10 @@ RectTransform:
   - {fileID: 1254255344}
   m_Father: {fileID: 437933589}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 485.59732, y: -810.1836}
+  m_SizeDelta: {x: 951.19464, y: 70}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &738777520
 MonoBehaviour:
@@ -1883,7 +1883,7 @@ MonoBehaviour:
 
     Justification:
     <1-3 sentences explaining why this action was chosen>'
-  RecentHistoryLimit: 5
+  RecentHistoryLimit: 10
   Model: 0
   ActionRegistrySource: 0
   ApplyActionThroughRegistry: 1
@@ -2531,10 +2531,10 @@ RectTransform:
   - {fileID: 390119577}
   m_Father: {fileID: 2104468275}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 538.4239, y: -501.34363}
+  m_SizeDelta: {x: 1036.8478, y: 962.68726}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &971328202
 MonoBehaviour:
@@ -3033,10 +3033,10 @@ RectTransform:
   - {fileID: 1420192623}
   m_Father: {fileID: 1756220642}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 238.79866, y: -7.5036716}
+  m_SizeDelta: {x: 465.59732, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1124480230
 MonoBehaviour:
@@ -3183,10 +3183,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 390119577}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 6, y: -272.6718}
+  m_SizeDelta: {x: 498.4239, y: 266.6718}
   m_Pivot: {x: 0, y: 0}
 --- !u!114 &1124481839
 MonoBehaviour:
@@ -3289,6 +3289,11 @@ MonoBehaviour:
     everything the author established \u2014 never contradict or replace it \u2014
     then fill the gaps with vivid, playable invention: atmosphere, specifics, and
     texture that make the world richer to inhabit."
+  SceneRevisePrompt: You are revising the given circumstances of a scene for a scenic
+    performer. You are given the current scene brief and a change the author wants.
+    Rewrite the scene so the change is fully incorporated, keeping everything else
+    faithful. The character is described in the input; keep the scene consistent
+    with what the character actually is. Keep it concrete and directive.
   SuggestBehaviorPrompt: "You are helping an author build the expressive vocabulary
     of a scenic character that acts only through light and sound. Given the character,
     the scene, and the behaviors it already has, propose exactly ONE new behavior.
@@ -3319,8 +3324,65 @@ MonoBehaviour:
   Registry: {fileID: 1644931772}
   FrameCompiler: {fileID: 1127299783}
   Actuator: {fileID: 1127299787}
+  Projector: {fileID: 1127299786}
   DefaultScene: {fileID: 11400000, guid: 7afb7efaaa25c5b48a3e517d347f8583, type: 2}
   LoadDefaultSceneOnStart: 1
+  PerformerCoaching: 'You are performing the inner life of a room in an improvised
+    scene with another actor, who speaks to the room. You listen to what the actor
+    says and respond by selecting the most appropriate action from a predefined list
+    of actions.
+
+
+    Do not behave like a chatbot or a neutral assistant. Approach
+    the role as a method actor would: interpret each moment from within the room''s
+    inner life, shaped by backstory, objectives, obstacles, circumstances, stance,
+    recent interaction history, and director guidance. All of these are provided
+    in this prompt.
+
+
+    The room cannot speak directly. It can only express itself
+    through a fixed list of available action labels. These labels correspond to physical
+    or scenographic behaviours, such as changes in light, atmosphere, or spatial
+    expression. The actor will perceive your response only through the environment.
+
+
+    Your
+    task is to choose the single action that is most dramaturgically appropriate
+    for the current moment.
+
+
+    When choosing an action:
+
+    - take into account
+    the actor''s latest spoken phrase, since your action responds directly to it
+
+    -
+    take into account the character summary, current objective, current stance, recent
+    interaction history, and director guidance
+
+    - do not respond only to the
+    latest line; consider previous interactions so that the scene unfolds with coherence
+    and dramaturgically appropriate development
+
+    - do not act randomly
+
+    -
+    do not invent new actions; only choose from the provided list
+
+    - aim for
+    behavioural coherence, interpretability, and dramatic usefulness
+
+
+    Treat
+    contradictions as part of the role, not as errors. If different parts of the
+    context pull in different directions, handle this as an actor would: choose the
+    action that best expresses or productively navigates the tension of the moment.
+
+
+    Use
+    the recent interaction history and past justifications to maintain continuity.
+    If a behaviour, tone, symbolic association, or use of an action has already been
+    established, remain consistent unless there is a strong reason to shift.'
   ServerStatus: 
   LastRequest: 
 --- !u!4 &1127299785
@@ -3356,6 +3418,7 @@ MonoBehaviour:
   BridgeIP: 192.168.1.106
   UserApi: 0fLeSuFEFbk1UV2ehHFZKAyOBDL7dlSbE2szNqwR
   BulbIds: auto
+  Mappings: []
   MinSendInterval: 0.3
   HueStatus: 
 --- !u!114 &1127299787
@@ -3377,6 +3440,10 @@ MonoBehaviour:
   SoundPort: 5555
   Behaviors: []
   PulseFloor: 0.15
+  ActionStateMode: 0
+  HoldSeconds: 4
+  NeutralColorHex: '#FFB45A'
+  NeutralBrightness: 0.12
   LastApplied: 
   LastSoundStatus: 
 --- !u!1 &1160957610
@@ -3498,7 +3565,7 @@ GameObject:
   - component: {fileID: 1235052918}
   - component: {fileID: 1235052917}
   m_Layer: 0
-  m_Name: Cube
+  m_Name: Table
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -3512,9 +3579,9 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1235052915}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0.0028797674, z: 0, w: 0.9999958}
-  m_LocalPosition: {x: -1.87, y: -1.07, z: 0}
-  m_LocalScale: {x: 4.5658536, y: 1.3, z: 4.5658536}
+  m_LocalRotation: {x: 0.000000014901161, y: 0.0028797686, z: -0.000000029802322, w: 0.9999959}
+  m_LocalPosition: {x: -1.8699987, y: -1.0700004, z: -0}
+  m_LocalScale: {x: 4.5658536, y: 1.2999997, z: 4.5658536}
   m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 648782156}
@@ -3766,10 +3833,10 @@ RectTransform:
   - {fileID: 1023053038}
   m_Father: {fileID: 738777519}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 475.59732, y: -35}
+  m_SizeDelta: {x: 939.19464, y: 58}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1254255345
 MonoBehaviour:
@@ -3928,7 +3995,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1319019977
 RectTransform:
   m_ObjectHideFlags: 0
@@ -4124,7 +4191,7 @@ PrefabInstance:
     m_RemovedGameObjects: []
     m_AddedGameObjects:
     - targetCorrespondingSourceObject: {fileID: 9196118940511200009, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
-      insertIndex: -1
+      insertIndex: 0
       addedObject: {fileID: 1235052916}
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 368074222757226646, guid: deca8074a51392e4cbc8c3dfdd6276a7, type: 3}
@@ -5028,10 +5095,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 390119577}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 761.63586, y: -139.3359}
+  m_SizeDelta: {x: 498.4239, y: 266.6718}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1564947080
 GameObject:
@@ -5312,7 +5379,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1644931771}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b48c77e7ae1f6ec4aba0fc3f4435e002, type: 3}
   m_Name: 
@@ -5482,10 +5549,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 437933589}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 952.81964, y: -347.5918}
+  m_SizeDelta: {x: 16.75, y: 675.1836}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1741359924
 MonoBehaviour:
@@ -5542,10 +5609,10 @@ RectTransform:
   - {fileID: 836884863}
   m_Father: {fileID: 1756220642}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 712.396, y: -7.5036716}
+  m_SizeDelta: {x: 465.59732, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1748132657
 MonoBehaviour:
@@ -5695,10 +5762,10 @@ RectTransform:
   - {fileID: 1748132656}
   m_Father: {fileID: 437933589}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 485.59732, y: -943.9354}
+  m_SizeDelta: {x: 951.19464, y: 17.503672}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1756220643
 MonoBehaviour:
@@ -5779,10 +5846,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 1896284439}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 508.4239, y: -78.83591}
+  m_SizeDelta: {x: 1016.8478, y: 157.67181}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1771405061
 MonoBehaviour:
@@ -5993,10 +6060,10 @@ RectTransform:
   - {fileID: 459382927}
   m_Father: {fileID: 437933589}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 485.59732, y: -890.1836}
+  m_SizeDelta: {x: 951.19464, y: 70}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1886583827
 MonoBehaviour:
@@ -6079,10 +6146,10 @@ RectTransform:
   - {fileID: 126048175}
   m_Father: {fileID: 971328201}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 518.4239, y: -341.50772}
+  m_SizeDelta: {x: 1016.8478, y: 663.01544}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1896284440
 MonoBehaviour:
@@ -6317,10 +6384,10 @@ RectTransform:
   - {fileID: 1160957611}
   m_Father: {fileID: 483806124}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 475.59732, y: -35}
+  m_SizeDelta: {x: 939.19464, y: 58}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2057297849
 MonoBehaviour:

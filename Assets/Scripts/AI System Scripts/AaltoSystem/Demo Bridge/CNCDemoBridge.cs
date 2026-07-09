@@ -92,6 +92,11 @@ namespace CNCDemo
         private List<FrameQuestion> _lastCharacterItems;
         private List<FrameQuestion> _lastSceneItems;
 
+        // The compiled character's summary (before the obstacle is folded in) and its obstacle,
+        // kept separate so the console can show the obstacle on its own after a load.
+        private string _lastSummaryRaw = string.Empty;
+        private string _lastObstacle = string.Empty;
+
         private void Start()
         {
             // Keep Unity's update loop ticking while the browser has focus. Without this the
@@ -125,8 +130,12 @@ namespace CNCDemo
                 ApplyPerformerPrompt();
             }
 
+            // The C&C demo runs on gpt-5.4 by default. Seed the performer to it at boot; the
+            // Technical tab toggle and a restored session (below) can still switch it afterward.
+            if (Performer != null) Performer.Model = AaltoDirectedRoomPerformerController.OpenAIModelPreset.Gpt54;
+
             // Keep the authoring model in step with the performer's model, so the Technical tab
-            // shows and controls one consistent choice (the performer's Inspector field is the seed).
+            // shows and controls one consistent choice.
             if (Performer != null && FrameCompiler != null) FrameCompiler.Model = PerformerModelId();
 
             if (LoadDefaultSceneOnStart && DefaultScene != null)
@@ -642,7 +651,14 @@ namespace CNCDemo
         /// <summary>Applies a compiled/revised character to the performer, folding the obstacle into the summary so the model always sees it.</summary>
         private void ApplyCharacterBrief(CNCFrameCompiler.DramaturgyBrief brief)
         {
-            if (brief == null || Performer == null) return;
+            if (brief == null) return;
+
+            // Keep the raw summary and the obstacle on their own so the console can show the
+            // obstacle as its own field after a load (the performer only ever sees the folded form).
+            _lastSummaryRaw = (brief.summary ?? string.Empty).Trim();
+            _lastObstacle = (brief.obstacle ?? string.Empty).Trim();
+
+            if (Performer == null) return;
 
             var summary = (brief.summary ?? string.Empty).Trim();
             if (!string.IsNullOrWhiteSpace(brief.obstacle))
@@ -913,7 +929,11 @@ namespace CNCDemo
 
         private string BuildStateJson()
         {
-            var summary = Performer != null ? Performer.CurrentCharacterSummary : string.Empty;
+            // Prefer the raw (un-folded) summary for display so the obstacle can be shown on its
+            // own field instead of being duplicated inside the summary text.
+            var summary = !string.IsNullOrWhiteSpace(_lastSummaryRaw)
+                ? _lastSummaryRaw
+                : (Performer != null ? Performer.CurrentCharacterSummary : string.Empty);
             var objective = Performer != null ? Performer.CurrentObjective : string.Empty;
             var stance = Performer != null ? Performer.CurrentStance : string.Empty;
             var guidance = Performer != null ? Performer.DirectorGuidance : string.Empty;
@@ -926,6 +946,7 @@ namespace CNCDemo
             var sb = new StringBuilder();
             sb.Append("{");
             sb.Append("\"summary\":\"").Append(Escape(summary)).Append("\",");
+            sb.Append("\"obstacle\":\"").Append(Escape(_lastObstacle ?? string.Empty)).Append("\",");
             sb.Append("\"objective\":\"").Append(Escape(objective)).Append("\",");
             sb.Append("\"stance\":\"").Append(Escape(stance)).Append("\",");
             sb.Append("\"guidance\":\"").Append(Escape(guidance)).Append("\",");
@@ -1048,6 +1069,8 @@ namespace CNCDemo
         private void ResetCharacterFromPreset()
         {
             _lastCharacterItems = null;   // back to the preset questions, blank answers
+            _lastSummaryRaw = string.Empty;
+            _lastObstacle = string.Empty;
             if (DefaultScene == null || Performer == null) return;
             Performer.CurrentCharacterSummary = DefaultScene.CharacterSummary;
             Performer.CurrentObjective = DefaultScene.Objective;
@@ -1135,6 +1158,7 @@ namespace CNCDemo
         private sealed class SessionState
         {
             public string summary, objective, stance, sceneFrame;
+            public string summaryRaw, obstacle;   // un-folded summary + its own obstacle, for display on load
             public List<CNCBehaviorSpec> behaviors = new List<CNCBehaviorSpec>();
             public string mode; public float holdSeconds; public string neutralColorHex; public float neutralBrightness;
             public string model, performerCoaching;
@@ -1155,6 +1179,8 @@ namespace CNCDemo
                 s.objective = Performer.CurrentObjective;
                 s.stance = Performer.CurrentStance;
             }
+            s.summaryRaw = _lastSummaryRaw;
+            s.obstacle = _lastObstacle;
             s.sceneFrame = _sceneFrame;
             if (Actuator != null)
             {
@@ -1247,6 +1273,8 @@ namespace CNCDemo
                 if (!string.IsNullOrEmpty(s.hueTarget)) Projector.BulbIds = s.hueTarget;
                 if (s.hueMappings != null) Projector.SetMappings(s.hueMappings);
             }
+            if (!string.IsNullOrEmpty(s.summaryRaw)) _lastSummaryRaw = s.summaryRaw;
+            if (!string.IsNullOrEmpty(s.obstacle)) _lastObstacle = s.obstacle;
             if (s.charItems != null && s.charItems.Count > 0) _lastCharacterItems = s.charItems;
             if (s.sceneItems != null && s.sceneItems.Count > 0) _lastSceneItems = s.sceneItems;
         }

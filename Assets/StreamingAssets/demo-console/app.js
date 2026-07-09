@@ -441,7 +441,7 @@
       var qs = props.questions || [];
       setAnswers(qs.map(function (q) { return q.answer || ""; }));
       api("/api/state").then(function (s) {
-        setCompiled({ summary: (s && s.summary) || "", objective: (s && s.objective) || "", obstacle: "", stance: (s && s.stance) || "" });
+        setCompiled({ summary: (s && s.summary) || "", objective: (s && s.objective) || "", obstacle: (s && s.obstacle) || "", stance: (s && s.stance) || "" });
         setPhase("done");
       });
     }, []);

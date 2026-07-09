@@ -86,8 +86,8 @@ namespace CNCDemo
         public OpenAIClient OpenAI;
 
         [Header("Model")]
-        [Tooltip("Model id for authoring steps. Cheaper is fine here (e.g. gpt-4o-mini); the performance model can differ.")]
-        public string Model = "gpt-4o-mini";
+        [Tooltip("Model id for authoring steps. The bridge seeds this from the performer's model (gpt-5.4 by default).")]
+        public string Model = "gpt-5.4";
 
         [Header("Coaching — Character Frame (return format is added automatically)")]
         [Tooltip("How the model reads the answers and phrases ONE clarifying question. The JSON return shape is fixed by the system.")]
