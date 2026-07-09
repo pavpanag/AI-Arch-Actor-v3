@@ -98,16 +98,28 @@ namespace CNCDemo
                   ",\"transitiontime\":" + tt + "}"
                 : "{\"on\":false,\"transitiontime\":" + tt + "}";
 
-            // One lamp, whatever its ID: broadcast the state to every resolved bulb.
+            // One lamp, whatever its ID: broadcast to every resolved bulb IN PARALLEL.
+            // Sequential sends made the cycle time grow with the bulb count (each HTTP round
+            // trip ~100ms), which showed up as a visible stall mid-pulse.
+            var requests = new List<UnityWebRequest>();
             foreach (var id in ResolveBulbIds())
             {
                 var url = "http://" + BridgeIP + "/api/" + UserApi + "/lights/" + id + "/state";
-                using (var req = UnityWebRequest.Put(url, body))
-                {
-                    req.SetRequestHeader("Content-Type", "application/json");
-                    yield return req.SendWebRequest();
-                }
+                var req = UnityWebRequest.Put(url, body);
+                req.SetRequestHeader("Content-Type", "application/json");
+                req.SendWebRequest();
+                requests.Add(req);
             }
+
+            bool allDone = false;
+            while (!allDone)
+            {
+                allDone = true;
+                foreach (var req in requests)
+                    if (!req.isDone) { allDone = false; break; }
+                if (!allDone) yield return null;
+            }
+            foreach (var req in requests) req.Dispose();
 
             _sending = false;
         }

@@ -57,7 +57,12 @@
       if (reviseRef.current) reviseRef.current.value = "";
       setBusy(true); setStatus("Adjusting…");
       api("/api/frame/revise-scene", { sceneFrame: (compiled && compiled.sceneFrame) || "", change: val })
-        .then(function (r) { setCompiled(r || compiled); setStatus("Adjusted."); setBusy(false); });
+        .then(function (r) {
+          var ok = r && r.sceneFrame;
+          setCompiled(ok ? r : compiled);
+          setStatus(ok ? "Adjusted." : "Couldn't adjust — " + ((r && r.status) || "no response") + ".");
+          setBusy(false);
+        });
     }
 
     function compileNow() {
@@ -66,8 +71,11 @@
         type: kind, items: items,
         followUpQuestion: followUp, followUpAnswer: followAns
       }).then(function (r) {
+        var ok = r && (kind === "scene" ? r.sceneFrame : r.summary);
         setCompiled(r || {});
-        setStatus("Confirmed. The lamp is playing this now.");
+        setStatus(ok
+          ? "Confirmed. The lamp is playing this now."
+          : "Couldn't compile — " + ((r && r.status) || "no response") + ". Check the API key in the Technical tab.");
         setBusy(false);
       });
     }
@@ -417,6 +425,7 @@
     var phaseState = useState("asking"); var phase = phaseState[0], setPhase = phaseState[1]; // asking|followup|thinking|done
     var followUpState = useState(""); var followUp = followUpState[0], setFollowUp = followUpState[1];
     var compiledState = useState(null); var compiled = compiledState[0], setCompiled = compiledState[1];
+    var errState = useState(""); var err = errState[0], setErr = errState[1];
 
     function itemsFrom(ans) {
       return questions.map(function (q, i) { return { question: q.question, answer: ans[i] || "" }; });
@@ -429,9 +438,13 @@
       });
     }
     function compileNow(ans, fq, fa) {
-      setPhase("thinking");
+      setPhase("thinking"); setErr("");
       api("/api/frame/compile", { type: "dramaturgy", items: itemsFrom(ans), followUpQuestion: fq, followUpAnswer: fa })
-        .then(function (r) { setCompiled(r || {}); setPhase("done"); });
+        .then(function (r) {
+          if (!r || !r.summary)
+            setErr("Couldn't compile — " + ((r && r.status) || "no response") + ". Check the API key in the Technical tab.");
+          setCompiled(r || {}); setPhase("done");
+        });
     }
     function revise() {
       var val = (reviseRef.current ? reviseRef.current.value : "").trim(); if (!val) return;
@@ -441,7 +454,11 @@
       api("/api/frame/revise", {
         summary: cur.summary || "", objective: cur.objective || "",
         obstacle: cur.obstacle || "", stance: cur.stance || "", change: val
-      }).then(function (r) { setCompiled(r || cur); setPhase("done"); });
+      }).then(function (r) {
+        if (!r || !r.summary) { setErr("Couldn't adjust — " + ((r && r.status) || "no response") + "."); setCompiled(cur); }
+        else { setErr(""); setCompiled(r); }
+        setPhase("done");
+      });
     }
     function enrich() {
       var cur = compiled || {};
@@ -449,7 +466,11 @@
       api("/api/frame/enrich", {
         type: "dramaturgy", summary: cur.summary || "", objective: cur.objective || "",
         obstacle: cur.obstacle || "", stance: cur.stance || ""
-      }).then(function (r) { setCompiled(r || cur); setPhase("done"); });
+      }).then(function (r) {
+        if (!r || !r.summary) { setErr("Couldn't enrich — " + ((r && r.status) || "no response") + "."); setCompiled(cur); }
+        else { setErr(""); setCompiled(r); }
+        setPhase("done");
+      });
     }
     function submit() {
       var val = (inputRef.current ? inputRef.current.value : "").trim(); if (!val) return;
@@ -495,6 +516,7 @@
           )
         : null,
       phase === "thinking" ? h("div", { className: "status" }, "The lamp is gathering itself…") : null,
+      err ? h("div", { className: "status" }, err) : null,
       (phase === "done" && compiled)
         ? h("div", null,
             h("div", { className: "compiled" },
@@ -653,7 +675,8 @@
     var sceneState = useState([]); var scene = sceneState[0], setScene = sceneState[1];
     var exprState = useState([]); var expr = exprState[0], setExpr = exprState[1];
     var readyState = useState(false); var ready = readyState[0], setReady = readyState[1];
-    var resetState = useState(0); var resetCount = resetState[0], setResetCount = resetState[1];
+    var resetState = useState({ chat: 0, scene: 0, expr: 0, stage: 0 });
+    var resetCount = resetState[0], setResetCount = resetState[1];
     var appMsgState = useState(""); var appMsg = appMsgState[0], setAppMsg = appMsgState[1];
 
     useEffect(function () {
@@ -667,15 +690,44 @@
       });
     }, []);
 
-    function resetVisitor() {
-      api("/api/preset/load", {}).then(function () {
-        return api("/api/frames");
-      }).then(function (f) {
-        if (f) { setDrama(f.dramaturgy || []); setScene(f.scene || []); setExpr(f.expressions || []); }
-        setResetCount(resetCount + 1); // remount all tabs with fresh state
-        setStep("dramaturgy");
-      });
+    // Per-tab reset: each button only resets its own tab (server state + remount of
+    // that tab's panel via its key). Nothing else is touched.
+    function resetCurrent() {
+      if (step === "dramaturgy") {
+        setAppMsg("Resetting character…");
+        api("/api/reset/character", {}).then(function () { return api("/api/frames"); }).then(function (f) {
+          if (f) setDrama(f.dramaturgy || []);
+          setResetCount(Object.assign({}, resetCount, { chat: resetCount.chat + 1 }));
+          setAppMsg("Character reset.");
+        });
+      } else if (step === "scene") {
+        setAppMsg("Resetting scene…");
+        api("/api/reset/scene", {}).then(function () { return api("/api/frames"); }).then(function (f) {
+          if (f) setScene(f.scene || []);
+          setResetCount(Object.assign({}, resetCount, { scene: resetCount.scene + 1 }));
+          setAppMsg("Scene reset.");
+        });
+      } else if (step === "expression") {
+        setAppMsg("Resetting expressions…");
+        api("/api/reset/expression", {}).then(function () {
+          setResetCount(Object.assign({}, resetCount, { expr: resetCount.expr + 1 }));
+          setAppMsg("Expressions reset.");
+        });
+      } else if (step === "stage") {
+        setAppMsg("Clearing the dialogue…");
+        api("/api/reset/stage", {}).then(function () {
+          setResetCount(Object.assign({}, resetCount, { stage: resetCount.stage + 1 }));
+          setAppMsg("Dialogue cleared — fresh take.");
+        });
+      }
     }
+
+    var RESET_LABELS = {
+      dramaturgy: "Reset the character",
+      scene: "Reset the scene",
+      expression: "Reset the expressions",
+      stage: "Reset the dialogue"
+    };
 
     function saveSetup() {
       setAppMsg("Saving…");
@@ -690,21 +742,21 @@
     }
 
     // All tabs stay mounted (hidden with display:none) so switching tabs never
-    // loses in-progress answers or edits. resetCount keys force a true remount
-    // only when "Reset the character" is pressed.
+    // loses in-progress answers or edits. Each tab has its own reset key, so a
+    // reset remounts only that tab.
     var body;
     if (!ready) body = h("div", { className: "empty" }, "Lighting the lamp…");
     else body = h(Fragment, null,
       h("div", { style: { display: step === "dramaturgy" ? "" : "none" } },
-        h(CharacterChat, { key: "chat" + resetCount, questions: drama, goToStage: function () { setStep("scene"); } })),
+        h(CharacterChat, { key: "chat" + resetCount.chat, questions: drama, goToStage: function () { setStep("scene"); } })),
       h("div", { style: { display: step === "scene" ? "" : "none" } },
-        h(FrameStep, { key: "scene" + resetCount, kind: "scene", items: scene, setItems: setScene, onNext: function () { setStep("expression"); } })),
+        h(FrameStep, { key: "scene" + resetCount.scene, kind: "scene", items: scene, setItems: setScene, onNext: function () { setStep("expression"); } })),
       h("div", { style: { display: step === "expression" ? "" : "none" } },
-        h(ExpressionStep, { key: "expr" + resetCount })),
+        h(ExpressionStep, { key: "expr" + resetCount.expr })),
       h("div", { style: { display: step === "stage" ? "" : "none" } },
-        h(Stage, { key: "stage" + resetCount })),
+        h(Stage, { key: "stage" + resetCount.stage })),
       h("div", { style: { display: step === "tech" ? "" : "none" } },
-        h(TechStep, { key: "tech" + resetCount })));
+        h(TechStep, { key: "tech" })));
 
     return h("div", { className: "wrap" },
       h("div", { className: "brand" },
@@ -726,7 +778,9 @@
         appMsg ? h("span", { className: "app-msg" }, appMsg) : null,
         h("button", { className: "ghost", onClick: saveSetup }, "Save setup"),
         h("button", { className: "ghost", onClick: loadSetup }, "Load setup"),
-        h("button", { className: "ghost", onClick: resetVisitor }, "Reset the character")
+        RESET_LABELS[step]
+          ? h("button", { className: "ghost", onClick: resetCurrent }, RESET_LABELS[step])
+          : null
       )
     );
   }

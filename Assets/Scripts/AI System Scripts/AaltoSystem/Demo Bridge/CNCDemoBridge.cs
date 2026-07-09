@@ -389,9 +389,7 @@ namespace CNCDemo
                             ApplyApiKeyToClients(key.Trim());
                             _apiKeyStatus = "set (saved) ••••" + Last4(key.Trim());
                         }
-                        var env = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-                        var note = !string.IsNullOrWhiteSpace(env) ? " — note: OPENAI_API_KEY env var is set and overrides this on restart" : "";
-                        return "{\"status\":\"Key saved" + Escape(note) + "\",\"keyStatus\":\"" + Escape(_apiKeyStatus) + "\"}";
+                        return "{\"status\":\"Key saved — it now takes effect on every start.\",\"keyStatus\":\"" + Escape(_apiKeyStatus) + "\"}";
                     }));
                     break;
                 }
@@ -408,6 +406,28 @@ namespace CNCDemo
 
                 case "/api/tech/hue-rediscover":
                     WriteJson(ctx, 200, RunOnMainThread(() => { Projector?.Rediscover(); return BuildTechJson(); }));
+                    break;
+
+                case "/api/reset/character":
+                    RunOnMainThread(() => { ResetCharacterFromPreset(); return true; });
+                    WriteJson(ctx, 200, "{\"ok\":true}");
+                    break;
+
+                case "/api/reset/scene":
+                    RunOnMainThread(() => { ResetSceneFromPreset(); return true; });
+                    WriteJson(ctx, 200, "{\"ok\":true}");
+                    break;
+
+                case "/api/reset/expression":
+                    RunOnMainThread(() => { ResetExpressionFromPreset(); return true; });
+                    WriteJson(ctx, 200, "{\"ok\":true}");
+                    break;
+
+                case "/api/reset/stage":
+                    // Clears the dialogue memory and starts a fresh take (the performer's own
+                    // start-over mechanism, which also archives the previous take).
+                    RunOnMainThread(() => { Performer?.StartNewTake(); return true; });
+                    WriteJson(ctx, 200, "{\"ok\":true}");
                     break;
 
                 case "/api/session/save":
@@ -621,12 +641,13 @@ namespace CNCDemo
             if (!string.IsNullOrWhiteSpace(brief.stance)) Performer.CurrentStance = brief.stance;
         }
 
-        private static string CharacterBriefJson(CNCFrameCompiler.DramaturgyBrief b)
+        private string CharacterBriefJson(CNCFrameCompiler.DramaturgyBrief b)
         {
             return "{\"summary\":\"" + Escape(b != null ? b.summary : string.Empty) + "\"," +
                    "\"objective\":\"" + Escape(b != null ? b.objective : string.Empty) + "\"," +
                    "\"obstacle\":\"" + Escape(b != null ? b.obstacle : string.Empty) + "\"," +
-                   "\"stance\":\"" + Escape(b != null ? b.stance : string.Empty) + "\"}";
+                   "\"stance\":\"" + Escape(b != null ? b.stance : string.Empty) + "\"," +
+                   "\"status\":\"" + Escape(FrameCompiler != null ? FrameCompiler.LastStatus : "frame compiler not assigned") + "\"}";
         }
 
         [Serializable]
@@ -654,9 +675,10 @@ namespace CNCDemo
             ComposeGuidance();
         }
 
-        private static string SceneBriefJson(CNCFrameCompiler.SceneBrief b)
+        private string SceneBriefJson(CNCFrameCompiler.SceneBrief b)
         {
-            return "{\"sceneFrame\":\"" + Escape(b != null ? b.sceneFrame : string.Empty) + "\"}";
+            return "{\"sceneFrame\":\"" + Escape(b != null ? b.sceneFrame : string.Empty) + "\"," +
+                   "\"status\":\"" + Escape(FrameCompiler != null ? FrameCompiler.LastStatus : "frame compiler not assigned") + "\"}";
         }
 
         // --- Technical tab helpers ---------------------------------------------
@@ -955,20 +977,42 @@ namespace CNCDemo
                 // flag toggle on the existing component — no code change.
                 Performer.PullContextFromBootstrapper = false;
                 Performer.RequireCompleteBootstrapperContext = false;
-
-                Performer.CurrentCharacterSummary = preset.CharacterSummary;
-                Performer.CurrentObjective = preset.Objective;
-                Performer.CurrentStance = preset.Stance;
             }
 
-            _sceneFrame = preset.SceneFrame;
+            ResetCharacterFromPreset();
+            ResetSceneFromPreset();
             _directingLines.Clear();
             ComposeGuidance();
+            ResetExpressionFromPreset();
+
+            Debug.Log("[CNCDemoBridge] Loaded preset: " + preset.name);
+        }
+
+        // --- Scoped resets (per tab) ------------------------------------------
+
+        private void ResetCharacterFromPreset()
+        {
+            if (DefaultScene == null || Performer == null) return;
+            Performer.CurrentCharacterSummary = DefaultScene.CharacterSummary;
+            Performer.CurrentObjective = DefaultScene.Objective;
+            Performer.CurrentStance = DefaultScene.Stance;
+        }
+
+        private void ResetSceneFromPreset()
+        {
+            if (DefaultScene == null) return;
+            _sceneFrame = DefaultScene.SceneFrame;
+            ComposeGuidance();
+        }
+
+        private void ResetExpressionFromPreset()
+        {
+            if (DefaultScene == null) return;
 
             var specs = new List<CNCBehaviorSpec>();
-            if (preset.Behaviors != null)
+            if (DefaultScene.Behaviors != null)
             {
-                foreach (var b in preset.Behaviors)
+                foreach (var b in DefaultScene.Behaviors)
                 {
                     if (b == null) continue;
                     specs.Add(new CNCBehaviorSpec
@@ -983,10 +1027,10 @@ namespace CNCDemo
             if (Actuator != null)
             {
                 Actuator.SetBehaviors(specs);
-                Actuator.ActionStateMode = preset.ActionStateMode;
-                Actuator.HoldSeconds = preset.HoldSeconds;
-                Actuator.NeutralColorHex = preset.NeutralColorHex;
-                Actuator.NeutralBrightness = preset.NeutralBrightness;
+                Actuator.ActionStateMode = DefaultScene.ActionStateMode;
+                Actuator.HoldSeconds = DefaultScene.HoldSeconds;
+                Actuator.NeutralColorHex = DefaultScene.NeutralColorHex;
+                Actuator.NeutralBrightness = DefaultScene.NeutralBrightness;
                 SyncRegistryFromBehaviors();
             }
             else
@@ -994,8 +1038,6 @@ namespace CNCDemo
                 // No actuator wired (e.g. Python rig only): the model still needs its vocabulary.
                 SyncRegistryFromList(specs);
             }
-
-            Debug.Log("[CNCDemoBridge] Loaded preset: " + preset.name);
         }
 
         /// <summary>
@@ -1145,15 +1187,22 @@ namespace CNCDemo
         // Outside the project entirely (Application.persistentDataPath) — never committed.
         private string ApiKeyFilePath => Path.Combine(Application.persistentDataPath, "cnc_openai_key.txt");
 
-        /// <summary>On boot: env var wins, else the saved file; applies to the OpenAI client(s).</summary>
+        /// <summary>
+        /// On boot: the key saved from the Technical tab wins (an explicit user action);
+        /// the OPENAI_API_KEY env var is only a fallback when nothing was saved. (A stale
+        /// env var silently overriding the pasted key caused "it doesn't keep my key".)
+        /// </summary>
         private void LoadAndApplyApiKey()
         {
             string key = null, source = null;
-            var env = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-            if (!string.IsNullOrWhiteSpace(env)) { key = env.Trim(); source = "env var"; }
-            else if (File.Exists(ApiKeyFilePath))
+            if (File.Exists(ApiKeyFilePath))
             {
                 try { key = File.ReadAllText(ApiKeyFilePath).Trim(); source = "saved"; } catch { }
+            }
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                var env = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+                if (!string.IsNullOrWhiteSpace(env)) { key = env.Trim(); source = "env var"; }
             }
 
             if (!string.IsNullOrWhiteSpace(key))
