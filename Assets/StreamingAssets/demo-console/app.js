@@ -11,7 +11,9 @@
       method: body === undefined ? "GET" : "POST",
       headers: { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body)
-    }).then(function (r) { return r.json().catch(function () { return {}; }); });
+    }).then(function (r) { return r.json().catch(function () { return {}; }); })
+      // Never let a dropped request leave a busy flag stuck: resolve with a status instead.
+      .catch(function () { return { status: "network error — is the lamp running?" }; });
   }
 
   var STEPS = [
@@ -345,6 +347,20 @@
     var directState = useState(""); var direct = directState[0], setDirect = directState[1];
     var feedRef = useRef(null);
 
+    // The actor's score: the lamp's prepared plan (rehearsal loop: prepare -> take -> notes -> revise).
+    var stratState = useState(""); var strat = stratState[0], setStrat = stratState[1];
+    var stratDirtyState = useState(false); var stratDirty = stratDirtyState[0], setStratDirty = stratDirtyState[1];
+    var stratBusyState = useState(false); var stratBusy = stratBusyState[0], setStratBusy = stratBusyState[1];
+    var stratStatusState = useState(""); var stratStatus = stratStatusState[0], setStratStatus = stratStatusState[1];
+    var notesState = useState(null); var notes = notesState[0], setNotes = notesState[1];
+    var notesBusyState = useState(false); var notesBusy = notesBusyState[0], setNotesBusy = notesBusyState[1];
+
+    // Talking the score over with the actor (thread lives here; the server is stateless).
+    var chatState = useState([]); var chat = chatState[0], setChat = chatState[1];
+    var chatInputState = useState(""); var chatInput = chatInputState[0], setChatInput = chatInputState[1];
+    var chatBusyState = useState(false); var chatBusy = chatBusyState[0], setChatBusy = chatBusyState[1];
+    var proposalState = useState(null); var proposal = proposalState[0], setProposal = proposalState[1];
+
     useEffect(function () {
       var live = true;
       function poll() {
@@ -355,6 +371,11 @@
       return function () { live = false; clearInterval(id); };
     }, []);
 
+    // Keep the strategy textarea in step with the server — unless the user is mid-edit.
+    useEffect(function () {
+      if (!stratDirty) setStrat(state.strategy || "");
+    }, [state.strategy]);
+
     function sendSay() {
       var t = say.trim(); if (!t) return;
       setSay(""); api("/api/say", { text: t });
@@ -364,7 +385,81 @@
       setDirect(""); api("/api/direct", { text: t });
     }
 
+    function prepareStrategy() {
+      setStratBusy(true); setNotes(null);
+      setStratStatus(strat ? "Rethinking the score…" : "The lamp is preparing how to play this…");
+      api("/api/strategy/generate", {}).then(function (r) {
+        if (r && r.strategy) {
+          setStrat(r.strategy); setStratDirty(false);
+          setStratStatus("Score prepared — the lamp holds to this from the next turn.");
+        } else setStratStatus("Couldn't prepare — " + ((r && r.status) || "no response") + ".");
+        setStratBusy(false);
+      });
+    }
+
+    function applyStrategyEdit() {
+      setStratBusy(true); setStratStatus("Applying your edit…");
+      api("/api/strategy/apply", { strategy: strat }).then(function () {
+        setStratDirty(false); setStratStatus("Applied — the lamp plays this from the next turn.");
+        setStratBusy(false);
+      });
+    }
+
+    function takeNotes() {
+      setNotesBusy(true); setNotes(null);
+      setStratStatus("The director is reviewing the take…");
+      api("/api/strategy/notes", {}).then(function (r) {
+        if (r && (r.notes || r.revisedStrategy)) { setNotes(r); setStratStatus(""); }
+        else setStratStatus("No notes came back — " + ((r && r.status) || "no response") + ".");
+        setNotesBusy(false);
+      });
+    }
+
+    function applyRevision() {
+      var next = (notes && notes.revisedStrategy) || "";
+      setStratBusy(true);
+      api("/api/strategy/apply", { strategy: next }).then(function () {
+        setStrat(next); setStratDirty(false); setNotes(null);
+        setStratStatus("Revision applied — reset the dialogue for a fresh take.");
+        setStratBusy(false);
+      });
+    }
+
+    function sendChatMessage(t) {
+      if (!t || chatBusy) return;
+      var thread = chat.concat([{ who: "director", text: t }]);
+      setChat(thread); setChatBusy(true);
+      api("/api/strategy/discuss", { message: t, thread: chat }).then(function (r) {
+        var reply = (r && r.reply) || "(the actor says nothing — " + ((r && r.status) || "no response") + ")";
+        setChat(thread.concat([{ who: "actor", text: reply }]));
+        if (r && r.revisedScore) setProposal(r.revisedScore);
+        setChatBusy(false);
+      });
+    }
+
+    function sendChat() {
+      var t = chatInput.trim(); if (!t) return;
+      setChatInput(""); sendChatMessage(t);
+    }
+
+    // A dilemma option clicked: the decision goes to the actor as a director message,
+    // visibly, through the same channel — the actor answers with an updated score.
+    function chooseDilemma(question, option) {
+      sendChatMessage('On "' + question + '" — I choose: ' + option);
+    }
+
+    function applyProposal() {
+      var next = proposal || "";
+      setStratBusy(true);
+      api("/api/strategy/apply", { strategy: next }).then(function () {
+        setStrat(next); setStratDirty(false); setProposal(null);
+        setStratStatus("Score updated — the lamp plays this from the next turn.");
+        setStratBusy(false);
+      });
+    }
+
     var dialogue = (state.dialogue || []).slice().reverse();  // newest first
+    var hasTake = !!(state.dialogue && state.dialogue.length);
 
     return h("div", null,
       h("div", { className: "card" },
@@ -391,6 +486,21 @@
         h("div", { className: "status", title: "What the performer is doing (or why the last turn failed)" },
           state.performerStatus || "")
       ),
+      h("div", { className: "card" },
+        h("h2", null, "The Scene, Unfolding"),
+        h("p", { className: "lead" }, "Everything the lamp does — and why it chose it."),
+        h("div", { className: "feed", ref: feedRef },
+          dialogue.length === 0
+            ? h("div", { className: "empty" }, "The lamp waits, listening.")
+            : dialogue.map(function (t, i) {
+                return h("div", { className: "turn", key: dialogue.length - i },
+                  t.actor ? h("div", { className: "said" }, h("span", { className: "who" }, "Actor"), t.actor) : null,
+                  h("div", { className: "did" }, t.action || "—"),
+                  h("div", { className: "why" }, t.why || "")
+                );
+              })
+        )
+      ),
       h("div", { className: "card carry" },
         h("div", { className: "carry-row" },
           h("span", { className: "carry-k" }, "Character"),
@@ -406,19 +516,84 @@
             : h("span", { className: "carry-v warn" }, "no behaviors — set them in Expression and press Apply"))
       ),
       h("div", { className: "card" },
-        h("h2", null, "The Scene, Unfolding"),
-        h("p", { className: "lead" }, "Everything the lamp does — and why it chose it."),
-        h("div", { className: "feed", ref: feedRef },
-          dialogue.length === 0
-            ? h("div", { className: "empty" }, "The lamp waits, listening.")
-            : dialogue.map(function (t, i) {
-                return h("div", { className: "turn", key: dialogue.length - i },
-                  t.actor ? h("div", { className: "said" }, h("span", { className: "who" }, "Actor"), t.actor) : null,
-                  h("div", { className: "did" }, t.action || "—"),
-                  h("div", { className: "why" }, t.why || "")
-                );
-              })
-        )
+        h("h2", null, "The Actor's Score"),
+        h("p", { className: "lead" },
+          "The lamp's prepared plan — how it means to play this scene with the actions it has. It holds to this every turn. Edit it directly, ask for notes after a take, or talk it over below — proposed revisions only take effect when you apply them."),
+        h("textarea", {
+          value: strat, rows: 7, name: "acting-strategy",
+          placeholder: "No score yet — the lamp improvises from character and scene alone. Prepare one to give it a plan.",
+          onInput: function (e) { setStrat(e.target.value); setStratDirty(true); }
+        }),
+        state.strategyStale && !stratDirty
+          ? h("p", { className: "hint", style: { color: "var(--ember)" } },
+              "The character, scene, or behaviors changed since this score was prepared — consider regenerating.")
+          : null,
+        h("div", { className: "row", style: { marginTop: "10px" } },
+          h("button", { className: "act", onClick: prepareStrategy, disabled: stratBusy || notesBusy },
+            strat ? "Regenerate" : "Prepare the score"),
+          stratDirty
+            ? h("button", { className: "ghost", onClick: applyStrategyEdit, disabled: stratBusy }, "Apply my edit")
+            : null,
+          h("button", {
+            className: "ghost", onClick: takeNotes, disabled: notesBusy || stratBusy || !hasTake,
+            title: hasTake ? "Review the take and propose a revised score" : "Nothing to review yet — play a take first"
+          }, notesBusy ? "The director is watching the take…" : "Notes on this take")),
+        h("div", { className: "status" }, stratStatus),
+        notes ? h("div", { className: "mode-box", style: { marginTop: "12px" } },
+          h("div", { className: "mode-title" }, "The director's notes"),
+          h("p", { className: "carry-v", style: { whiteSpace: "pre-wrap", margin: "0" } }, notes.notes || "—"),
+          (notes.changes && notes.changes.length) ? h("div", null,
+            h("div", { className: "mode-title", style: { marginTop: "12px" } }, "What would change, and why"),
+            h("ul", { className: "hint", style: { margin: "4px 0 0 18px" } },
+              notes.changes.map(function (c, i) { return h("li", { key: i, style: { marginBottom: "4px" } }, c); }))) : null,
+          (notes.dilemmas && notes.dilemmas.length) ? h("div", null,
+            h("div", { className: "mode-title", style: { marginTop: "12px" } }, "For you to decide"),
+            notes.dilemmas.map(function (d, i) {
+              return h("div", { key: i, style: { marginTop: "8px" } },
+                h("p", { className: "carry-v", style: { margin: "0 0 6px" } }, d.question),
+                h("div", { className: "row" },
+                  (d.options || []).map(function (o, j) {
+                    return h("button", {
+                      className: "ghost", key: j, disabled: chatBusy,
+                      onClick: function () { chooseDilemma(d.question, o); }
+                    }, o);
+                  })));
+            }),
+            h("p", { className: "hint", style: { marginTop: "6px" } },
+              "Choosing sends your decision to the actor below — it answers with an updated score for you to apply.")) : null,
+          notes.revisedStrategy ? h("div", null,
+            h("div", { className: "mode-title", style: { marginTop: "12px" } }, "Proposed revision"),
+            h("p", { className: "carry-v", style: { whiteSpace: "pre-wrap", margin: "0" } }, notes.revisedStrategy)) : null,
+          h("div", { className: "row", style: { marginTop: "12px" } },
+            notes.revisedStrategy
+              ? h("button", { className: "act", onClick: applyRevision, disabled: stratBusy }, "Apply the revision")
+              : null,
+            h("button", { className: "ghost", onClick: function () { setNotes(null); } }, "Keep the current score"))
+        ) : null,
+        h("div", { style: { marginTop: "16px" } },
+          h("div", { className: "mode-title" }, "Talk it over"),
+          chat.length ? h("div", { style: { margin: "8px 0 4px" } },
+            chat.map(function (m, i) {
+              return h("p", { className: "hint", key: i, style: { margin: "0 0 6px" } },
+                h("b", null, m.who === "director" ? "You: " : "The lamp: "), m.text);
+            })) : null,
+          proposal ? h("div", { className: "mode-box", style: { margin: "10px 0" } },
+            h("div", { className: "mode-title" }, "Proposed score"),
+            h("p", { className: "carry-v", style: { whiteSpace: "pre-wrap", margin: "0" } }, proposal),
+            h("div", { className: "row", style: { marginTop: "10px" } },
+              h("button", { className: "act", onClick: applyProposal, disabled: stratBusy }, "Apply this score"),
+              h("button", { className: "ghost", onClick: function () { setProposal(null); } }, "Not this"))) : null,
+          h("div", { className: "stage-bar", style: { marginTop: "8px" } },
+            h("input", {
+              type: "text", placeholder: "Tell the actor what you want different… (\"don't answer the charlatan jab\")",
+              value: chatInput, name: "score-chat",
+              onInput: function (e) { setChatInput(e.target.value); },
+              onKeyDown: function (e) { if (e.key === "Enter") sendChat(); }
+            }),
+            h("button", { className: "ghost", onClick: sendChat, disabled: chatBusy }, chatBusy ? "…" : "Send")),
+          chat.length ? h("p", { className: "hint", style: { marginTop: "6px" } },
+            "The actor may answer with a question, or propose a rewritten score — nothing changes until you apply it. ",
+            h("a", { href: "#", onClick: function (e) { e.preventDefault(); setChat([]); setProposal(null); } }, "Clear the conversation")) : null)
       )
     );
   }
@@ -570,7 +745,10 @@
     { k: "sceneCompile",  label: "Scene — how the answers are compiled" },
     { k: "sceneEnrich",   label: "Scene — how enrichment works" },
     { k: "sceneRevise",   label: "Scene — how an adjustment is applied" },
-    { k: "suggest",       label: "Expression — how a behavior is suggested" }
+    { k: "suggest",       label: "Expression — how a behavior is suggested" },
+    { k: "strategy",      label: "Stage — how the actor's score is prepared" },
+    { k: "notes",         label: "Stage — how the director's notes review a take" },
+    { k: "discuss",       label: "Stage — how the actor discusses its score" }
   ];
 
   function TechStep() {
@@ -604,7 +782,7 @@
 
     function payload() {
       var p = (tech && tech.prompts) || {};
-      var out = { model: (tech && tech.model) || "", hueTarget: (tech && tech.hueTarget) || "", hueMappings: (tech && tech.hueMappings) || [] };
+      var out = { hueTarget: (tech && tech.hueTarget) || "", hueMappings: (tech && tech.hueMappings) || [] };
       TECH_PROMPTS.forEach(function (row) { out[row.k] = p[row.k] || ""; });
       return out;
     }
@@ -670,12 +848,10 @@
             ? "Current: " + keyStatus + ". Saved to a local file outside git; paste a new key to replace it."
             : "No key set — the lamp can't reach OpenAI until you save one. It's stored locally, never in the scene or git.")),
       h("div", { className: "mode-box", style: { marginTop: "16px" } },
-        h("div", { className: "mode-title" }, "Model — used for performing and authoring"),
-        h("div", { className: "mode-row" },
-          h("button", { className: "mode-btn" + (tech.model === "light" ? " active" : ""), onClick: function () { setTech(Object.assign({}, tech, { model: "light" })); } }, "Lightweight — GPT-4o mini"),
-          h("button", { className: "mode-btn" + (tech.model === "heavy" ? " active" : ""), onClick: function () { setTech(Object.assign({}, tech, { model: "heavy" })); } }, "Heavyweight — GPT-5.4")),
-        h("p", { className: "hint", style: { marginTop: "8px" } },
-          "Currently in use: " + (tech.modelId || "—") + ". This is the single control — it sets both the performer and the authoring calls (the performer's Inspector field only seeds it at start). Apply to change.")),
+        h("div", { className: "mode-title" }, "Model"),
+        h("p", { className: "hint", style: { margin: "0" } },
+          "Everything — performing and authoring — runs on " + (tech.modelId || "gpt-5.4") +
+          ", the strongest model the performer supports. The lighter models don't act well, so there is no switch.")),
       h("div", { className: "mode-box", style: { marginTop: "16px" } },
         h("div", { className: "mode-title" }, "Physical lamp — Hue bulb IDs"),
         h("p", { className: "hint", style: { margin: "0 0 10px" } },

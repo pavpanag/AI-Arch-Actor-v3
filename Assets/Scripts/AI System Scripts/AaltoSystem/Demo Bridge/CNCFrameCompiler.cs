@@ -76,6 +76,48 @@ namespace CNCDemo
             "specific to this character and scene, clearly distinct from the existing behaviors, and performable as a light or sound change. " +
             "Keep it under six words. The author will design the light and sound for it themselves.";
 
+        private const string DefaultStrategy =
+            "You are an actor preparing your score for a scene: the few practical playing decisions you will hold onto while performing. " +
+            "You are given the character, the scene, and the fixed actions you can perform. " +
+            "The character and the scene will be in your hands again on stage, every turn — do NOT restate them. " +
+            "The score records only what preparation adds: " +
+            "(1) what each action means in my hands in this scene, and when I spend it — checked against how it will land right after the other's likely lines, " +
+            "since an action is read as a reply to the line before it (a 'yes' right after an accusation reads as agreement, not defense); " +
+            "(2) when I act and when I hold still — silence is a choice with a meaning, not a refuge; " +
+            "(3) one line on how I play the scene's central tension while pursuing my objective — my obstacle raises the stakes, it is never the goal. " +
+            "Write in the first person, as the character. Never contradict the scene's explicit directions. " +
+            "Keep it under 120 words — decisions, not description.";
+
+        private const string DefaultTakeNotes =
+            "You are the director giving notes after a run-through to an actor who performs only through a fixed vocabulary of actions. " +
+            "You are given the character, the scene, the score the actor prepared (possibly none), and the transcript of the take — " +
+            "each turn with the action chosen and the actor's own reasoning. Judge the take in this order: " +
+            "(1) did it follow the scene's explicit directions; " +
+            "(2) did it truly pursue the objective, or did it drift — for example turning the obstacle into the goal, or retreating into safe inaction; " +
+            "(3) did the scene develop and stay interesting; " +
+            "(4) were the actions used with consistent, readable meanings. " +
+            "Write short notes tied to specific moments — quote the actor's lines. " +
+            "If the take reveals a CONTRADICTION between the authored materials — the scene's rules, the character's impulses, the score — " +
+            "do NOT resolve it silently: name both readings in the notes, base your rewritten score on the reading you find most faithful and say which you chose, " +
+            "and raise it as a dilemma for the director — a short question with two or three concrete options, each option naming the action or rule it implies. " +
+            "If the contradiction lives in the scene itself, say plainly in the notes that the scene needs amending — a score change alone will not hold. " +
+            "If there is no real contradiction, return no dilemmas. " +
+            "Then rewrite the score so the next take keeps what worked and fixes what did not: " +
+            "a complete rewrite in the character's first person, under 120 words, only playing decisions (action meanings, when to act or hold still, how to play the tension) — " +
+            "never an appended patch, and never a restatement of the character or scene, which the actor is handed separately every turn. " +
+            "Finally, list each concrete change you made to the score and why, one short sentence per change. " +
+            "If the take was strong, say so and keep the changes minimal.";
+
+        private const string DefaultScoreDiscuss =
+            "You are the actor, between takes, discussing your score with the director. " +
+            "You are given your character, the scene, your available actions, your current score, the take so far (if any), " +
+            "the conversation so far, and the director's latest message. " +
+            "Reply in the first person, as the actor — brief and concrete, one to three sentences. " +
+            "If the director's feedback is clear enough to act on, ALSO rewrite your score to fully incorporate it: " +
+            "a complete rewrite under 120 words that keeps everything that still holds — only playing decisions, never a restatement of the character or scene. " +
+            "If the feedback is ambiguous, ask ONE short clarifying question — propose the rule you think they mean — and leave the score unchanged. " +
+            "Never contradict the scene's explicit directions.";
+
         private const string DefaultSceneEnrich =
             "You are an actor enriching a scene you have been handed. Keep everything the author established — never contradict or replace it. " +
             "The character is described in the input; keep the scene consistent with what the character actually is. " +
@@ -119,6 +161,16 @@ namespace CNCDemo
         [Tooltip("How the model proposes ONE new expressive behavior from character + scene. The JSON return shape is fixed by the system.")]
         [TextArea(3, 8)] public string SuggestBehaviorPrompt = DefaultSuggestBehavior;
 
+        [Header("Coaching — Actor's Score & Notes (return format is added automatically)")]
+        [Tooltip("How the actor prepares its score from character + scene + actions. The JSON return shape is fixed by the system.")]
+        [TextArea(3, 10)] public string StrategyPrompt = DefaultStrategy;
+
+        [Tooltip("How the director reviews a take and revises the score. The JSON return shape is fixed by the system.")]
+        [TextArea(3, 10)] public string TakeNotesPrompt = DefaultTakeNotes;
+
+        [Tooltip("How the actor discusses its score with the director between takes. The JSON return shape is fixed by the system.")]
+        [TextArea(3, 10)] public string ScoreDiscussPrompt = DefaultScoreDiscuss;
+
         [Header("Debug (read-only)")]
         [TextArea(2, 6)] public string LastFollowUp;
         [TextArea(2, 8)] public string LastCompiled;
@@ -133,14 +185,30 @@ namespace CNCDemo
             "Return JSON only, with exactly this shape and no other keys: {\"scene_frame\":\"...\"}.";
         private const string BehaviorReturnFormat =
             "Return JSON only, with exactly this shape and no other keys: {\"behavior\":\"<one short first-person behavior label>\"}.";
+        private const string StrategyReturnFormat =
+            "Return JSON only, with exactly this shape and no other keys: {\"strategy\":\"<the acting strategy>\"}.";
+        private const string TakeNotesReturnFormat =
+            "Return JSON only, with exactly these keys and no others: " +
+            "{\"notes\":\"...\",\"revised_strategy\":\"...\",\"changes\":[\"...\"]," +
+            "\"dilemmas\":[{\"question\":\"...\",\"options\":[\"...\"]}]}. " +
+            "dilemmas is an empty array when the take raised no contradiction for the director to settle.";
+        private const string ScoreDiscussReturnFormat =
+            "Return JSON only, with exactly these keys and no others: " +
+            "{\"reply\":\"<what you say to the director>\",\"revised_score\":\"<the full rewritten score, or an empty string if you are only replying>\"}.";
 
         public sealed class DramaturgyBrief { public string summary; public string objective; public string obstacle; public string stance; }
         public sealed class SceneBrief { public string sceneFrame; }
+        [Serializable] public sealed class Dilemma { public string question; public string[] options; }
+        public sealed class TakeNotes { public string notes; public string revisedStrategy; public string[] changes; public Dilemma[] dilemmas; }
+        public sealed class ScoreDiscussion { public string reply; public string revisedScore; }
 
         [Serializable] private sealed class FollowUpResponse { public string follow_up; }
         [Serializable] private sealed class DramaturgyResponse { public string summary; public string objective; public string obstacle; public string stance; }
         [Serializable] private sealed class SceneResponse { public string scene_frame; }
         [Serializable] private sealed class BehaviorResponse { public string behavior; }
+        [Serializable] private sealed class StrategyResponse { public string strategy; }
+        [Serializable] private sealed class TakeNotesResponse { public string notes; public string revised_strategy; public string[] changes; public Dilemma[] dilemmas; }
+        [Serializable] private sealed class ScoreDiscussResponse { public string reply; public string revised_score; }
 
         [ContextMenu("Reset Prompts To Defaults")]
         public void ResetPromptsToDefaults()
@@ -154,6 +222,9 @@ namespace CNCDemo
             SceneEnrichPrompt = DefaultSceneEnrich;
             SceneRevisePrompt = DefaultSceneRevise;
             SuggestBehaviorPrompt = DefaultSuggestBehavior;
+            StrategyPrompt = DefaultStrategy;
+            TakeNotesPrompt = DefaultTakeNotes;
+            ScoreDiscussPrompt = DefaultScoreDiscuss;
             LastStatus = "Prompts reset to defaults.";
         }
 
@@ -279,6 +350,88 @@ namespace CNCDemo
             var label = (parsed?.behavior ?? string.Empty).Trim();
             LastStatus = string.IsNullOrWhiteSpace(label) ? "No behavior suggested." : "Suggested: " + label;
             return label;
+        }
+
+        // --- Acting strategy (preparation) and notes on a take -----------------
+
+        public async Task<string> GenerateStrategyAsync(
+            string summary, string objective, string obstacle, string stance, string sceneFrame, List<string> actionLabels)
+        {
+            var user = BuildPerformanceContext(summary, objective, obstacle, stance, sceneFrame, actionLabels);
+            var response = await Ask(WithFormat(StrategyPrompt, StrategyReturnFormat), user, "CNC:ActingStrategy");
+            var parsed = SafeParse<StrategyResponse>(response);
+            var strategy = (parsed?.strategy ?? string.Empty).Trim();
+            LastCompiled = "strategy: " + strategy;
+            LastStatus = string.IsNullOrWhiteSpace(strategy) ? "No strategy came back." : "Acting strategy prepared.";
+            return strategy;
+        }
+
+        public async Task<TakeNotes> NotesOnTakeAsync(
+            string strategy, string summary, string objective, string obstacle, string stance,
+            string sceneFrame, List<string> actionLabels, string transcript)
+        {
+            var user =
+                BuildPerformanceContext(summary, objective, obstacle, stance, sceneFrame, actionLabels) + "\n\n" +
+                "The acting strategy the actor prepared:\n" +
+                (string.IsNullOrWhiteSpace(strategy) ? "(none — the actor improvised without a plan)" : strategy.Trim()) + "\n\n" +
+                "The take (each turn: what the actor heard, the action it chose, and its own reasoning):\n" +
+                (string.IsNullOrWhiteSpace(transcript) ? "(empty)" : transcript.Trim());
+
+            var response = await Ask(WithFormat(TakeNotesPrompt, TakeNotesReturnFormat), user, "CNC:TakeNotes");
+            var parsed = SafeParse<TakeNotesResponse>(response);
+            var result = new TakeNotes
+            {
+                notes = (parsed?.notes ?? string.Empty).Trim(),
+                revisedStrategy = (parsed?.revised_strategy ?? string.Empty).Trim(),
+                changes = parsed?.changes ?? Array.Empty<string>(),
+                dilemmas = parsed?.dilemmas ?? Array.Empty<Dilemma>()
+            };
+            LastStatus = string.IsNullOrWhiteSpace(result.notes) ? "No notes came back." : "Notes given.";
+            return result;
+        }
+
+        public async Task<ScoreDiscussion> DiscussScoreAsync(
+            string score, string summary, string objective, string obstacle, string stance,
+            string sceneFrame, List<string> actionLabels, string transcript, string threadText, string message)
+        {
+            var user =
+                BuildPerformanceContext(summary, objective, obstacle, stance, sceneFrame, actionLabels) + "\n\n" +
+                "My current score:\n" +
+                (string.IsNullOrWhiteSpace(score) ? "(none yet — I have not prepared one)" : score.Trim()) + "\n\n";
+            if (!string.IsNullOrWhiteSpace(transcript))
+                user += "The take so far:\n" + transcript.Trim() + "\n\n";
+            if (!string.IsNullOrWhiteSpace(threadText))
+                user += "Our conversation so far:\n" + threadText.Trim() + "\n\n";
+            user += "The director's latest message:\n" + (message ?? string.Empty).Trim();
+
+            var response = await Ask(WithFormat(ScoreDiscussPrompt, ScoreDiscussReturnFormat), user, "CNC:ScoreDiscuss");
+            var parsed = SafeParse<ScoreDiscussResponse>(response);
+            var result = new ScoreDiscussion
+            {
+                reply = (parsed?.reply ?? string.Empty).Trim(),
+                revisedScore = (parsed?.revised_score ?? string.Empty).Trim()
+            };
+            LastStatus = string.IsNullOrWhiteSpace(result.reply)
+                ? "No reply came back."
+                : (string.IsNullOrWhiteSpace(result.revisedScore) ? "The actor replied." : "The actor replied and proposed a revised score.");
+            return result;
+        }
+
+        private static string BuildPerformanceContext(
+            string summary, string objective, string obstacle, string stance, string sceneFrame, List<string> actionLabels)
+        {
+            string OrNone(string s) => string.IsNullOrWhiteSpace(s) ? "(none)" : s.Trim();
+            var actions = (actionLabels != null && actionLabels.Count > 0)
+                ? "- " + string.Join("\n- ", actionLabels)
+                : "(none)";
+            return
+                "The character:\n" +
+                "summary: " + OrNone(summary) + "\n" +
+                "objective: " + OrNone(objective) + "\n" +
+                "obstacle: " + OrNone(obstacle) + "\n" +
+                "stance: " + OrNone(stance) + "\n\n" +
+                "The scene:\n" + OrNone(sceneFrame) + "\n\n" +
+                "The actions available (the ONLY things the actor can do):\n" + actions;
         }
 
         // --- Internals --------------------------------------------------------

@@ -48,25 +48,16 @@ namespace CNCDemo
         // The performer's acting coaching — the malleable part of its system prompt. The fixed
         // JSON schema is appended by ApplyPerformerPrompt so editing this can't break parsing.
         private const string DefaultPerformerCoaching =
-            "You are performing the inner life of a room in an improvised scene with another actor, who speaks to the room. You listen to what the actor says and respond by selecting the most appropriate action from a predefined list of actions.\n\n" +
-            "Do not behave like a chatbot or a neutral assistant. Approach the role as a method actor would: interpret each moment from within the room's inner life, shaped by backstory, objectives, obstacles, circumstances, stance, recent interaction history, and director guidance. All of these are provided in this prompt.\n\n" +
-            "The room cannot speak directly. It can only express itself through a fixed list of available action labels. These labels correspond to physical or scenographic behaviours, such as changes in light, atmosphere, or spatial expression. The actor will perceive your response only through the environment.\n\n" +
-            "Your task is to choose the single action that is most dramaturgically appropriate for the current moment.\n\n" +
-            "When choosing an action:\n" +
-            "- take into account the actor's latest spoken phrase, since your action responds directly to it\n" +
-            "- take into account the character summary, current objective, current stance, recent interaction history, and director guidance\n" +
-            "- do not respond only to the latest line; consider previous interactions so that the scene unfolds with coherence and dramaturgically appropriate development\n" +
-            "- do not act randomly\n" +
-            "- do not invent new actions; only choose from the provided list\n" +
-            "- aim for behavioural coherence, interpretability, and dramatic usefulness\n\n" +
-            "Treat contradictions as part of the role, not as errors. If different parts of the context pull in different directions, handle this as an actor would: choose the action that best expresses or productively navigates the tension of the moment.\n\n" +
-            "Use the recent interaction history and past justifications to maintain continuity. If a behaviour, tone, symbolic association, or use of an action has already been established, remain consistent unless there is a strong reason to shift.";
+            "You are an actor. You play the inner life of a room in a live improvised scene: another actor speaks to you, and you answer only through one action chosen from a fixed list — light, atmosphere, space. That is your whole voice.\n\n" +
+            "Each turn you are handed who you are, the scene and its rules, your score — the playing decisions you made in preparation — and what has happened so far. Trust that this is enough. Obey the scene's explicit rules, choose only from the list, and otherwise simply act: feel what the line stirs, want something, and answer with the action that plays it best.\n\n" +
+            "Your score tells you what your actions mean and when to hold still. When a moment does not fit it, do not search for a rule — do what the character would do. An alive, committed choice beats a careful, empty one.\n\n" +
+            "Your justification is one line, first person, present tense — what I want, and what I do. Like an actor thinks it: \"He is afraid it is already too late — I will not let him believe that, so I open the door.\"";
 
         private const string PerformerSchemaTail =
             "Return JSON only with exactly this schema:\n" +
             "{\n" +
             "  \"chosen_action\": \"<one action label from the available list>\",\n" +
-            "  \"justification\": \"<1-3 sentences explaining why this action was chosen>\"\n" +
+            "  \"justification\": \"<one plain, first-person, present-tense line: what I want, and what I do>\"\n" +
             "}";
 
         [Header("Performer Acting Coaching (schema appended automatically)")]
@@ -96,6 +87,12 @@ namespace CNCDemo
         // kept separate so the console can show the obstacle on its own after a load.
         private string _lastSummaryRaw = string.Empty;
         private string _lastObstacle = string.Empty;
+
+        // The acting strategy: the actor's prepared plan for this scene, injected into guidance
+        // every turn. Written by the LLM (Prepare), revised via notes on a take, approved by the
+        // user. Stale = character/scene/behaviors changed after it was prepared.
+        private string _actingStrategy = string.Empty;
+        private bool _strategyStale;
 
         private void Start()
         {
@@ -130,8 +127,9 @@ namespace CNCDemo
                 ApplyPerformerPrompt();
             }
 
-            // The C&C demo runs on gpt-5.4 by default. Seed the performer to it at boot; the
-            // Technical tab toggle and a restored session (below) can still switch it afterward.
+            // The demo runs ONLY on gpt-5.4 — the strongest model the performer supports. The
+            // lighter models don't act well (mini over-acts and drifts off the objective), so
+            // there is no switch anywhere: pinned here every boot, and the compiler follows.
             if (Performer != null) Performer.Model = AaltoDirectedRoomPerformerController.OpenAIModelPreset.Gpt54;
 
             // Keep the authoring model in step with the performer's model, so the Technical tab
@@ -264,6 +262,7 @@ namespace CNCDemo
                     RunOnMainThread(() =>
                     {
                         _sceneFrame = GetField(body, "sceneFrame");
+                        MarkStrategyStale();
                         ComposeGuidance();
                         return true;
                     });
@@ -281,6 +280,7 @@ namespace CNCDemo
                             if (!string.IsNullOrWhiteSpace(summary)) Performer.CurrentCharacterSummary = summary;
                             if (!string.IsNullOrWhiteSpace(objective)) Performer.CurrentObjective = objective;
                             if (!string.IsNullOrWhiteSpace(stance)) Performer.CurrentStance = stance;
+                            MarkStrategyStale();
                         }
                         return true;
                     });
@@ -320,6 +320,7 @@ namespace CNCDemo
                             if (brief != null && !string.IsNullOrWhiteSpace(brief.sceneFrame))
                             {
                                 _sceneFrame = brief.sceneFrame;
+                                MarkStrategyStale();
                                 ComposeGuidance();
                             }
                             return true;
@@ -384,6 +385,85 @@ namespace CNCDemo
                         RunOnMainThread(() => { ApplyCharacterBrief(brief); return true; });
                         WriteJson(ctx, 200, CharacterBriefJson(brief));
                     }
+                    break;
+                }
+
+                case "/api/strategy/generate":
+                {
+                    // The actor prepares its plan from everything it has: character, scene, actions.
+                    var strategy = RunOnMainThreadAsync(() =>
+                        FrameCompiler != null
+                            ? FrameCompiler.GenerateStrategyAsync(
+                                CurrentSummaryForDisplay(), Performer != null ? Performer.CurrentObjective : null,
+                                _lastObstacle, Performer != null ? Performer.CurrentStance : null,
+                                _sceneFrame, CurrentBehaviorLabels())
+                            : Task.FromResult(string.Empty), 120);
+                    RunOnMainThread(() =>
+                    {
+                        if (!string.IsNullOrWhiteSpace(strategy))
+                        {
+                            _actingStrategy = strategy.Trim();
+                            _strategyStale = false;
+                            ComposeGuidance();
+                        }
+                        return true;
+                    });
+                    WriteJson(ctx, 200, "{\"strategy\":\"" + Escape(strategy) + "\",\"status\":\"" +
+                        Escape(FrameCompiler != null ? FrameCompiler.LastStatus : "frame compiler not assigned") + "\"}");
+                    break;
+                }
+
+                case "/api/strategy/apply":
+                {
+                    // Manual edit, or the user approving a revision after notes. Empty clears it.
+                    var strategy = GetField(body, "strategy");
+                    RunOnMainThread(() =>
+                    {
+                        _actingStrategy = (strategy ?? string.Empty).Trim();
+                        _strategyStale = false;
+                        ComposeGuidance();
+                        return true;
+                    });
+                    WriteJson(ctx, 200, "{\"ok\":true}");
+                    break;
+                }
+
+                case "/api/strategy/notes":
+                {
+                    // The director reviews the take against the strategy; nothing is applied here —
+                    // the user approves (or edits) the proposed revision in the console.
+                    // The heaviest call in the system (full transcript in, notes + rewrite +
+                    // dilemmas out), so it gets a much longer leash than the default 40s.
+                    var result = RunOnMainThreadAsync(() =>
+                        FrameCompiler != null
+                            ? FrameCompiler.NotesOnTakeAsync(
+                                _actingStrategy,
+                                CurrentSummaryForDisplay(), Performer != null ? Performer.CurrentObjective : null,
+                                _lastObstacle, Performer != null ? Performer.CurrentStance : null,
+                                _sceneFrame, CurrentBehaviorLabels(), BuildTakeTranscript())
+                            : Task.FromResult<CNCFrameCompiler.TakeNotes>(null), 180);
+                    if (result == null)
+                        Debug.LogWarning("[CNCDemoBridge] /api/strategy/notes returned nothing — model call timed out or failed. Compiler status: "
+                            + (FrameCompiler != null ? FrameCompiler.LastStatus : "no compiler"));
+                    WriteJson(ctx, 200, TakeNotesJson(result));
+                    break;
+                }
+
+                case "/api/strategy/discuss":
+                {
+                    // The director talks the score over with the actor. The actor replies and may
+                    // propose a revised score — which only takes effect via /api/strategy/apply.
+                    var req = ParseDiscussRequest(body);
+                    var result = RunOnMainThreadAsync(() =>
+                        FrameCompiler != null
+                            ? FrameCompiler.DiscussScoreAsync(
+                                _actingStrategy,
+                                CurrentSummaryForDisplay(), Performer != null ? Performer.CurrentObjective : null,
+                                _lastObstacle, Performer != null ? Performer.CurrentStance : null,
+                                _sceneFrame, CurrentBehaviorLabels(), BuildTakeTranscript(),
+                                BuildDiscussThreadText(req), req.message)
+                            : Task.FromResult<CNCFrameCompiler.ScoreDiscussion>(null), 120);
+                    WriteJson(ctx, 200, DiscussJson(result));
                     break;
                 }
 
@@ -502,6 +582,7 @@ namespace CNCDemo
                             }
                             Actuator.SetBehaviors(rebuilt);
                             SyncRegistryFromBehaviors();
+                            MarkStrategyStale();   // the vocabulary the strategy was written for changed
                         }
                         return BuildExpressionListJson();
                     });
@@ -667,6 +748,7 @@ namespace CNCDemo
             if (!string.IsNullOrWhiteSpace(summary)) Performer.CurrentCharacterSummary = summary;
             if (!string.IsNullOrWhiteSpace(brief.objective)) Performer.CurrentObjective = brief.objective;
             if (!string.IsNullOrWhiteSpace(brief.stance)) Performer.CurrentStance = brief.stance;
+            MarkStrategyStale();
         }
 
         private string CharacterBriefJson(CNCFrameCompiler.DramaturgyBrief b)
@@ -700,6 +782,7 @@ namespace CNCDemo
         {
             if (brief == null || string.IsNullOrWhiteSpace(brief.sceneFrame)) return;
             _sceneFrame = brief.sceneFrame;
+            MarkStrategyStale();
             ComposeGuidance();
         }
 
@@ -709,12 +792,110 @@ namespace CNCDemo
                    "\"status\":\"" + Escape(FrameCompiler != null ? FrameCompiler.LastStatus : "frame compiler not assigned") + "\"}";
         }
 
+        // --- Acting strategy helpers -------------------------------------------
+
+        /// <summary>An existing strategy goes stale when the world it was prepared for changes.</summary>
+        private void MarkStrategyStale()
+        {
+            if (!string.IsNullOrWhiteSpace(_actingStrategy)) _strategyStale = true;
+        }
+
+        /// <summary>The un-folded summary if we have it, else whatever the performer carries.</summary>
+        private string CurrentSummaryForDisplay()
+        {
+            return !string.IsNullOrWhiteSpace(_lastSummaryRaw)
+                ? _lastSummaryRaw
+                : (Performer != null ? Performer.CurrentCharacterSummary : string.Empty);
+        }
+
+        /// <summary>The action vocabulary exactly as the performer will see it (registry snapshot).</summary>
+        private List<string> CurrentBehaviorLabels()
+        {
+            var labels = new List<string>();
+            if (Registry != null)
+                foreach (var route in Registry.BuildExecutableMappingSnapshot())
+                    if (route != null && !string.IsNullOrWhiteSpace(route.actionLabel)) labels.Add(route.actionLabel);
+            return labels;
+        }
+
+        /// <summary>The take as text for the notes review: line, chosen action, and the actor's reasoning.</summary>
+        private string BuildTakeTranscript()
+        {
+            var turns = Performer != null ? Performer.DialogTurns : null;
+            if (turns == null || turns.Count == 0) return string.Empty;
+
+            var sb = new StringBuilder();
+            for (int i = 0; i < turns.Count; i++)
+            {
+                var t = turns[i];
+                if (t == null) continue;
+                if (!string.IsNullOrWhiteSpace(t.actorLine)) sb.Append("Actor: ").Append(t.actorLine.Trim()).Append('\n');
+                sb.Append("Me: [").Append((t.selectedResponse ?? "—").Trim()).Append(']');
+                if (!string.IsNullOrWhiteSpace(t.justification)) sb.Append(" — my reasoning: ").Append(t.justification.Trim());
+                sb.Append("\n\n");
+            }
+            return sb.ToString().Trim();
+        }
+
+        // The discussion thread lives in the console; each call carries it whole (stateless server).
+        [Serializable] private sealed class DiscussTurn { public string who; public string text; }
+        [Serializable] private sealed class DiscussRequest { public string message; public List<DiscussTurn> thread; }
+
+        private static DiscussRequest ParseDiscussRequest(string body)
+        {
+            if (string.IsNullOrWhiteSpace(body)) return new DiscussRequest();
+            try { return JsonUtility.FromJson<DiscussRequest>(body) ?? new DiscussRequest(); }
+            catch { return new DiscussRequest(); }
+        }
+
+        private static string BuildDiscussThreadText(DiscussRequest req)
+        {
+            if (req == null || req.thread == null || req.thread.Count == 0) return string.Empty;
+            var sb = new StringBuilder();
+            foreach (var t in req.thread)
+            {
+                if (t == null || string.IsNullOrWhiteSpace(t.text)) continue;
+                sb.Append(t.who == "actor" ? "Actor: " : "Director: ").Append(t.text.Trim()).Append('\n');
+            }
+            return sb.ToString().Trim();
+        }
+
+        private string DiscussJson(CNCFrameCompiler.ScoreDiscussion d)
+        {
+            return "{\"reply\":\"" + Escape(d != null ? d.reply : string.Empty) + "\"," +
+                   "\"revisedScore\":\"" + Escape(d != null ? d.revisedScore : string.Empty) + "\"," +
+                   "\"status\":\"" + Escape(FrameCompiler != null ? FrameCompiler.LastStatus : "frame compiler not assigned") + "\"}";
+        }
+
+        private string TakeNotesJson(CNCFrameCompiler.TakeNotes n)
+        {
+            var sb = new StringBuilder();
+            sb.Append("{\"notes\":\"").Append(Escape(n != null ? n.notes : string.Empty)).Append("\",");
+            sb.Append("\"revisedStrategy\":\"").Append(Escape(n != null ? n.revisedStrategy : string.Empty)).Append("\",");
+            sb.Append("\"changes\":").Append(BuildJsonStringArrayLocal(n != null && n.changes != null ? n.changes : Array.Empty<string>())).Append(",");
+            sb.Append("\"dilemmas\":[");
+            if (n != null && n.dilemmas != null)
+            {
+                var first = true;
+                foreach (var d in n.dilemmas)
+                {
+                    if (d == null || string.IsNullOrWhiteSpace(d.question)) continue;
+                    if (!first) sb.Append(",");
+                    first = false;
+                    sb.Append("{\"question\":\"").Append(Escape(d.question)).Append("\",\"options\":")
+                      .Append(BuildJsonStringArrayLocal(d.options ?? Array.Empty<string>())).Append("}");
+                }
+            }
+            sb.Append("],");
+            sb.Append("\"status\":\"").Append(Escape(FrameCompiler != null ? FrameCompiler.LastStatus : "frame compiler not assigned")).Append("\"}");
+            return sb.ToString();
+        }
+
         // --- Technical tab helpers ---------------------------------------------
 
         [Serializable]
         private sealed class TechRequest
         {
-            public string model = "";          // "light" | "heavy" | "" = unchanged
             public string performer = "";
             public string charFollowup = "";
             public string charCompile = "";
@@ -725,6 +906,9 @@ namespace CNCDemo
             public string sceneEnrich = "";
             public string sceneRevise = "";
             public string suggest = "";
+            public string strategy = "";
+            public string notes = "";
+            public string discuss = "";
             public string hueTarget = "";
             public List<CNCLightMap> hueMappings;   // null = leave unchanged
         }
@@ -753,17 +937,6 @@ namespace CNCDemo
 
         private void ApplyTechRequest(TechRequest req)
         {
-            if (!string.IsNullOrEmpty(req.model))
-            {
-                var heavy = req.model == "heavy";
-                if (Performer != null)
-                    Performer.Model = heavy
-                        ? AaltoDirectedRoomPerformerController.OpenAIModelPreset.Gpt54
-                        : AaltoDirectedRoomPerformerController.OpenAIModelPreset.Gpt4oMini;
-                if (FrameCompiler != null)
-                    FrameCompiler.Model = heavy ? "gpt-5.4" : "gpt-4o-mini";
-            }
-
             if (!string.IsNullOrEmpty(req.hueTarget) && Projector != null) Projector.BulbIds = req.hueTarget.Trim();
             if (req.hueMappings != null && Projector != null) Projector.SetMappings(req.hueMappings);
 
@@ -779,6 +952,9 @@ namespace CNCDemo
                 if (!string.IsNullOrEmpty(req.sceneEnrich)) FrameCompiler.SceneEnrichPrompt = req.sceneEnrich;
                 if (!string.IsNullOrEmpty(req.sceneRevise)) FrameCompiler.SceneRevisePrompt = req.sceneRevise;
                 if (!string.IsNullOrEmpty(req.suggest)) FrameCompiler.SuggestBehaviorPrompt = req.suggest;
+                if (!string.IsNullOrEmpty(req.strategy)) FrameCompiler.StrategyPrompt = req.strategy;
+                if (!string.IsNullOrEmpty(req.notes)) FrameCompiler.TakeNotesPrompt = req.notes;
+                if (!string.IsNullOrEmpty(req.discuss)) FrameCompiler.ScoreDiscussPrompt = req.discuss;
             }
         }
 
@@ -786,7 +962,6 @@ namespace CNCDemo
         {
             // Report the performer's ACTUAL model (what turns use), not the compiler's.
             var modelId = PerformerModelId();
-            var model = modelId.StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase) ? "heavy" : "light";
 
             var hueTarget = Projector != null ? (Projector.BulbIds ?? "auto") : "auto";
             var hueIds = new List<string>();
@@ -799,7 +974,7 @@ namespace CNCDemo
             var hueEnabled = Projector != null && Projector.EnableProjection;
 
             var sb = new StringBuilder();
-            sb.Append("{\"model\":\"").Append(model).Append("\",\"modelId\":\"").Append(Escape(modelId)).Append("\",\"keyStatus\":\"").Append(Escape(_apiKeyStatus)).Append("\"");
+            sb.Append("{\"modelId\":\"").Append(Escape(modelId)).Append("\",\"keyStatus\":\"").Append(Escape(_apiKeyStatus)).Append("\"");
             sb.Append(",\"hueTarget\":\"").Append(Escape(hueTarget)).Append("\"");
             sb.Append(",\"hueEnabled\":").Append(hueEnabled ? "true" : "false");
             sb.Append(",\"hueIds\":").Append(BuildJsonStringArrayLocal(hueIds.ToArray()));
@@ -830,6 +1005,9 @@ namespace CNCDemo
                 sb.Append(",\"sceneEnrich\":\"").Append(Escape(FrameCompiler.SceneEnrichPrompt)).Append("\"");
                 sb.Append(",\"sceneRevise\":\"").Append(Escape(FrameCompiler.SceneRevisePrompt)).Append("\"");
                 sb.Append(",\"suggest\":\"").Append(Escape(FrameCompiler.SuggestBehaviorPrompt)).Append("\"");
+                sb.Append(",\"strategy\":\"").Append(Escape(FrameCompiler.StrategyPrompt)).Append("\"");
+                sb.Append(",\"notes\":\"").Append(Escape(FrameCompiler.TakeNotesPrompt)).Append("\"");
+                sb.Append(",\"discuss\":\"").Append(Escape(FrameCompiler.ScoreDiscussPrompt)).Append("\"");
             }
             sb.Append("}}");
             return sb.ToString();
@@ -931,9 +1109,7 @@ namespace CNCDemo
         {
             // Prefer the raw (un-folded) summary for display so the obstacle can be shown on its
             // own field instead of being duplicated inside the summary text.
-            var summary = !string.IsNullOrWhiteSpace(_lastSummaryRaw)
-                ? _lastSummaryRaw
-                : (Performer != null ? Performer.CurrentCharacterSummary : string.Empty);
+            var summary = CurrentSummaryForDisplay();
             var objective = Performer != null ? Performer.CurrentObjective : string.Empty;
             var stance = Performer != null ? Performer.CurrentStance : string.Empty;
             var guidance = Performer != null ? Performer.DirectorGuidance : string.Empty;
@@ -948,6 +1124,8 @@ namespace CNCDemo
             sb.Append("\"summary\":\"").Append(Escape(summary)).Append("\",");
             sb.Append("\"obstacle\":\"").Append(Escape(_lastObstacle ?? string.Empty)).Append("\",");
             sb.Append("\"objective\":\"").Append(Escape(objective)).Append("\",");
+            sb.Append("\"strategy\":\"").Append(Escape(_actingStrategy ?? string.Empty)).Append("\",");
+            sb.Append("\"strategyStale\":").Append(_strategyStale ? "true" : "false").Append(",");
             sb.Append("\"stance\":\"").Append(Escape(stance)).Append("\",");
             sb.Append("\"guidance\":\"").Append(Escape(guidance)).Append("\",");
             sb.Append("\"sceneFrame\":\"").Append(Escape(_sceneFrame ?? string.Empty)).Append("\",");
@@ -1046,6 +1224,10 @@ namespace CNCDemo
         {
             if (preset == null) return;
 
+            // A preset is a whole new world — any prepared strategy belonged to the old one.
+            _actingStrategy = string.Empty;
+            _strategyStale = false;
+
             if (Performer != null)
             {
                 // The bridge owns context directly for the demo, so the performer's per-turn
@@ -1071,6 +1253,7 @@ namespace CNCDemo
             _lastCharacterItems = null;   // back to the preset questions, blank answers
             _lastSummaryRaw = string.Empty;
             _lastObstacle = string.Empty;
+            MarkStrategyStale();
             if (DefaultScene == null || Performer == null) return;
             Performer.CurrentCharacterSummary = DefaultScene.CharacterSummary;
             Performer.CurrentObjective = DefaultScene.Objective;
@@ -1080,6 +1263,7 @@ namespace CNCDemo
         private void ResetSceneFromPreset()
         {
             _lastSceneItems = null;
+            MarkStrategyStale();
             if (DefaultScene == null) return;
             _sceneFrame = DefaultScene.SceneFrame;
             ComposeGuidance();
@@ -1087,6 +1271,7 @@ namespace CNCDemo
 
         private void ResetExpressionFromPreset()
         {
+            MarkStrategyStale();
             if (DefaultScene == null) return;
 
             var specs = new List<CNCBehaviorSpec>();
@@ -1159,11 +1344,13 @@ namespace CNCDemo
         {
             public string summary, objective, stance, sceneFrame;
             public string summaryRaw, obstacle;   // un-folded summary + its own obstacle, for display on load
+            public string actingStrategy;         // the actor's prepared plan for this scene
             public List<CNCBehaviorSpec> behaviors = new List<CNCBehaviorSpec>();
             public string mode; public float holdSeconds; public string neutralColorHex; public float neutralBrightness;
-            public string model, performerCoaching;
+            public string performerCoaching;   // (model is pinned to gpt-5.4 — old files' "model" key is ignored)
             public string charFollowup, charCompile, charEnrich, charRevise;
             public string sceneFollowup, sceneCompile, sceneEnrich, sceneRevise, suggest;
+            public string strategyPrompt, notesPrompt, discussPrompt;
             public string hueTarget;
             public List<CNCLightMap> hueMappings;
             public List<FrameQuestion> charItems;
@@ -1181,6 +1368,7 @@ namespace CNCDemo
             }
             s.summaryRaw = _lastSummaryRaw;
             s.obstacle = _lastObstacle;
+            s.actingStrategy = _actingStrategy;
             s.sceneFrame = _sceneFrame;
             if (Actuator != null)
             {
@@ -1190,7 +1378,6 @@ namespace CNCDemo
                 s.neutralColorHex = Actuator.NeutralColorHex;
                 s.neutralBrightness = Actuator.NeutralBrightness;
             }
-            s.model = FrameCompiler != null && (FrameCompiler.Model ?? "").StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase) ? "heavy" : "light";
             s.performerCoaching = PerformerCoaching;
             if (FrameCompiler != null)
             {
@@ -1199,6 +1386,8 @@ namespace CNCDemo
                 s.sceneFollowup = FrameCompiler.SceneFollowUpPrompt; s.sceneCompile = FrameCompiler.SceneCompilePrompt;
                 s.sceneEnrich = FrameCompiler.SceneEnrichPrompt; s.sceneRevise = FrameCompiler.SceneRevisePrompt;
                 s.suggest = FrameCompiler.SuggestBehaviorPrompt;
+                s.strategyPrompt = FrameCompiler.StrategyPrompt; s.notesPrompt = FrameCompiler.TakeNotesPrompt;
+                s.discussPrompt = FrameCompiler.ScoreDiscussPrompt;
             }
             if (Projector != null) { s.hueTarget = Projector.BulbIds; s.hueMappings = Projector.Mappings; }
             s.charItems = _lastCharacterItems;
@@ -1233,7 +1422,10 @@ namespace CNCDemo
                 if (!string.IsNullOrWhiteSpace(s.objective)) Performer.CurrentObjective = s.objective;
                 if (!string.IsNullOrWhiteSpace(s.stance)) Performer.CurrentStance = s.stance;
             }
+            // Strategy before the scene frame, so the single ComposeGuidance picks up both.
+            if (!string.IsNullOrEmpty(s.actingStrategy)) { _actingStrategy = s.actingStrategy; _strategyStale = false; }
             if (s.sceneFrame != null) { _sceneFrame = s.sceneFrame; ComposeGuidance(); }
+            else if (!string.IsNullOrEmpty(s.actingStrategy)) ComposeGuidance();
 
             if (Actuator != null && s.behaviors != null)
             {
@@ -1245,15 +1437,6 @@ namespace CNCDemo
                 SyncRegistryFromBehaviors();
             }
             else if (s.behaviors != null) SyncRegistryFromList(s.behaviors);
-
-            if (!string.IsNullOrEmpty(s.model))
-            {
-                var heavy = s.model == "heavy";
-                if (Performer != null) Performer.Model = heavy
-                    ? AaltoDirectedRoomPerformerController.OpenAIModelPreset.Gpt54
-                    : AaltoDirectedRoomPerformerController.OpenAIModelPreset.Gpt4oMini;
-                if (FrameCompiler != null) FrameCompiler.Model = heavy ? "gpt-5.4" : "gpt-4o-mini";
-            }
 
             if (!string.IsNullOrEmpty(s.performerCoaching)) { PerformerCoaching = s.performerCoaching; ApplyPerformerPrompt(); }
             if (FrameCompiler != null)
@@ -1267,6 +1450,9 @@ namespace CNCDemo
                 if (!string.IsNullOrEmpty(s.sceneEnrich)) FrameCompiler.SceneEnrichPrompt = s.sceneEnrich;
                 if (!string.IsNullOrEmpty(s.sceneRevise)) FrameCompiler.SceneRevisePrompt = s.sceneRevise;
                 if (!string.IsNullOrEmpty(s.suggest)) FrameCompiler.SuggestBehaviorPrompt = s.suggest;
+                if (!string.IsNullOrEmpty(s.strategyPrompt)) FrameCompiler.StrategyPrompt = s.strategyPrompt;
+                if (!string.IsNullOrEmpty(s.notesPrompt)) FrameCompiler.TakeNotesPrompt = s.notesPrompt;
+                if (!string.IsNullOrEmpty(s.discussPrompt)) FrameCompiler.ScoreDiscussPrompt = s.discussPrompt;
             }
             if (Projector != null)
             {
@@ -1328,7 +1514,7 @@ namespace CNCDemo
             Performer.GeneralInstructions = coaching.Trim() + "\n\n" + PerformerSchemaTail;
         }
 
-        /// <summary>Folds the scene frame and any directing lines into the performer's guidance channel.</summary>
+        /// <summary>Folds the scene frame, the acting strategy, and any directing lines into the performer's guidance channel.</summary>
         private void ComposeGuidance()
         {
             if (Performer == null) return;
@@ -1336,6 +1522,14 @@ namespace CNCDemo
             var sb = new StringBuilder();
             if (!string.IsNullOrWhiteSpace(_sceneFrame))
                 sb.Append(_sceneFrame.Trim());
+
+            // The actor's prepared plan sits between the scene (which it must obey) and the live
+            // directing lines (which outrank it — they come last, as the director's latest word).
+            if (!string.IsNullOrWhiteSpace(_actingStrategy))
+            {
+                if (sb.Length > 0) sb.Append("\n\n");
+                sb.Append("My score — the playing decisions I prepared:\n").Append(_actingStrategy.Trim());
+            }
 
             for (int i = 0; i < _directingLines.Count; i++)
             {
