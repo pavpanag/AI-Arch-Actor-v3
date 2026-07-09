@@ -120,6 +120,10 @@ namespace CNCDemo
                 ApplyPerformerPrompt();
             }
 
+            // Keep the authoring model in step with the performer's model, so the Technical tab
+            // shows and controls one consistent choice (the performer's Inspector field is the seed).
+            if (Performer != null && FrameCompiler != null) FrameCompiler.Model = PerformerModelId();
+
             if (LoadDefaultSceneOnStart && DefaultScene != null)
                 ApplyPreset(DefaultScene);
 
@@ -708,6 +712,21 @@ namespace CNCDemo
             catch { return new TechRequest(); }
         }
 
+        /// <summary>The model id the performer will actually use this turn (mirrors its enum field).</summary>
+        private string PerformerModelId()
+        {
+            if (Performer == null)
+                return FrameCompiler != null ? (FrameCompiler.Model ?? "gpt-4o-mini") : "gpt-4o-mini";
+            switch (Performer.Model)
+            {
+                case AaltoDirectedRoomPerformerController.OpenAIModelPreset.Gpt54: return "gpt-5.4";
+                case AaltoDirectedRoomPerformerController.OpenAIModelPreset.Gpt54Mini: return "gpt-5.4-mini";
+                case AaltoDirectedRoomPerformerController.OpenAIModelPreset.Gpt41: return "gpt-4.1";
+                case AaltoDirectedRoomPerformerController.OpenAIModelPreset.Gpt41Mini: return "gpt-4.1-mini";
+                default: return "gpt-4o-mini";
+            }
+        }
+
         private void ApplyTechRequest(TechRequest req)
         {
             if (!string.IsNullOrEmpty(req.model))
@@ -741,8 +760,9 @@ namespace CNCDemo
 
         private string BuildTechJson()
         {
-            var model = FrameCompiler != null && (FrameCompiler.Model ?? "").StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase)
-                ? "heavy" : "light";
+            // Report the performer's ACTUAL model (what turns use), not the compiler's.
+            var modelId = PerformerModelId();
+            var model = modelId.StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase) ? "heavy" : "light";
 
             var hueTarget = Projector != null ? (Projector.BulbIds ?? "auto") : "auto";
             var hueIds = new List<string>();
@@ -755,7 +775,7 @@ namespace CNCDemo
             var hueEnabled = Projector != null && Projector.EnableProjection;
 
             var sb = new StringBuilder();
-            sb.Append("{\"model\":\"").Append(model).Append("\",\"keyStatus\":\"").Append(Escape(_apiKeyStatus)).Append("\"");
+            sb.Append("{\"model\":\"").Append(model).Append("\",\"modelId\":\"").Append(Escape(modelId)).Append("\",\"keyStatus\":\"").Append(Escape(_apiKeyStatus)).Append("\"");
             sb.Append(",\"hueTarget\":\"").Append(Escape(hueTarget)).Append("\"");
             sb.Append(",\"hueEnabled\":").Append(hueEnabled ? "true" : "false");
             sb.Append(",\"hueIds\":").Append(BuildJsonStringArrayLocal(hueIds.ToArray()));
