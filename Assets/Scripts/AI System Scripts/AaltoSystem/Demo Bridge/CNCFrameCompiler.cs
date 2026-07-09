@@ -23,13 +23,14 @@ namespace CNCDemo
         // Canonical default coaching text. Fields initialise from these, and the context-menu
         // reset restores them — so updating a default here reaches the component with one click.
         private const string DefaultCharacterFollowUp =
-            "You are helping an author define the inner life of a character for an improvised scene. " +
-            "You are given their answers to a few questions, written in the first person, as the character. " +
-            "Treat the author's answers as the authority on what the character is; never treat a question's wording as a fact about the character. " +
-            "If something important is unclear, thin, or genuinely contradictory within the answers, ask exactly ONE short, specific clarifying question. " +
-            "Phrase the question in the FIRST PERSON, as the character speaking to itself " +
+            "You are helping an author bring a character to life for an improvised scene, from their first-person answers. " +
+            "Draw out ONE telling detail: UNLESS the answers are already vivid and specific, ask exactly ONE short clarifying question " +
+            "about the vaguest, thinnest, or most intriguing answer — the kind of question that makes the character more playable. " +
+            "Short, one-word, or generic answers should prompt a question. " +
+            "Treat the answers as the truth about the character; do NOT flag a mismatch between a question's wording and the answer as a contradiction. " +
+            "Phrase the question in the FIRST PERSON, as the character wondering about itself " +
             "(for example 'Why do I want to keep people close?', never 'Why do you want...'). " +
-            "If the answers are already clear enough to work with, ask nothing.";
+            "Return an empty question only when the answers are already rich and specific.";
 
         private const string DefaultCharacterCompile =
             "Compile the author's answers (written in the first person, as the character) into runtime controls for a scenic performer. " +
@@ -48,14 +49,14 @@ namespace CNCDemo
             "else faithful to what was there. The character is whatever the author says it is. Keep everything concrete and playable.";
 
         private const string DefaultSceneFollowUp =
-            "You are helping an author define the given circumstances of a scene for an improvised performance. " +
-            "You are given their answers to a few questions, written in the first person, as the character in the scene. " +
-            "The character is described in the input; keep in mind what the character actually is. " +
-            "Treat the author's answers as the authority; never treat a question's wording as a fact. " +
-            "If something important is unclear, thin, or genuinely contradictory, ask exactly ONE short, specific clarifying question. " +
-            "Phrase the question in the FIRST PERSON, as the character speaking to itself " +
+            "You are helping an author set the given circumstances of a scene, from their first-person answers. " +
+            "The character is described in the input; keep in mind what it actually is. " +
+            "UNLESS the answers are already vivid and specific, ask exactly ONE short clarifying question about the vaguest or thinnest answer — " +
+            "something that sharpens the scene. Short, one-word, or generic answers should prompt a question. " +
+            "Treat the answers as the truth; do NOT flag a mismatch between a question's wording and the answer as a contradiction. " +
+            "Phrase the question in the FIRST PERSON, as the character wondering about the scene " +
             "(for example 'Who else is in the room with me?', never 'Who else is with you?'). " +
-            "If the answers are already clear enough to work with, ask nothing.";
+            "Return an empty question only when the answers are already rich and specific.";
 
         private const string DefaultSceneCompile =
             "Compile the author's answers into a short scene brief for a scenic performer: the given circumstances, who is present, and the character's role and how present it should be. " +
