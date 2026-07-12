@@ -5,12 +5,11 @@ import cv2
 from ultralytics import YOLO
 import time
 import json
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-from threading import Thread
 from pythonosc import udp_client
 import torch
 
+# Headless: no camera-preview window and no matplotlib graph — detection + OSC only, to save
+# CPU/GPU during the demo. The tracked people are shown in Unity, which is the only view needed.
 camera_index = 1
 RES_WIDTH, RES_HEIGHT = 640, 480
 
@@ -22,7 +21,9 @@ if torch.cuda.is_available():
     model.to('cuda')
 
 # OSC client setup
-osc_client = udp_client.SimpleUDPClient("127.0.0.1", 3333)
+# NOTE: 3334, not 3333 — the C&C demo's speech receiver owns 3333. Unity listens for
+# "/position" on 3334 via an OSC component wired to ReceivePosition.
+osc_client = udp_client.SimpleUDPClient("127.0.0.1", 3334)
 
 # Function to detect humans in the frame and return their positions
 def detect_humans(frame):
@@ -31,7 +32,8 @@ def detect_humans(frame):
     # Flip the frame horizontally
     frame = cv2.flip(frame, 1)
 
-    results = model(frame)
+    # verbose=False silences YOLO's per-frame console print (overhead + noise, no window to see).
+    results = model(frame, verbose=False)
     positions = []
 
     for result in results:
@@ -60,10 +62,7 @@ def detect_humans(frame):
             cls = int(box.cls[0].cpu().numpy()) if hasattr(box.cls, 'cpu') else int(box.cls)
 
             if model.names[cls] == "person":
-                cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-                label = f"Person {conf:.2f}"
-                cv2.putText(frame, label, (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
+                # No drawing — headless. Just take the person's centre.
                 center_x = (x1 + x2) / 2
                 center_y = (y1 + y2) / 2
                 positions.append((center_x, center_y))
@@ -82,26 +81,15 @@ frame_height = RES_HEIGHT
 # Variable to store the latest positions with timestamp
 latest_positions = []
 
-# Function to update the plot with all the latest positions
-def update_plot(i):
-    ax.clear()
-    ax.set_xlim(0, 100)
-    ax.set_ylim(0, 100)
-    if latest_positions:
-        for pos in latest_positions:
-            ax.plot(pos[0], pos[1], 'ro')
-            ax.text(pos[0], pos[1], f'({pos[0]}, {pos[1]})', fontsize=9, ha='right')
-
-# Create a figure and axis for the plot
-fig, ax = plt.subplots()
-ani = animation.FuncAnimation(fig, update_plot, interval=1000, cache_frame_data=False)  # Update every 1000ms
-
-# Run real-time detection in a separate thread
+# Headless detection loop — runs on the main thread (no windows to service), detects people,
+# and sends each position to Unity over OSC. Ctrl+C in the console to stop.
 def run_detection():
     global latest_positions
     start_time = time.time()
     frame_skip = 2  # Process every 2nd frame
     frame_count = 0
+
+    print("Tracking started (headless). Sending /position to 127.0.0.1:3334. Ctrl+C to stop.")
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -113,7 +101,7 @@ def run_detection():
             continue
 
         # Detect humans in the frame
-        frame_with_detections, positions = detect_humans(frame)
+        _, positions = detect_humans(frame)
 
         # Store the most recent positions with timestamp
         current_time = time.time()
@@ -141,27 +129,12 @@ def run_detection():
 
             start_time = current_time
 
-        # Commented out OpenCV display for better performance
-        # cv2.imshow('YOLOv8 Human Detection (Flipped)', frame_with_detections)
-
-        # Press 'q' to exit the loop
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-    # Release the video capture and close windows
     cap.release()
-    cv2.destroyAllWindows()
 
-# Start the detection thread
-detection_thread = Thread(target=run_detection)
-detection_thread.start()
 
-# Show the plot
-plt.show()
-
-# Wait for the detection thread to finish
-detection_thread.join()
-
-# Print the stored latest positions with timestamp
-if latest_positions:
-    print(f"Latest Positions: {latest_positions}")
+try:
+    run_detection()
+except KeyboardInterrupt:
+    print("\nTracking stopped.")
+finally:
+    cap.release()

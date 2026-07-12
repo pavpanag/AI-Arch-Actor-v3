@@ -962,15 +962,46 @@
       stage: "Reset the dialogue"
     };
 
+    // Named setups: save as many configurations as you like, load any of them by name.
+    var setupsState = useState([]); var setups = setupsState[0], setSetups = setupsState[1];
+    var setupNameState = useState(""); var setupName = setupNameState[0], setSetupName = setupNameState[1];
+    var setupSelState = useState(""); var setupSel = setupSelState[0], setSetupSel = setupSelState[1];
+
+    useEffect(function () {
+      api("/api/session/list").then(function (r) {
+        if (r && r.setups) setSetups(r.setups);
+        // The bridge remembers which setup is on stage — so after Load's page reload
+        // (or even a Unity restart) the picker still shows what's playing.
+        if (r && r.current) setSetupSel(r.current);
+      });
+    }, []);
+
     function saveSetup() {
+      // Typed name wins; else save over the selected setup; else the unnamed quick slot.
+      var name = setupName.trim() || setupSel;
       setAppMsg("Saving…");
-      api("/api/session/save", {}).then(function (r) { setAppMsg((r && r.status) || "Saved."); });
+      api("/api/session/save", { name: name }).then(function (r) {
+        setAppMsg((r && r.status) || "Saved.");
+        if (r && r.setups) {
+          setSetups(r.setups);
+          if (name && r.setups.length) setSetupSel(r.setups[0].name);  // newest first
+        }
+        setSetupName("");
+      });
     }
     function loadSetup() {
       setAppMsg("Loading…");
-      api("/api/session/load", {}).then(function (r) {
+      api("/api/session/load", { name: setupSel }).then(function (r) {
         if (r && r.loaded) location.reload();
-        else setAppMsg("No saved setup found yet.");
+        else setAppMsg(setupSel ? "Couldn't load “" + setupSel + "”." : "No saved setup found yet.");
+      });
+    }
+    function deleteSetup() {
+      if (!setupSel) return;
+      if (!confirm('Delete the setup "' + setupSel + '"? The lamp keeps playing its current state.')) return;
+      api("/api/session/delete", { name: setupSel }).then(function (r) {
+        if (r && r.setups) setSetups(r.setups);
+        setSetupSel(""); setAppMsg("Deleted “" + setupSel + "”.");
       });
     }
 
@@ -1009,8 +1040,23 @@
       body,
       h("div", { className: "footer" },
         appMsg ? h("span", { className: "app-msg" }, appMsg) : null,
-        h("button", { className: "ghost", onClick: saveSetup }, "Save setup"),
-        h("button", { className: "ghost", onClick: loadSetup }, "Load setup"),
+        h("input", {
+          type: "text", placeholder: "name this setup…", value: setupName, name: "setup-name",
+          style: { width: "150px" },
+          onInput: function (e) { setSetupName(e.target.value); },
+          onKeyDown: function (e) { if (e.key === "Enter") saveSetup(); }
+        }),
+        h("button", { className: "ghost", onClick: saveSetup, title: "Save as the typed name — or over the selected setup" }, "Save"),
+        h("select", {
+          value: setupSel, name: "setup-pick",
+          onChange: function (e) { setSetupSel(e.target.value); }
+        },
+          h("option", { value: "" }, setups.length ? "— saved setups —" : "— no saved setups —"),
+          setups.map(function (s) {
+            return h("option", { value: s.name, key: s.name }, s.name + "  (" + s.savedAt + ")");
+          })),
+        h("button", { className: "ghost", onClick: loadSetup, title: setupSel ? "Load “" + setupSel + "”" : "Load the last-used setup" }, "Load"),
+        setupSel ? h("button", { className: "mini danger", onClick: deleteSetup, title: "Delete “" + setupSel + "”" }, "×") : null,
         RESET_LABELS[step]
           ? h("button", { className: "ghost", onClick: resetCurrent }, RESET_LABELS[step])
           : null

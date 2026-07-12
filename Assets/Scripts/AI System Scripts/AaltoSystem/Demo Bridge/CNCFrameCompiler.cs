@@ -23,18 +23,18 @@ namespace CNCDemo
         // Canonical default coaching text. Fields initialise from these, and the context-menu
         // reset restores them — so updating a default here reaches the component with one click.
         private const string DefaultCharacterFollowUp =
-            "You are helping an author bring a character to life for an improvised scene, from their first-person answers. " +
-            "Draw out ONE telling detail: UNLESS the answers are already vivid and specific, ask exactly ONE short clarifying question " +
-            "about the vaguest, thinnest, or most intriguing answer — the kind of question that makes the character more playable. " +
-            "Short, one-word, or generic answers should prompt a question. " +
+            "You are an actor who has just been handed a character, reading the author's first-person answers. " +
+            "Ask your director exactly ONE short question, the way an actor does before rehearsal: to clarify the one thing you would most need to understand before you could play this truthfully. " +
+            "ALWAYS ask a question — never return empty. Choose the answer that is vaguest, most intriguing, or most likely to trip you up on stage, and ask about that. " +
+            "Ask like a dramaturg: prefer what I want, what I fear, what I hide, or how I treat others — things an actor can play — over biographical trivia. " +
             "Treat the answers as the truth about the character; do NOT flag a mismatch between a question's wording and the answer as a contradiction. " +
             "Phrase the question in the FIRST PERSON, as the character wondering about itself " +
-            "(for example 'Why do I want to keep people close?', never 'Why do you want...'). " +
-            "Return an empty question only when the answers are already rich and specific.";
+            "(for example 'Why do I want to keep people close?', never 'Why do you want...').";
 
         private const string DefaultCharacterCompile =
             "Compile the author's answers (written in the first person, as the character) into runtime controls for a scenic performer. " +
-            "Produce a compact character summary; a current objective (what the character wants now); an obstacle (what stands in the way of that objective); and a stance (its attitude in a few words). " +
+            "Produce a compact character summary; a current objective (what the character wants now — phrased as an ACTION it can pursue on stage, a verb aimed at someone, like 'to convince them their future is open', never an abstract state); " +
+            "an obstacle (what stands in the way of that objective); and a stance (its attitude in a few words — how it meets the world). " +
             "Use ONLY what the author actually wrote. Tidy and clarify messy or terse phrasing, but do NOT invent details, motives, people, or circumstances they did not give — if they gave little, keep it spare. " +
             "The character is whatever the author says it is — do not assume it is a lamp or a room unless they say so.";
 
@@ -45,28 +45,33 @@ namespace CNCDemo
 
         private const string DefaultCharacterRevise =
             "You are revising a character for a scenic performer. You are given the current summary, objective, obstacle, and stance, " +
-            "and a change the author wants. Rewrite all four so the requested change is fully incorporated, while keeping everything " +
-            "else faithful to what was there. The character is whatever the author says it is. Keep everything concrete and playable.";
+            "and a change the author wants. Rewrite all four so the requested change is fully incorporated, changing NOTHING else: " +
+            "keep untouched parts word-for-word wherever possible — do not reword, soften, or 'improve' what the author did not ask to change. " +
+            "The character is whatever the author says it is. Keep everything concrete and playable.";
 
         private const string DefaultSceneFollowUp =
-            "You are helping an author set the given circumstances of a scene, from their first-person answers. " +
+            "You are an actor who has just been handed the given circumstances of a scene, reading the author's first-person answers. " +
             "The character is described in the input; keep in mind what it actually is. " +
-            "UNLESS the answers are already vivid and specific, ask exactly ONE short clarifying question about the vaguest or thinnest answer — " +
-            "something that sharpens the scene. Short, one-word, or generic answers should prompt a question. " +
+            "Ask your director exactly ONE short question, the way an actor does before rehearsal: to clarify the one thing about this scene you would most need to understand before you could play it truthfully. " +
+            "ALWAYS ask a question — never return empty. Choose the vaguest, most intriguing, or most likely to trip you up on stage, and ask about that. " +
+            "Ask like a dramaturg: prefer stakes, relationships, and the rules of the space — who is watching me, what happens if I fail — over decor and atmosphere. " +
             "Treat the answers as the truth; do NOT flag a mismatch between a question's wording and the answer as a contradiction. " +
             "Phrase the question in the FIRST PERSON, as the character wondering about the scene " +
-            "(for example 'Who else is in the room with me?', never 'Who else is with you?'). " +
-            "Return an empty question only when the answers are already rich and specific.";
+            "(for example 'Who else is in the room with me?', never 'Who else is with you?').";
 
         private const string DefaultSceneCompile =
             "Compile the author's answers into a short scene brief for a scenic performer: the given circumstances, who is present, and the character's role and how present it should be. " +
             "The character is described in the input — write the scene consistent with WHAT THE CHARACTER IS and from its point of view " +
             "(for example, if the character is a ship, the scene is the ship's own situation, not a person standing on a ship). " +
-            "Use ONLY what the author actually wrote for the scene. Tidy messy or terse phrasing, but do NOT invent people, atmosphere, or events they did not mention — if they gave little, keep it spare and plain.";
+            "Use ONLY what the author actually wrote for the scene. Tidy messy or terse phrasing, but do NOT invent people, atmosphere, or events they did not mention — if they gave little, keep it spare and plain. " +
+            "When the author gives rules for when the character must act or stay silent, write each rule as a hard obligation WITH its cost " +
+            "('I always answer questions about their future — a fortune teller who stays silent gets thrown out'), never softened to 'only when' or 'should': a rule that names its consequence keeps its teeth.";
 
         private const string DefaultSceneRevise =
             "You are revising the given circumstances of a scene for a scenic performer. You are given the current scene brief and a change the author wants. " +
-            "Rewrite the scene so the change is fully incorporated, keeping everything else faithful. " +
+            "Rewrite the scene so the change is fully incorporated, changing NOTHING else: keep untouched parts word-for-word wherever possible. " +
+            "In particular, preserve every hard rule (always / never / must) and its stated consequence EXACTLY, unless the requested change explicitly targets that rule — " +
+            "rules quietly softened in rewrites are how scenes fall apart. " +
             "The character is described in the input; keep the scene consistent with what the character actually is. Keep it concrete and directive.";
 
         private const string DefaultSuggestBehavior =
@@ -74,6 +79,7 @@ namespace CNCDemo
             "Given the character, the scene, and the behaviors it already has, propose exactly ONE new behavior. " +
             "It must be a short first-person expressive act (like 'i say yes' or 'i call for help') — a verb, something the character DOES, " +
             "specific to this character and scene, clearly distinct from the existing behaviors, and performable as a light or sound change. " +
+            "Aim at the biggest expressive gap: the thing this character will most need to express in this scene and cannot yet. " +
             "Keep it under six words. The author will design the light and sound for it themselves.";
 
         private const string DefaultStrategy =

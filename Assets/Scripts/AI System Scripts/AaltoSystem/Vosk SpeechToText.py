@@ -279,7 +279,46 @@ def send_osc(ip: str, port: int, args: Sequence[object], address: str = OSC_ADDR
 
 # -------------------- App --------------------
 
+# Vosk requires 16 kHz mono. Many mics (especially under WASAPI, which will not resample)
+# only open at their native rate — so we capture at the device rate and downsample here.
 SAMPLE_RATE = 16000
+
+try:
+    import numpy as _np
+except Exception:  # numpy ships with sounddevice, but degrade gracefully if absent
+    _np = None
+
+
+def resample_to_16k(pcm16_bytes: bytes, src_rate: int) -> bytes:
+    """Downsample mono int16 PCM from src_rate to 16 kHz. Pass-through when already 16 kHz."""
+    if src_rate == SAMPLE_RATE or not pcm16_bytes:
+        return pcm16_bytes
+    if _np is None:
+        # No numpy: last-resort crude decimation by an integer factor (keeps it running).
+        factor = max(1, round(src_rate / SAMPLE_RATE))
+        return _np_free_decimate(pcm16_bytes, factor) if factor > 1 else pcm16_bytes
+
+    samples = _np.frombuffer(pcm16_bytes, dtype=_np.int16)
+    if samples.size == 0:
+        return pcm16_bytes
+    # Linear interpolation to the exact 16 kHz length — good enough for speech recognition
+    # and dependency-light (no scipy required).
+    out_len = int(round(samples.size * SAMPLE_RATE / src_rate))
+    if out_len <= 0:
+        return b""
+    x_old = _np.linspace(0.0, 1.0, num=samples.size, endpoint=False)
+    x_new = _np.linspace(0.0, 1.0, num=out_len, endpoint=False)
+    resampled = _np.interp(x_new, x_old, samples.astype(_np.float32))
+    return resampled.astype(_np.int16).tobytes()
+
+
+def _np_free_decimate(pcm16_bytes: bytes, factor: int) -> bytes:
+    # Keep every Nth 2-byte sample. Only used if numpy is somehow unavailable.
+    out = bytearray()
+    step = 2 * factor
+    for i in range(0, len(pcm16_bytes) - 1, step):
+        out += pcm16_bytes[i:i + 2]
+    return bytes(out)
 
 
 class VoskOscApp:
@@ -295,6 +334,7 @@ class VoskOscApp:
         self.stream: sd.InputStream | None = None
         self.model: vosk.Model | None = None
         self.recognizer: vosk.KaldiRecognizer | None = None
+        self.capture_rate = SAMPLE_RATE  # actual device rate we opened; audio is resampled to 16 kHz
 
         # ---------- UI: config ----------
         cfg = tk.Frame(root)
@@ -546,13 +586,55 @@ class VoskOscApp:
             self._log(f"[FAIL] OSC test failed: {e}")
 
     # ---------- Mic listing ----------
+    # Host APIs that give a clean, (near-)exclusive capture from the chosen device.
+    # MME/DirectShow route through the Windows shared mixer, so they can pick up system
+    # audio and never truly go silent — we still list them, but rank them last.
+    _HOST_API_RANK = {"Windows WASAPI": 0, "Windows DirectSound": 1, "Windows WDM-KS": 2, "MME": 3}
+
+    # Preferred default mic, matched by NAME not index — indices reshuffle when USB devices are
+    # plugged/unplugged, so "device 25" is fragile; the name "Line (... USB Audio CODEC ...)" is
+    # the real USB mic on this rig (NOT the noisy "USB 2.0 Camera" mic). First substring that
+    # matches an input device wins; falls back to the cleanest device if none match.
+    PREFERRED_MIC_NAMES = ("USB Audio CODEC",)
+
     def _list_mics(self) -> list[str]:
+        # IMPORTANT: the label must carry the REAL device index (enumerate position is not it —
+        # the device list has gaps). We prefix each entry with its true sounddevice index.
         items: list[str] = []
         devices = sd.query_devices()
-        for i, d in enumerate(devices):
-            if d.get("max_input_channels", 0) > 0:
-                items.append(f"{i}: {d.get('name','(unknown)')}")
+        try:
+            default_in = sd.default.device[0]
+        except Exception:
+            default_in = None
+
+        rows: list[tuple[int, int, str]] = []  # (host_rank, device_index, label)
+        for idx, d in enumerate(devices):
+            if d.get("max_input_channels", 0) <= 0:
+                continue
+            try:
+                host = sd.query_hostapis(d["hostapi"]).get("name", "?")
+            except Exception:
+                host = "?"
+            rank = self._HOST_API_RANK.get(host, 9)
+            name = d.get("name", "(unknown)")
+            star = " *" if idx == default_in else ""
+            label = f"{idx}: {name}  [{host}]{star}"
+            rows.append((rank, idx, label))
+
+        # Cleanest host APIs first, so the top of the list is the safe default.
+        rows.sort(key=lambda r: (r[0], r[1]))
+        items = [label for _, _, label in rows]
         return items or ["(no input devices)"]
+
+    def _default_mic_label(self, items: list[str]) -> str:
+        # Prefer the first entry whose name contains a preferred substring (the real USB mic),
+        # so we don't default to the noisy camera mic or the system default. Since the list is
+        # already sorted cleanest-host-first, the first match is also the best host API for it.
+        for want in self.PREFERRED_MIC_NAMES:
+            for label in items:
+                if want.lower() in label.lower():
+                    return label
+        return items[0]  # nothing preferred present — fall back to the cleanest device
 
     def refresh_mics(self) -> None:
         menu = self.mic_menu["menu"]
@@ -560,14 +642,20 @@ class VoskOscApp:
         items = self._list_mics()
         for it in items:
             menu.add_command(label=it, command=lambda v=it: self.mic_var.set(v))
-        self.mic_var.set(items[0])
+        chosen = self._default_mic_label(items)
+        self.mic_var.set(chosen)
+        if chosen != items[0]:
+            self._log(f"[mic] Defaulted to preferred mic: {chosen}")
         self._log("Mic list refreshed.")
 
     def _selected_mic_index(self) -> int | None:
+        # Label shape is "<index>: <name>  [<host>]". Take only the leading integer, so a
+        # device name that itself contains a colon can't corrupt the parse.
         sel = self.mic_var.get()
+        head = sel.split(":", 1)[0].strip()
         try:
-            return int(sel.split(":")[0]) if ":" in sel else None
-        except Exception:
+            return int(head)
+        except (ValueError, TypeError):
             return None
 
     def _safe_channel(self) -> int:
@@ -635,11 +723,40 @@ class VoskOscApp:
             return
 
         mic_index = self._selected_mic_index()
+        if mic_index is None:
+            self._log("[error] No microphone selected. Pick one from the Mic list and try again.")
+            return
 
-        # Start audio stream
+        # Report exactly which device we are about to open — so a silent fallback to the
+        # system default (the old bug) can never happen unnoticed again.
+        try:
+            dev = sd.query_devices(mic_index)
+            host = sd.query_hostapis(dev["hostapi"]).get("name", "?")
+            native_rate = int(dev.get("default_samplerate", SAMPLE_RATE)) or SAMPLE_RATE
+            self._log(f"[mic] Opening device {mic_index}: {dev.get('name','?')}  [{host}]")
+        except Exception as e:
+            self._log(f"[error] Selected mic index {mic_index} is not a valid device: {e}")
+            self._log("Click 'Refresh mics' and pick again.")
+            return
+
+        # Choose a rate the device actually accepts. Prefer 16 kHz (no resampling needed);
+        # otherwise fall back to the device's native rate and downsample in the worker — this
+        # is what lets clean WASAPI capture work, since WASAPI refuses to resample for us.
+        capture_rate = SAMPLE_RATE
+        try:
+            sd.check_input_settings(device=mic_index, samplerate=SAMPLE_RATE, channels=1, dtype="int16")
+        except Exception:
+            capture_rate = native_rate
+            self._log(f"[mic] Device won't open at 16 kHz; capturing at {capture_rate} Hz and downsampling.")
+            if _np is None:
+                self._log("[warn] numpy not found — using crude decimation. `pip install numpy` for clean audio.")
+        self.capture_rate = capture_rate
+
+        # Start audio stream. device is an explicit int index now, so PortAudio cannot fall
+        # back to the default input on us.
         try:
             self.stream = sd.InputStream(
-                samplerate=SAMPLE_RATE,
+                samplerate=capture_rate,
                 channels=1,
                 dtype="int16",
                 callback=self.audio_callback,
@@ -647,7 +764,9 @@ class VoskOscApp:
             )
             self.stream.start()
         except Exception as e:
-            self._log(f"[error] Failed to start audio stream: {e}")
+            self._log(f"[error] Failed to start audio stream on device {mic_index}: {e}")
+            self._log("Try a different host API for the same mic (a DirectSound entry for this mic often opens when WASAPI won't),")
+            self._log("or 'Refresh mics' and pick again.")
             self._log("macOS note: check System Settings -> Privacy & Security -> Microphone -> enable Terminal/IDE.")
             return
 
@@ -684,6 +803,9 @@ class VoskOscApp:
                 audio = self.audio_q.get(timeout=0.25)
             except queue.Empty:
                 continue
+
+            # Vosk needs 16 kHz; the stream may be running at the device's native rate.
+            audio = resample_to_16k(audio, self.capture_rate)
 
             try:
                 if self.recognizer.AcceptWaveform(audio):

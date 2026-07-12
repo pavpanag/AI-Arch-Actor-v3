@@ -532,14 +532,48 @@ namespace CNCDemo
                     break;
 
                 case "/api/session/save":
+                {
+                    var name = GetField(body, "name");
                     WriteJson(ctx, 200, RunOnMainThread(() =>
-                        "{\"status\":\"" + (SaveSession() ? "Setup saved" : "save failed") + "\"}"));
+                    {
+                        var ok = SaveSession(name);
+                        var what = string.IsNullOrWhiteSpace(name) ? "Setup saved" : "Saved “" + SanitizeSetupName(name) + "”";
+                        return "{\"status\":\"" + (ok ? Escape(what) : "save failed") + "\"," +
+                               "\"setups\":" + BuildSetupsArrayJson() + "}";
+                    }));
                     break;
+                }
 
                 case "/api/session/load":
+                {
+                    var name = GetField(body, "name");
                     WriteJson(ctx, 200, RunOnMainThread(() =>
-                        "{\"loaded\":" + (LoadSessionFromFile() ? "true" : "false") + "}"));
+                        "{\"loaded\":" + (LoadSetupByName(name) ? "true" : "false") + "}"));
                     break;
+                }
+
+                case "/api/session/list":
+                    WriteJson(ctx, 200, RunOnMainThread(() =>
+                        "{\"setups\":" + BuildSetupsArrayJson() + ",\"current\":\"" + Escape(_currentSetupName) + "\"}"));
+                    break;
+
+                case "/api/session/delete":
+                {
+                    var name = GetField(body, "name");
+                    WriteJson(ctx, 200, RunOnMainThread(() =>
+                    {
+                        try
+                        {
+                            var path = SetupFilePath(name);
+                            if (File.Exists(path)) File.Delete(path);
+                            if (string.Equals(_currentSetupName, SanitizeSetupName(name), StringComparison.OrdinalIgnoreCase))
+                                _currentSetupName = string.Empty;   // its file is gone; the state stays on stage, unnamed
+                        }
+                        catch (Exception ex) { Debug.LogWarning("[CNCDemoBridge] setup delete failed: " + ex.Message); }
+                        return "{\"setups\":" + BuildSetupsArrayJson() + ",\"current\":\"" + Escape(_currentSetupName) + "\"}";
+                    }));
+                    break;
+                }
 
                 case "/api/expression/list":
                     WriteJson(ctx, 200, RunOnMainThread(BuildExpressionListJson));
@@ -1347,14 +1381,14 @@ namespace CNCDemo
             public string actingStrategy;         // the actor's prepared plan for this scene
             public List<CNCBehaviorSpec> behaviors = new List<CNCBehaviorSpec>();
             public string mode; public float holdSeconds; public string neutralColorHex; public float neutralBrightness;
-            public string performerCoaching;   // (model is pinned to gpt-5.4 — old files' "model" key is ignored)
-            public string charFollowup, charCompile, charEnrich, charRevise;
-            public string sceneFollowup, sceneCompile, sceneEnrich, sceneRevise, suggest;
-            public string strategyPrompt, notesPrompt, discussPrompt;
+            // NOTE: coaching prompts are deliberately NOT part of setups anymore. They are system
+            // configuration, owned by the Technical tab — old files' prompt keys are ignored on
+            // load, so a stale setup can never quietly reinstall outdated coaching.
             public string hueTarget;
             public List<CNCLightMap> hueMappings;
             public List<FrameQuestion> charItems;
             public List<FrameQuestion> sceneItems;
+            public string setupName;   // which named setup this state came from
         }
 
         private SessionState BuildSessionState()
@@ -1378,40 +1412,96 @@ namespace CNCDemo
                 s.neutralColorHex = Actuator.NeutralColorHex;
                 s.neutralBrightness = Actuator.NeutralBrightness;
             }
-            s.performerCoaching = PerformerCoaching;
-            if (FrameCompiler != null)
-            {
-                s.charFollowup = FrameCompiler.CharacterFollowUpPrompt; s.charCompile = FrameCompiler.CharacterCompilePrompt;
-                s.charEnrich = FrameCompiler.CharacterEnrichPrompt; s.charRevise = FrameCompiler.CharacterRevisePrompt;
-                s.sceneFollowup = FrameCompiler.SceneFollowUpPrompt; s.sceneCompile = FrameCompiler.SceneCompilePrompt;
-                s.sceneEnrich = FrameCompiler.SceneEnrichPrompt; s.sceneRevise = FrameCompiler.SceneRevisePrompt;
-                s.suggest = FrameCompiler.SuggestBehaviorPrompt;
-                s.strategyPrompt = FrameCompiler.StrategyPrompt; s.notesPrompt = FrameCompiler.TakeNotesPrompt;
-                s.discussPrompt = FrameCompiler.ScoreDiscussPrompt;
-            }
             if (Projector != null) { s.hueTarget = Projector.BulbIds; s.hueMappings = Projector.Mappings; }
             s.charItems = _lastCharacterItems;
             s.sceneItems = _lastSceneItems;
+            s.setupName = _currentSetupName;
             return s;
         }
 
-        private bool SaveSession()
+        // Named setups live as their own files; cnc_session.json stays the "current state" copy
+        // that boot auto-restores — every save/load also refreshes it, so after a restart you're
+        // back in whatever setup you last touched.
+        private string SetupsDirPath => Path.Combine(Application.persistentDataPath, "cnc_setups");
+        private string SetupFilePath(string name) => Path.Combine(SetupsDirPath, SanitizeSetupName(name) + ".json");
+
+        // Which named setup is currently "on stage" — travels inside the saved json too, so the
+        // console's picker still shows the right name after a page reload or a Unity restart.
+        private string _currentSetupName = string.Empty;
+
+        private static string SanitizeSetupName(string name)
         {
-            try { File.WriteAllText(SessionFilePath, JsonUtility.ToJson(BuildSessionState(), true)); return true; }
+            var trimmed = (name ?? string.Empty).Trim();
+            var sb = new StringBuilder();
+            foreach (var c in trimmed)
+                sb.Append(char.IsLetterOrDigit(c) || c == ' ' || c == '-' || c == '_' ? c : '-');
+            var safe = sb.ToString().Trim();
+            if (safe.Length > 40) safe = safe.Substring(0, 40).Trim();
+            return string.IsNullOrWhiteSpace(safe) ? "setup" : safe;
+        }
+
+        private bool SaveSession(string name = null)
+        {
+            try
+            {
+                // Adopt the name BEFORE building the state, so the saved json carries it.
+                if (!string.IsNullOrWhiteSpace(name)) _currentSetupName = SanitizeSetupName(name);
+                var json = JsonUtility.ToJson(BuildSessionState(), true);
+                File.WriteAllText(SessionFilePath, json);   // boot-restore copy
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    Directory.CreateDirectory(SetupsDirPath);
+                    File.WriteAllText(SetupFilePath(name), json);
+                }
+                return true;
+            }
             catch (Exception ex) { Debug.LogError("[CNCDemoBridge] session save failed: " + ex.Message); return false; }
         }
 
-        private bool LoadSessionFromFile()
+        /// <summary>Loads a named setup ("" = the boot-restore quick slot) and makes it current.</summary>
+        private bool LoadSetupByName(string name)
         {
-            if (!File.Exists(SessionFilePath)) return false;
+            var path = string.IsNullOrWhiteSpace(name) ? SessionFilePath : SetupFilePath(name);
+            if (!File.Exists(path)) return false;
             try
             {
-                var s = JsonUtility.FromJson<SessionState>(File.ReadAllText(SessionFilePath));
+                var json = File.ReadAllText(path);
+                var s = JsonUtility.FromJson<SessionState>(json);
                 if (s == null) return false;
                 ApplySessionState(s);
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    _currentSetupName = SanitizeSetupName(name);    // explicit load wins over the json's field
+                    File.WriteAllText(SessionFilePath, json);       // boot restores the last-loaded setup
+                }
                 return true;
             }
-            catch (Exception ex) { Debug.LogError("[CNCDemoBridge] session load failed: " + ex.Message); return false; }
+            catch (Exception ex) { Debug.LogError("[CNCDemoBridge] setup load failed: " + ex.Message); return false; }
+        }
+
+        private bool LoadSessionFromFile() => LoadSetupByName(null);
+
+        private string BuildSetupsArrayJson()
+        {
+            var sb = new StringBuilder("[");
+            try
+            {
+                if (Directory.Exists(SetupsDirPath))
+                {
+                    var files = new DirectoryInfo(SetupsDirPath).GetFiles("*.json");
+                    Array.Sort(files, (a, b) => b.LastWriteTimeUtc.CompareTo(a.LastWriteTimeUtc));
+                    var first = true;
+                    foreach (var f in files)
+                    {
+                        if (!first) sb.Append(",");
+                        first = false;
+                        sb.Append("{\"name\":\"").Append(Escape(Path.GetFileNameWithoutExtension(f.Name))).Append("\",");
+                        sb.Append("\"savedAt\":\"").Append(Escape(f.LastWriteTime.ToString("d MMM HH:mm"))).Append("\"}");
+                    }
+                }
+            }
+            catch (Exception ex) { Debug.LogWarning("[CNCDemoBridge] setup list failed: " + ex.Message); }
+            return sb.Append("]").ToString();
         }
 
         private void ApplySessionState(SessionState s)
@@ -1438,27 +1528,13 @@ namespace CNCDemo
             }
             else if (s.behaviors != null) SyncRegistryFromList(s.behaviors);
 
-            if (!string.IsNullOrEmpty(s.performerCoaching)) { PerformerCoaching = s.performerCoaching; ApplyPerformerPrompt(); }
-            if (FrameCompiler != null)
-            {
-                if (!string.IsNullOrEmpty(s.charFollowup)) FrameCompiler.CharacterFollowUpPrompt = s.charFollowup;
-                if (!string.IsNullOrEmpty(s.charCompile)) FrameCompiler.CharacterCompilePrompt = s.charCompile;
-                if (!string.IsNullOrEmpty(s.charEnrich)) FrameCompiler.CharacterEnrichPrompt = s.charEnrich;
-                if (!string.IsNullOrEmpty(s.charRevise)) FrameCompiler.CharacterRevisePrompt = s.charRevise;
-                if (!string.IsNullOrEmpty(s.sceneFollowup)) FrameCompiler.SceneFollowUpPrompt = s.sceneFollowup;
-                if (!string.IsNullOrEmpty(s.sceneCompile)) FrameCompiler.SceneCompilePrompt = s.sceneCompile;
-                if (!string.IsNullOrEmpty(s.sceneEnrich)) FrameCompiler.SceneEnrichPrompt = s.sceneEnrich;
-                if (!string.IsNullOrEmpty(s.sceneRevise)) FrameCompiler.SceneRevisePrompt = s.sceneRevise;
-                if (!string.IsNullOrEmpty(s.suggest)) FrameCompiler.SuggestBehaviorPrompt = s.suggest;
-                if (!string.IsNullOrEmpty(s.strategyPrompt)) FrameCompiler.StrategyPrompt = s.strategyPrompt;
-                if (!string.IsNullOrEmpty(s.notesPrompt)) FrameCompiler.TakeNotesPrompt = s.notesPrompt;
-                if (!string.IsNullOrEmpty(s.discussPrompt)) FrameCompiler.ScoreDiscussPrompt = s.discussPrompt;
-            }
+            // (Coaching prompts intentionally not restored — the Technical tab owns them.)
             if (Projector != null)
             {
                 if (!string.IsNullOrEmpty(s.hueTarget)) Projector.BulbIds = s.hueTarget;
                 if (s.hueMappings != null) Projector.SetMappings(s.hueMappings);
             }
+            if (!string.IsNullOrEmpty(s.setupName)) _currentSetupName = s.setupName;
             if (!string.IsNullOrEmpty(s.summaryRaw)) _lastSummaryRaw = s.summaryRaw;
             if (!string.IsNullOrEmpty(s.obstacle)) _lastObstacle = s.obstacle;
             if (s.charItems != null && s.charItems.Count > 0) _lastCharacterItems = s.charItems;

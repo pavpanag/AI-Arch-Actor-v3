@@ -2497,6 +2497,117 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
+--- !u!1 &955837887
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 955837888}
+  - component: {fileID: 955837891}
+  - component: {fileID: 955837890}
+  - component: {fileID: 955837889}
+  m_Layer: 0
+  m_Name: Sphere
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &955837888
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 955837887}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 3.79, y: -2.96, z: 0.29}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2121339673}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!135 &955837889
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 955837887}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Radius: 0.5
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!23 &955837890
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 955837887}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &955837891
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 955837887}
+  m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1 &971328200
 GameObject:
   m_ObjectHideFlags: 0
@@ -3232,6 +3343,9 @@ GameObject:
   - component: {fileID: 1127299783}
   - component: {fileID: 1127299786}
   - component: {fileID: 1127299787}
+  - component: {fileID: 1127299789}
+  - component: {fileID: 1127299788}
+  - component: {fileID: 1127299790}
   m_Layer: 0
   m_Name: Demo Bridge
   m_TagString: Untagged
@@ -3302,6 +3416,53 @@ MonoBehaviour:
     and scene, clearly distinct from the existing behaviors, and performable as a
     light or sound change. Keep it under six words. The author will design the light
     and sound for it themselves."
+  StrategyPrompt: "You are an actor preparing your score for a scene: the few practical
+    playing decisions you will hold onto while performing. You are given the character,
+    the scene, and the fixed actions you can perform. The character and the scene
+    will be in your hands again on stage, every turn \u2014 do NOT restate them.
+    The score records only what preparation adds: (1) what each action means in my
+    hands in this scene, and when I spend it \u2014 checked against how it will land
+    right after the other's likely lines, since an action is read as a reply to the
+    line before it (a 'yes' right after an accusation reads as agreement, not defense);
+    (2) when I act and when I hold still \u2014 silence is a choice with a meaning,
+    not a refuge; (3) one line on how I play the scene's central tension while pursuing
+    my objective \u2014 my obstacle raises the stakes, it is never the goal. Write
+    in the first person, as the character. Never contradict the scene's explicit
+    directions. Keep it under 120 words \u2014 decisions, not description."
+  TakeNotesPrompt: "You are the director giving notes after a run-through to an actor
+    who performs only through a fixed vocabulary of actions. You are given the character,
+    the scene, the score the actor prepared (possibly none), and the transcript of
+    the take \u2014 each turn with the action chosen and the actor's own reasoning.
+    Judge the take in this order: (1) did it follow the scene's explicit directions;
+    (2) did it truly pursue the objective, or did it drift \u2014 for example turning
+    the obstacle into the goal, or retreating into safe inaction; (3) did the scene
+    develop and stay interesting; (4) were the actions used with consistent, readable
+    meanings. Write short notes tied to specific moments \u2014 quote the actor's
+    lines. If the take reveals a CONTRADICTION between the authored materials \u2014
+    the scene's rules, the character's impulses, the score \u2014 do NOT resolve
+    it silently: name both readings in the notes, base your rewritten score on the
+    reading you find most faithful and say which you chose, and raise it as a dilemma
+    for the director \u2014 a short question with two or three concrete options,
+    each option naming the action or rule it implies. If the contradiction lives
+    in the scene itself, say plainly in the notes that the scene needs amending \u2014
+    a score change alone will not hold. If there is no real contradiction, return
+    no dilemmas. Then rewrite the score so the next take keeps what worked and fixes
+    what did not: a complete rewrite in the character's first person, under 120 words,
+    only playing decisions (action meanings, when to act or hold still, how to play
+    the tension) \u2014 never an appended patch, and never a restatement of the character
+    or scene, which the actor is handed separately every turn. Finally, list each
+    concrete change you made to the score and why, one short sentence per change.
+    If the take was strong, say so and keep the changes minimal."
+  ScoreDiscussPrompt: "You are the actor, between takes, discussing your score with
+    the director. You are given your character, the scene, your available actions,
+    your current score, the take so far (if any), the conversation so far, and the
+    director's latest message. Reply in the first person, as the actor \u2014 brief
+    and concrete, one to three sentences. If the director's feedback is clear enough
+    to act on, ALSO rewrite your score to fully incorporate it: a complete rewrite
+    under 120 words that keeps everything that still holds \u2014 only playing decisions,
+    never a restatement of the character or scene. If the feedback is ambiguous,
+    ask ONE short clarifying question \u2014 propose the rule you think they mean
+    \u2014 and leave the score unchanged. Never contradict the scene's explicit directions."
   LastFollowUp: 
   LastCompiled: 
   LastStatus: 
@@ -3446,6 +3607,59 @@ MonoBehaviour:
   NeutralBrightness: 0.12
   LastApplied: 
   LastSoundStatus: 
+--- !u!114 &1127299788
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1127299782}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 380dcc58577de6146ad5c35d3e3b6577, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AaltoSystem::CNCDemo.CNCTranscriberLauncher
+  LaunchOnStart: 1
+  CloseOnExit: 1
+  PythonExe: 
+  ScriptPath: 
+  Status: 
+--- !u!114 &1127299789
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1127299782}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a5c0f663e7e374c4e87bda335eaa56a5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AaltoSystem::CNCDemo.CNCSpeechOscReceiver
+  Performer: {fileID: 830374541}
+  EnableListener: 1
+  SpeechPort: 3333
+  ExpectedAddress: /speech
+  Status: 
+  LastHeard: 
+  TotalReceived: 0
+--- !u!114 &1127299790
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1127299782}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7e4d354a578e6984dac4337ac89fe76a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AaltoSystem::CNCDemo.CNCTrackingLauncher
+  LaunchOnEnable: 1
+  CloseOnDisable: 1
+  PythonExe: 
+  ScriptPath: 
+  Status: 
 --- !u!1 &1160957610
 GameObject:
   m_ObjectHideFlags: 0
@@ -3527,7 +3741,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f0550900ab338423c9d337bf2bc4afb7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OSC
-  inPort: 3333
+  inPort: 3334
   outIP: 127.0.0.1
   outPort: 4444
   DebugLogPackets: 0
@@ -5281,7 +5495,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1fac4b19d672b3c48b5c14cbc468a4a1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HotSpotDetector
-  sampler: {fileID: 0}
+  sampler: {fileID: 871430987}
   useSamplerBounds: 1
   fixedMin: {x: -5, y: -5}
   fixedMax: {x: 5, y: 5}
@@ -6612,6 +6826,61 @@ MonoBehaviour:
   m_ChildScaleWidth: 0
   m_ChildScaleHeight: 0
   m_ReverseArrangement: 0
+--- !u!1 &2121339671
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2121339673}
+  - component: {fileID: 2121339672}
+  m_Layer: 0
+  m_Name: POI
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!114 &2121339672
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2121339671}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 62195cdee8adc5f4dadee9bed1c1c11d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AaltoSystem::CNCDemo.CNCProximityLight
+  Radius: 3
+  WatchNamePrefix: TrackedPerson_
+  AlsoWatch: []
+  TargetLight: {fileID: 1347566416}
+  OnColor: {r: 0.21568628, g: 0.21568628, b: 0.21568628, a: 1}
+  OnIntensity: 9.91
+  FadeSpeed: 7.91
+  GlowRenderer: {fileID: 0}
+  SomeoneClose: 0
+  NearestName: 
+--- !u!4 &2121339673
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2121339671}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -3.9, y: 2.9, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 955837888}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2141083975
 GameObject:
   m_ObjectHideFlags: 0
@@ -6861,3 +7130,4 @@ SceneRoots:
   - {fileID: 1578428142}
   - {fileID: 1626101198}
   - {fileID: 1127299785}
+  - {fileID: 2121339673}
