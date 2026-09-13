@@ -52,6 +52,7 @@ public class ConversationWithLight : MonoBehaviour
     public Light sceneLight;
 
     [Header("OpenAI")]
+    [Tooltip("Optional override. Normally leave empty — the key is resolved centrally by OpenAIKeyStore (saved key file, else OPENAI_API_KEY env var).")]
     public string apiKey = "";
     public string model = "gpt-4o-mini"; // use gpt-4o / gpt-4o-mini for response_format
 
@@ -100,12 +101,19 @@ public class ConversationWithLight : MonoBehaviour
 
         UnityEngine.Debug.Log("Request body: " + body);
 
+        string resolvedKey = OpenAIKeyStore.Resolve(apiKey);
+        if (string.IsNullOrEmpty(resolvedKey))
+        {
+            if (conversationLog) conversationLog.text += "\nError: no OpenAI API key found (see OpenAIKeyStore).";
+            yield break;
+        }
+
         using (var req = new UnityWebRequest("https://api.openai.com/v1/chat/completions", "POST"))
         {
             req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body));
             req.downloadHandler = new DownloadHandlerBuffer();
             req.SetRequestHeader("Content-Type", "application/json");
-            req.SetRequestHeader("Authorization", "Bearer " + apiKey);
+            req.SetRequestHeader("Authorization", "Bearer " + resolvedKey);
 
             yield return req.SendWebRequest();
 
