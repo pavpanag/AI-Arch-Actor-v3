@@ -10,7 +10,7 @@ from pythonosc import udp_client
 
 # Load API key securely
 
-api_key = os.getenv("OPENAI_API_KEY1")
+api_key = os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY1")
 
 
 

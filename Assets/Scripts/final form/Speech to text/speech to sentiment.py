@@ -3,7 +3,7 @@ import os
 import speech_recognition as sr
 
 # Load API key securely
-api_key = os.getenv("OPENAI_API_KEY1")
+api_key = os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY1")
 
 def transcribe_speech():
     """Captures audio from the microphone and converts it to text."""

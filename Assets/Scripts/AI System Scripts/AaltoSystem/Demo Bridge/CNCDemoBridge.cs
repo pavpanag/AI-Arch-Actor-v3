@@ -485,7 +485,7 @@ namespace CNCDemo
                     {
                         if (!string.IsNullOrWhiteSpace(key))
                         {
-                            try { File.WriteAllText(ApiKeyFilePath, key.Trim()); }
+                            try { OpenAIKeyStore.Save(key); }
                             catch (Exception ex) { return "{\"status\":\"save failed: " + Escape(ex.Message) + "\",\"keyStatus\":\"" + Escape(_apiKeyStatus) + "\"}"; }
                             ApplyApiKeyToClients(key.Trim());
                             _apiKeyStatus = "set (saved) ••••" + Last4(key.Trim());
@@ -1541,31 +1541,18 @@ namespace CNCDemo
             if (s.sceneItems != null && s.sceneItems.Count > 0) _lastSceneItems = s.sceneItems;
         }
 
-        // --- OpenAI API key (kept OUT of git: env var, else an untracked local file) ----------
+        // --- OpenAI API key (kept OUT of git; resolution lives in OpenAIKeyStore) ----------
 
         private string _apiKeyStatus = "not set";
 
-        // Outside the project entirely (Application.persistentDataPath) — never committed.
-        private string ApiKeyFilePath => Path.Combine(Application.persistentDataPath, "cnc_openai_key.txt");
-
         /// <summary>
-        /// On boot: the key saved from the Technical tab wins (an explicit user action);
-        /// the OPENAI_API_KEY env var is only a fallback when nothing was saved. (A stale
-        /// env var silently overriding the pasted key caused "it doesn't keep my key".)
+        /// On boot: resolve via the central OpenAIKeyStore (the key saved from the
+        /// Technical tab wins — an explicit user action; the OPENAI_API_KEY env var
+        /// is only a fallback when nothing was saved).
         /// </summary>
         private void LoadAndApplyApiKey()
         {
-            string key = null, source = null;
-            if (File.Exists(ApiKeyFilePath))
-            {
-                try { key = File.ReadAllText(ApiKeyFilePath).Trim(); source = "saved"; } catch { }
-            }
-            if (string.IsNullOrWhiteSpace(key))
-            {
-                var env = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-                if (!string.IsNullOrWhiteSpace(env)) { key = env.Trim(); source = "env var"; }
-            }
-
+            var key = OpenAIKeyStore.Resolve(null, out var source);
             if (!string.IsNullOrWhiteSpace(key))
             {
                 ApplyApiKeyToClients(key);

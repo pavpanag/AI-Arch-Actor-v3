@@ -56,7 +56,7 @@ public class POIStateDirector : MonoBehaviour
     public bool includeAgentIds = false;
 
     [Header("LLM / OpenAI Settings")]
-    [Tooltip("Your OpenAI API key (kept local).")]
+    [Tooltip("Optional override. Normally leave empty — the key is resolved centrally by OpenAIKeyStore (saved key file, else OPENAI_API_KEY env var).")]
     public string apiKey = "";
     [InspectorName("Model (OpenAI Dropdown)")]
     public OpenAIModelPreset model = OpenAIModelPreset.Gpt4oMini;
@@ -184,9 +184,10 @@ public class POIStateDirector : MonoBehaviour
 
     IEnumerator SendPOISummaryToLLM()
     {
-        if (string.IsNullOrEmpty(apiKey))
+        string resolvedKey = OpenAIKeyStore.Resolve(apiKey);
+        if (string.IsNullOrEmpty(resolvedKey))
         {
-            Debug.LogWarning("POIStateDirector: apiKey is empty, skipping send.");
+            Debug.LogWarning("POIStateDirector: no OpenAI API key found (save one via OpenAIKeyStore or set OPENAI_API_KEY), skipping send.");
             yield break;
         }
 
@@ -280,7 +281,7 @@ public class POIStateDirector : MonoBehaviour
                 req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body));
                 req.downloadHandler = new DownloadHandlerBuffer();
                 req.SetRequestHeader("Content-Type", "application/json");
-                req.SetRequestHeader("Authorization", "Bearer " + apiKey);
+                req.SetRequestHeader("Authorization", "Bearer " + resolvedKey);
 
                 yield return req.SendWebRequest();
 

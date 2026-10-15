@@ -8,7 +8,7 @@ import tkinter as tk
 from tkinter import scrolledtext, ttk
 
 # OpenAI & Philips Hue Configuration
-api_key = os.getenv("OPENAI_API_KEY1")
+api_key = os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY1")
 BRIDGE_IP = "192.168.1.9"
 USER_API = "0fLeSuFEFbk1UV2ehHFZKAyOBDL7dlSbE2szNqwR"
 MODEL = "gpt-3.5-turbo"

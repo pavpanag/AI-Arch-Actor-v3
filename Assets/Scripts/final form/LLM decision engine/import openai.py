@@ -3,7 +3,7 @@ import speech_recognition as sr
 import openai
 
 # Load API key securely
-api_key = os.getenv("OPENAI_API_KEY1")
+api_key = os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY1")
 
 def transcribe_speech(device_index=1):  # Default mic index set to 1
     """Captures audio from the microphone and converts it to text."""

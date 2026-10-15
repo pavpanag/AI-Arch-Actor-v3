@@ -81,7 +81,8 @@ namespace DirectingSystem
         public int mediumUpper = 66;
 
         [Header("OpenAI")]
-        public string apiKey = "";           
+        [Tooltip("Optional override. Normally leave empty — the key is resolved centrally by OpenAIKeyStore (saved key file, else OPENAI_API_KEY env var).")]
+        public string apiKey = "";
         [InspectorName("Model (OpenAI Dropdown)")]
         public OpenAIModelPreset model = OpenAIModelPreset.Gpt4oMini; 
 
@@ -169,12 +170,19 @@ namespace DirectingSystem
             UnityEngine.Debug.Log(body);
             UnityEngine.Debug.Log("=========================");
 
+            string resolvedKey = OpenAIKeyStore.Resolve(apiKey);
+            if (string.IsNullOrEmpty(resolvedKey))
+            {
+                UnityEngine.Debug.LogWarning("DirectingLight: no OpenAI API key found (save one via OpenAIKeyStore or set OPENAI_API_KEY).");
+                yield break;
+            }
+
             using (var req = new UnityWebRequest("https://api.openai.com/v1/chat/completions", "POST"))
             {
                 req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body));
                 req.downloadHandler = new DownloadHandlerBuffer();
                 req.SetRequestHeader("Content-Type", "application/json");
-                req.SetRequestHeader("Authorization", "Bearer " + apiKey);
+                req.SetRequestHeader("Authorization", "Bearer " + resolvedKey);
 
                 yield return req.SendWebRequest();
 

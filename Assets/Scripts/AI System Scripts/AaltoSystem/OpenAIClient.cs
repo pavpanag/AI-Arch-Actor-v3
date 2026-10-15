@@ -60,8 +60,8 @@ static class ExternalEditorPathFixer
 
 public sealed class OpenAIClient : MonoBehaviour
 {
-    [Header("Auth (temporary: Inspector)")]
-    [Tooltip("OpenAI API key (starts with sk-...). Stored in scene/prefab; replace later.")]
+    [Header("Auth")]
+    [Tooltip("Optional override. Normally leave empty — the key is resolved centrally by OpenAIKeyStore (saved key file, else OPENAI_API_KEY env var).")]
     public string ApiKey;
 
     [Header("Defaults")]
@@ -102,8 +102,9 @@ public sealed class OpenAIClient : MonoBehaviour
         float? temperature = null,
         string contextTag = "Unspecified")
     {
-        if (string.IsNullOrWhiteSpace(ApiKey))
-            throw new Exception("OpenAIClient.ApiKey is empty (set it in the Inspector).");
+        var apiKey = OpenAIKeyStore.Resolve(ApiKey);
+        if (string.IsNullOrWhiteSpace(apiKey))
+            throw new Exception("No OpenAI API key found. Save one from the demo's Technical tab or set the OPENAI_API_KEY environment variable (see OpenAIKeyStore).");
 
         var usedModel = string.IsNullOrWhiteSpace(model) ? DefaultModel : model;
         var usedTemp = (temperature ?? Temperature);
@@ -152,7 +153,7 @@ public sealed class OpenAIClient : MonoBehaviour
             req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(payload));
             req.downloadHandler = new DownloadHandlerBuffer();
             req.SetRequestHeader("Content-Type", "application/json");
-            req.SetRequestHeader("Authorization", $"Bearer {ApiKey.Trim()}");
+            req.SetRequestHeader("Authorization", $"Bearer {apiKey}");
 
             await Send(req);
 

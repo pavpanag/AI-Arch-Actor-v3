@@ -4,7 +4,7 @@ import speech_recognition as sr
 from pythonosc import udp_client
 
 # Load API key securely
-api_key = os.getenv("OPENAI_API_KEY1")
+api_key = os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY1")
 
 # OSC client setup
 osc_client = udp_client.SimpleUDPClient("127.0.0.1", 8000)

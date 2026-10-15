@@ -4,7 +4,7 @@ import speech_recognition as sr
 import openai
 
 # OpenAI & Philips Hue Configuration
-api_key = os.getenv("OPENAI_API_KEY1")  # OpenAI API key from environment
+api_key = os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY1")  # OpenAI API key from environment
 BRIDGE_IP = "192.168.1.106"
 USER_API = "0fLeSuFEFbk1UV2ehHFZKAyOBDL7dlSbE2szNqwR"
 LIGHT_ID = 5  # Controlling Light 5
